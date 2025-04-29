@@ -1,0 +1,16 @@
+{
+  "name": "kidsfight",
+  "version": "1.0.0",
+  "description": "Cartoon-style fighting game using Phaser JS",
+  "scripts": {
+    "start": "npx http-server .",
+    "test": "jest"
+  },
+  "dependencies": {
+    "phaser": "^3.60.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}

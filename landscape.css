@@ -1,0 +1,28 @@
+/* Overlay for landscape mode requirement */
+#landscape-overlay {
+  display: none;
+  position: fixed;
+  z-index: 99999;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.92);
+  color: #fff;
+  font-size: 2rem;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-family: sans-serif;
+}
+#landscape-overlay.visible {
+  display: flex;
+}
+#landscape-overlay img {
+  width: 80px;
+  margin-bottom: 24px;
+  animation: rotateIcon 1.2s infinite ease-in-out alternate;
+}
+
+@keyframes rotateIcon {
+  0% { transform: rotate(-25deg); }
+  100% { transform: rotate(25deg); }
+}
