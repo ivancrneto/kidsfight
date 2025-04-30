@@ -80,6 +80,14 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   create() {
+    // --- RESET ALL GAME STATE ON RESTART ---
+    this.gameOver = false;
+    this.player1State = 'idle';
+    this.player2State = 'idle';
+    this.lastAttackTime = [0, 0];
+    this.attackCount = [0, 0];
+    this.lungeTimer = [0, 0];
+    this.timeLeft = 60;
     // console.log('[DEBUG] create() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
     // --- CREATE CUSTOM SPRITESHEETS FIRST ---
     // Player 1
@@ -474,6 +482,7 @@ class KidsFightScene extends Phaser.Scene {
 
 
   update(time, delta) {
+    if (this.gameOver) return;
     // --- SPECIAL PIPS UPDATE LOGIC ---
     // Helper: update special pips and indicators for a player
     const updateSpecialPips = (playerIdx) => {
@@ -618,7 +627,7 @@ class KidsFightScene extends Phaser.Scene {
         this.player1.anims.currentAnim?.key === 'p1_walk' &&
         !this.gameOver
       ) {
-        this.player1.play('p1_idle', true);
+        if (!this.gameOver) this.player1.play('p1_idle', true);
       }
     }
     // Player 2 movement
@@ -654,7 +663,7 @@ class KidsFightScene extends Phaser.Scene {
         this.player2.anims.currentAnim?.key === 'p2_walk' &&
         !this.gameOver
       ) {
-        this.player2.play('p2_idle', true);
+        if (!this.gameOver) this.player2.play('p2_idle', true);
       }
     }
 
@@ -669,7 +678,8 @@ class KidsFightScene extends Phaser.Scene {
         }
       } else {
         if (this.player1State !== 'idle') {
-          this.player1.play('p1_idle', true);
+          // Only play idle if game is not over
+          if (!this.gameOver) this.player1.play('p1_idle', true);
           this.player1State = 'idle';
 // console.log('[DEBUG] player1State set to:', this.player1State);
         }
@@ -687,7 +697,8 @@ class KidsFightScene extends Phaser.Scene {
         }
       } else {
         if (this.player2State !== 'idle') {
-          this.player2.play('p2_idle', true);
+          // Only play idle if game is not over
+          if (!this.gameOver) this.player2.play('p2_idle', true);
           this.player2.setFlipX(true);
           this.player2State = 'idle';
         }
@@ -722,7 +733,7 @@ class KidsFightScene extends Phaser.Scene {
         this.healthBar2.width = 200 * healthRatio;
         // Manually switch to idle after 400ms
         this.time.delayedCall(400, () => {
-          if (this.player1State === 'attack') {
+          if (this.player1State === 'attack' && !this.gameOver) {
             this.player1.play('p1_idle', true);
             this.player1State = 'idle';
             // console.log('[DEBUG] player1State set to:', this.player1State);
@@ -747,13 +758,13 @@ class KidsFightScene extends Phaser.Scene {
       this.healthBar2.width = 200 * healthRatio;
       this.showSpecialEffect(this.player1.x, this.player1.y - 60);
       this.time.delayedCall(700, () => {
-        if (this.player1State === 'special') {
-          this.player1.play('p1_idle', true);
-          this.player1State = 'idle';
-          // Reset special pips after special is used
-          this.attackCount[0] = 0;
-        }
-      });
+         if (this.player1State === 'special' && !this.gameOver) {
+           this.player1.play('p1_idle', true);
+           this.player1State = 'idle';
+           // Reset special pips after special is used
+           this.attackCount[0] = 0;
+         }
+       });
     }
 
     // Player 2 attack (; key or K key or touch)
@@ -772,11 +783,11 @@ class KidsFightScene extends Phaser.Scene {
       const healthRatio1 = Math.max(0, this.player1.health / MAX_HEALTH);
       this.healthBar1.width = 200 * healthRatio1;
       this.time.delayedCall(400, () => {
-        if (this.player2State === 'attack') {
-          this.player2.play('p2_idle', true);
-          this.player2State = 'idle';
-        }
-      });
+         if (this.player2State === 'attack' && !this.gameOver) {
+           this.player2.play('p2_idle', true);
+           this.player2State = 'idle';
+         }
+       });
     }
 
     // Player 2 special (L key or touch)
@@ -796,7 +807,7 @@ class KidsFightScene extends Phaser.Scene {
       this.healthBar1.width = 200 * healthRatio1;
       this.showSpecialEffect(this.player2.x, this.player2.y - 60);
       this.time.delayedCall(700, () => {
-        if (this.player2State === 'special') {
+        if (this.player2State === 'special' && !this.gameOver) {
           this.player2.play('p2_idle', true);
           this.player2State = 'idle';
           // Reset special pips after special is used
@@ -839,12 +850,91 @@ class KidsFightScene extends Phaser.Scene {
       alpha: 1,
       duration: 400
     });
-    // Optionally, stop all player movement/animations
+
+    // --- Add 'Jogar Novamente' button ---
+    const btnY = this.cameras.main.height / 2 + 90;
+    const playAgainBtn = this.add.text(
+      this.cameras.main.width / 2,
+      btnY,
+      'Jogar Novamente',
+      {
+        fontSize: '32px',
+        color: '#fff',
+        backgroundColor: '#44aaff',
+        fontFamily: 'monospace',
+        padding: { left: 32, right: 32, top: 12, bottom: 12 },
+        align: 'center',
+        stroke: '#000',
+        strokeThickness: 6,
+        borderRadius: 16,
+        fixedWidth: 320
+      }
+    )
+      .setOrigin(0.5)
+      .setDepth(10002)
+      .setAlpha(0)
+      .setInteractive({ useHandCursor: true });
+    this.tweens.add({
+      targets: playAgainBtn,
+      alpha: 1,
+      duration: 400,
+      delay: 200
+    });
+    playAgainBtn.on('pointerdown', () => {
+      winText.destroy();
+      playAgainBtn.destroy();
+      this.scene.restart();
+    });
+    // Winner celebrates, loser lays down
+    if (this.player1 && this.player2) {
+      const p1Dead = this.player1.health <= 0;
+      const p2Dead = this.player2.health <= 0;
+      if (p1Dead && !p2Dead) {
+        // Player 2 wins
+        this.player2.setFrame(3); // Winner celebrates
+        this.player2.setFlipX(true);
+        this.player2.setAngle(0);
+        this.player1.setFrame(4); // Loser lays down (frame 4)
+        this.player1.setFlipX(false);
+        this.player1.setAngle(270);
+        this.showSpecialEffect(this.player1.x, this.player1.y);
+      } else if (p2Dead && !p1Dead) {
+        // Player 1 wins
+        this.player1.setFrame(3); // Winner celebrates
+        this.player1.setFlipX(false);
+        this.player1.setAngle(0);
+        this.player2.setFrame(4); // Loser lays down (frame 4)
+        this.player2.setFlipX(true);
+        this.player2.setAngle(270);
+        this.showSpecialEffect(this.player2.x, this.player2.y);
+      } else {
+        // Draw or both dead: both use frame 5
+        this.player1.setFrame(5); // Both use frame 5 for draw
+        this.player1.setFlipX(false);
+        // No rotation for draw
+        this.player2.setFrame(5);
+        this.player2.setFlipX(true);
+        // No rotation for draw
+        this.showSpecialEffect(this.player1.x, this.player1.y);
+        this.showSpecialEffect(this.player2.x, this.player2.y);
+      }
+    }
     if (this.player1 && this.player1.anims) this.player1.anims.stop();
     if (this.player2 && this.player2.anims) this.player2.anims.stop();
-    // Optionally, you could add a restart button or auto-restart after a delay here
+
+    // Freeze winner in frame 3 (celebration) after win
+    if (this.player1.frame.name === 3) {
+      this.player1.setFrame(3);
+    }
+    if (this.player2.frame.name === 3) {
+      this.player2.setFrame(3);
+    }
+
+    // Do not remove input listeners; rely on this.gameOver = true to block input after game over.
+    // This avoids breaking keyboard input after scene restart.
   }
 }
+
 
 
 
