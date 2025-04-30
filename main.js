@@ -4,7 +4,7 @@ import player1RawImg from './sprites-bento3.png?url';
 import player2RawImg from './sprites-davir3.png?url';
 
 // Import pure utilities for testability
-import { updateSceneLayout, applyGameCss, tryAttack } from './gameUtils';
+import { updateSceneLayout, applyGameCss, tryAttack } from './gameUtils.mjs';
 
 
 // Dynamically set game size based on viewport, accounting for mobile browser UI
@@ -88,6 +88,7 @@ class KidsFightScene extends Phaser.Scene {
     this.attackCount = [0, 0];
     this.lungeTimer = [0, 0];
     this.timeLeft = 60;
+    this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
     // console.log('[DEBUG] create() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
     // --- CREATE CUSTOM SPRITESHEETS FIRST ---
     // Player 1
@@ -216,7 +217,8 @@ class KidsFightScene extends Phaser.Scene {
   // --- EFFECTS ---
   // --- PLAYER SPAWN LOGIC (moved from orphaned code) ---
   const playerSprites = ['player1', 'player2'];
-  const scale = 0.4;
+  // Responsive player scale based on height (target ~38% of screen height)
+  const scale = (GAME_HEIGHT * 0.38) / 512;
   const frameHeight = 512;
   const player1FrameWidths = [300, 300, 430, 580, 580, 440, 440, 440];
 
@@ -226,10 +228,9 @@ class KidsFightScene extends Phaser.Scene {
   const bodyHeight = frameHeight * scale;
   // player.y is the center, so set: playerY = GAME_HEIGHT - (this.textures.get('player1').getSourceImage().height * scale) / 2;
 // But we can use the actual sprite height after creation for precision
-  let playerY;
-  // We'll set playerY after creating the sprite and scaling it.
-  const PLATFORM_Y = 230;
-  const PLATFORM_HEIGHT = 20;
+  // Responsive platform position and height
+  const PLATFORM_Y = GAME_HEIGHT * 0.7; // 70% down the screen (lower for desktop)
+  const PLATFORM_HEIGHT = GAME_HEIGHT * 0.045; // 4.5% of screen height
   // Add background image
   
   bg.displayWidth = GAME_WIDTH;
@@ -250,7 +251,11 @@ class KidsFightScene extends Phaser.Scene {
   const p1Key = playerSpritesSafe[selectedSafe.p1] || 'player1';
   const p2Key = playerSpritesSafe[selectedSafe.p2] || 'player2';
   const PLAYER_PLATFORM_OFFSET = 20;
-  this.player1 = this.physics.add.sprite(200, PLATFORM_Y + PLAYER_PLATFORM_OFFSET, p1Key, 0);
+  // Responsive player spawn positions
+  const p1X = GAME_WIDTH * 0.25;
+  const p2X = GAME_WIDTH * 0.75;
+  const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
+  this.player1 = this.physics.add.sprite(p1X, playerY, p1Key, 0);
   this.player1.setScale(scale);
   this.player1.setOrigin(0.5, 1); // bottom center
   this.player1.body.setSize(this.player1.displayWidth, this.player1.displayHeight);
@@ -259,10 +264,9 @@ class KidsFightScene extends Phaser.Scene {
   this.physics.add.collider(this.player1, platform);
   this.player1.setCollideWorldBounds(true);
   this.player1.setBounce(0.1);
-  this.player1.health = MAX_HEALTH;
   this.player1.facing = 1;
 
-      this.player2 = this.physics.add.sprite(600, PLATFORM_Y + PLAYER_PLATFORM_OFFSET, p2Key, 0);
+  this.player2 = this.physics.add.sprite(p2X, playerY, p2Key, 0);
   this.player2.setScale(scale);
   this.player2.setOrigin(0.5, 1); // bottom center
   this.player2.body.setSize(this.player2.displayWidth, this.player2.displayHeight);
@@ -271,7 +275,6 @@ class KidsFightScene extends Phaser.Scene {
   this.physics.add.collider(this.player2, platform);
   this.player2.setCollideWorldBounds(true);
   this.player2.setBounce(0.1);
-  this.player2.health = MAX_HEALTH;
   this.player2.facing = -1;
   this.player2.setFlipX(true); // Invert horizontally
 
@@ -568,21 +571,32 @@ class KidsFightScene extends Phaser.Scene {
     }
     // Update timer display
     if (this.timerText) this.timerText.setText(Math.ceil(this.timeLeft));
+
+    // Invert frames if players cross each other
+    if (this.player1 && this.player2) {
+      if (this.player1.x > this.player2.x) {
+        this.player1.setFlipX(true);  // Face left
+        this.player2.setFlipX(false); // Face right
+      } else {
+        this.player1.setFlipX(false); // Face right
+        this.player2.setFlipX(true);  // Face left
+      }
+    }
     // Check win/lose by health
     // Health-based win detection
     if (!this.gameOver && this.player1 && this.player2) {
-      if (this.player1.health <= 0) {
+      if (this.playerHealth[0] <= 0) {
         this.endGame('Davi R Venceu!');
         return;
-      } else if (this.player2.health <= 0) {
+      } else if (this.playerHealth[1] <= 0) {
         this.endGame('Bento Venceu!');
         return;
       }
     }
     if (this.timeLeft === 0) {
-      if (this.player1.health > this.player2.health) {
+      if (this.playerHealth[0] > this.playerHealth[1]) {
         this.endGame('Bento Venceu!');
-      } else if (this.player2.health > this.player1.health) {
+      } else if (this.playerHealth[1] > this.playerHealth[0]) {
         this.endGame('Davi R Venceu!');
       } else {
         this.endGame('Empate!');
@@ -718,6 +732,7 @@ class KidsFightScene extends Phaser.Scene {
     // console.log('[DEBUG] Attack condition:', attackCondition, 'isDown:', this.keys.v.isDown, 'lastAttackTime:', this.lastAttackTime?.[0], 'now:', now, '_touchJustPressedP1A:', this._touchJustPressedP1A);
     // Player 1 attack (V key or touch)
     if (attackCondition) {
+      // Always reset touch flag after attack (fixes mobile bug)
       this._touchJustPressedP1A = false;
       // console.log('[DEBUG] Attack block entered, player1:', this.player1);
       // Now always allowed to attack here, no further state check needed
@@ -727,9 +742,10 @@ class KidsFightScene extends Phaser.Scene {
         this.player1State = 'attack';
         // console.log('[DEBUG] player1State set to:', this.player1State);
         // Deal damage to player2 if in range
+        console.log('[DEBUG-BEFORE] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
         tryAttack(this, 0, this.player1, this.player2, now, false);
-        // Update health bar for player2
-        const healthRatio = Math.max(0, this.player2.health / MAX_HEALTH);
+        console.log('[DEBUG-AFTER] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
+        const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
         this.healthBar2.width = 200 * healthRatio;
         // Manually switch to idle after 400ms
         this.time.delayedCall(400, () => {
@@ -754,7 +770,7 @@ class KidsFightScene extends Phaser.Scene {
       this.player1.play('p1_special', true);
       this.player1State = 'special';
       tryAttack(this, 0, this.player1, this.player2, now, true);
-      const healthRatio = Math.max(0, this.player2.health / MAX_HEALTH);
+      const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
       this.healthBar2.width = 200 * healthRatio;
       this.showSpecialEffect(this.player1.x, this.player1.y - 60);
       this.time.delayedCall(700, () => {
@@ -776,11 +792,13 @@ class KidsFightScene extends Phaser.Scene {
       this.player2State !== 'special'
     ) || (this._touchJustPressedP2A && this.player2State !== 'attack' && this.player2State !== 'special');
     if (attackConditionP2) {
+      // Always reset touch flag after attack (fixes mobile bug for Player 2)
       this._touchJustPressedP2A = false;
       this.player2.play('p2_attack', true);
       this.player2State = 'attack';
+      // console.log('[DEBUG] Player 2 attack');
       tryAttack(this, 1, this.player2, this.player1, now, false);
-      const healthRatio1 = Math.max(0, this.player1.health / MAX_HEALTH);
+      const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
       this.healthBar1.width = 200 * healthRatio1;
       this.time.delayedCall(400, () => {
          if (this.player2State === 'attack' && !this.gameOver) {
@@ -803,7 +821,7 @@ class KidsFightScene extends Phaser.Scene {
       this.player2.play('p2_special', true);
       this.player2State = 'special';
       tryAttack(this, 1, this.player2, this.player1, now, true);
-      const healthRatio1 = Math.max(0, this.player1.health / MAX_HEALTH);
+      const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
       this.healthBar1.width = 200 * healthRatio1;
       this.showSpecialEffect(this.player2.x, this.player2.y - 60);
       this.time.delayedCall(700, () => {
@@ -858,16 +876,15 @@ class KidsFightScene extends Phaser.Scene {
       btnY,
       'Jogar Novamente',
       {
-        fontSize: '32px',
+        fontSize: '48px',
         color: '#fff',
         backgroundColor: '#44aaff',
         fontFamily: 'monospace',
-        padding: { left: 32, right: 32, top: 12, bottom: 12 },
+        padding: { left: 48, right: 48, top: 24, bottom: 24 },
         align: 'center',
         stroke: '#000',
-        strokeThickness: 6,
-        borderRadius: 16,
-        fixedWidth: 320
+        strokeThickness: 8,
+        borderRadius: 24
       }
     )
       .setOrigin(0.5)
@@ -887,8 +904,8 @@ class KidsFightScene extends Phaser.Scene {
     });
     // Winner celebrates, loser lays down
     if (this.player1 && this.player2) {
-      const p1Dead = this.player1.health <= 0;
-      const p2Dead = this.player2.health <= 0;
+      const p1Dead = this.playerHealth[0] <= 0;
+      const p2Dead = this.playerHealth[1] <= 0;
       if (p1Dead && !p2Dead) {
         // Player 2 wins
         this.player2.setFrame(3); // Winner celebrates

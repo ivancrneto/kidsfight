@@ -676,7 +676,7 @@ var _spritesBento3PngUrlDefault = parcelHelpers.interopDefault(_spritesBento3Png
 var _spritesDavir3PngUrl = require("./sprites-davir3.png?url");
 var _spritesDavir3PngUrlDefault = parcelHelpers.interopDefault(_spritesDavir3PngUrl);
 // Import pure utilities for testability
-var _gameUtils = require("./gameUtils");
+var _gameUtilsMjs = require("./gameUtils.mjs");
 // Dynamically set game size based on viewport, accounting for mobile browser UI
 const GAME_WIDTH = window.innerWidth;
 const GAME_HEIGHT = window.innerHeight;
@@ -770,6 +770,10 @@ class KidsFightScene extends Phaser.Scene {
             0
         ];
         this.timeLeft = 60;
+        this.playerHealth = [
+            MAX_HEALTH,
+            MAX_HEALTH
+        ];
         // console.log('[DEBUG] create() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
         // --- CREATE CUSTOM SPRITESHEETS FIRST ---
         // Player 1
@@ -983,7 +987,8 @@ class KidsFightScene extends Phaser.Scene {
             'player1',
             'player2'
         ];
-        const scale = 0.4;
+        // Responsive player scale based on height (target ~38% of screen height)
+        const scale = GAME_HEIGHT * 0.38 / 512;
         const frameHeight = 512;
         const player1FrameWidths = [
             300,
@@ -1001,10 +1006,9 @@ class KidsFightScene extends Phaser.Scene {
         const bodyHeight = frameHeight * scale;
         // player.y is the center, so set: playerY = GAME_HEIGHT - (this.textures.get('player1').getSourceImage().height * scale) / 2;
         // But we can use the actual sprite height after creation for precision
-        let playerY;
-        // We'll set playerY after creating the sprite and scaling it.
-        const PLATFORM_Y = 230;
-        const PLATFORM_HEIGHT = 20;
+        // Responsive platform position and height
+        const PLATFORM_Y = GAME_HEIGHT * 0.7; // 70% down the screen (lower for desktop)
+        const PLATFORM_HEIGHT = GAME_HEIGHT * 0.045; // 4.5% of screen height
         // Add background image
         bg.displayWidth = GAME_WIDTH;
         bg.displayHeight = GAME_HEIGHT;
@@ -1025,7 +1029,11 @@ class KidsFightScene extends Phaser.Scene {
         const p1Key = playerSpritesSafe[selectedSafe.p1] || 'player1';
         const p2Key = playerSpritesSafe[selectedSafe.p2] || 'player2';
         const PLAYER_PLATFORM_OFFSET = 20;
-        this.player1 = this.physics.add.sprite(200, PLATFORM_Y + PLAYER_PLATFORM_OFFSET, p1Key, 0);
+        // Responsive player spawn positions
+        const p1X = GAME_WIDTH * 0.25;
+        const p2X = GAME_WIDTH * 0.75;
+        const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
+        this.player1 = this.physics.add.sprite(p1X, playerY, p1Key, 0);
         this.player1.setScale(scale);
         this.player1.setOrigin(0.5, 1); // bottom center
         this.player1.body.setSize(this.player1.displayWidth, this.player1.displayHeight);
@@ -1034,9 +1042,8 @@ class KidsFightScene extends Phaser.Scene {
         this.physics.add.collider(this.player1, platform);
         this.player1.setCollideWorldBounds(true);
         this.player1.setBounce(0.1);
-        this.player1.health = MAX_HEALTH;
         this.player1.facing = 1;
-        this.player2 = this.physics.add.sprite(600, PLATFORM_Y + PLAYER_PLATFORM_OFFSET, p2Key, 0);
+        this.player2 = this.physics.add.sprite(p2X, playerY, p2Key, 0);
         this.player2.setScale(scale);
         this.player2.setOrigin(0.5, 1); // bottom center
         this.player2.body.setSize(this.player2.displayWidth, this.player2.displayHeight);
@@ -1045,7 +1052,6 @@ class KidsFightScene extends Phaser.Scene {
         this.physics.add.collider(this.player2, platform);
         this.player2.setCollideWorldBounds(true);
         this.player2.setBounce(0.1);
-        this.player2.health = MAX_HEALTH;
         this.player2.facing = -1;
         this.player2.setFlipX(true); // Invert horizontally
         // Player 1 Animations (custom frames)
@@ -1291,7 +1297,7 @@ class KidsFightScene extends Phaser.Scene {
         this.updateSceneLayout();
         // Listen for Phaser's resize event and re-apply CSS AND update layout
         this.scale.on('resize', ()=>{
-            if (typeof (0, _gameUtils.applyGameCss) === 'function') (0, _gameUtils.applyGameCss)();
+            if (typeof (0, _gameUtilsMjs.applyGameCss) === 'function') (0, _gameUtilsMjs.applyGameCss)();
             if (typeof this.updateSceneLayout === 'function') this.updateSceneLayout();
         });
     }
@@ -1359,20 +1365,30 @@ class KidsFightScene extends Phaser.Scene {
         }
         // Update timer display
         if (this.timerText) this.timerText.setText(Math.ceil(this.timeLeft));
+        // Invert frames if players cross each other
+        if (this.player1 && this.player2) {
+            if (this.player1.x > this.player2.x) {
+                this.player1.setFlipX(true); // Face left
+                this.player2.setFlipX(false); // Face right
+            } else {
+                this.player1.setFlipX(false); // Face right
+                this.player2.setFlipX(true); // Face left
+            }
+        }
         // Check win/lose by health
         // Health-based win detection
         if (!this.gameOver && this.player1 && this.player2) {
-            if (this.player1.health <= 0) {
+            if (this.playerHealth[0] <= 0) {
                 this.endGame('Davi R Venceu!');
                 return;
-            } else if (this.player2.health <= 0) {
+            } else if (this.playerHealth[1] <= 0) {
                 this.endGame('Bento Venceu!');
                 return;
             }
         }
         if (this.timeLeft === 0) {
-            if (this.player1.health > this.player2.health) this.endGame('Bento Venceu!');
-            else if (this.player2.health > this.player1.health) this.endGame('Davi R Venceu!');
+            if (this.playerHealth[0] > this.playerHealth[1]) this.endGame('Bento Venceu!');
+            else if (this.playerHealth[1] > this.playerHealth[0]) this.endGame('Davi R Venceu!');
             else this.endGame('Empate!');
             return;
         }
@@ -1471,6 +1487,7 @@ class KidsFightScene extends Phaser.Scene {
         // console.log('[DEBUG] Attack condition:', attackCondition, 'isDown:', this.keys.v.isDown, 'lastAttackTime:', this.lastAttackTime?.[0], 'now:', now, '_touchJustPressedP1A:', this._touchJustPressedP1A);
         // Player 1 attack (V key or touch)
         if (attackCondition) {
+            // Always reset touch flag after attack (fixes mobile bug)
             this._touchJustPressedP1A = false;
             // console.log('[DEBUG] Attack block entered, player1:', this.player1);
             // Now always allowed to attack here, no further state check needed
@@ -1480,9 +1497,10 @@ class KidsFightScene extends Phaser.Scene {
             this.player1State = 'attack';
             // console.log('[DEBUG] player1State set to:', this.player1State);
             // Deal damage to player2 if in range
-            (0, _gameUtils.tryAttack)(this, 0, this.player1, this.player2, now, false);
-            // Update health bar for player2
-            const healthRatio = Math.max(0, this.player2.health / MAX_HEALTH);
+            console.log('[DEBUG-BEFORE] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
+            (0, _gameUtilsMjs.tryAttack)(this, 0, this.player1, this.player2, now, false);
+            console.log('[DEBUG-AFTER] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
+            const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
             this.healthBar2.width = 200 * healthRatio;
             // Manually switch to idle after 400ms
             this.time.delayedCall(400, ()=>{
@@ -1499,8 +1517,8 @@ class KidsFightScene extends Phaser.Scene {
             this._touchJustPressedP1S = false;
             this.player1.play('p1_special', true);
             this.player1State = 'special';
-            (0, _gameUtils.tryAttack)(this, 0, this.player1, this.player2, now, true);
-            const healthRatio = Math.max(0, this.player2.health / MAX_HEALTH);
+            (0, _gameUtilsMjs.tryAttack)(this, 0, this.player1, this.player2, now, true);
+            const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
             this.healthBar2.width = 200 * healthRatio;
             this.showSpecialEffect(this.player1.x, this.player1.y - 60);
             this.time.delayedCall(700, ()=>{
@@ -1515,11 +1533,13 @@ class KidsFightScene extends Phaser.Scene {
         // Player 2 attack (; key or K key or touch)
         const attackConditionP2 = this.keys && (this.keys.semicolon && this.keys.semicolon.isDown || this.keys.k && this.keys.k.isDown) && now > (this.lastAttackTime?.[1] || 0) + ATTACK_COOLDOWN && this.player2State !== 'attack' && this.player2State !== 'special' || this._touchJustPressedP2A && this.player2State !== 'attack' && this.player2State !== 'special';
         if (attackConditionP2) {
+            // Always reset touch flag after attack (fixes mobile bug for Player 2)
             this._touchJustPressedP2A = false;
             this.player2.play('p2_attack', true);
             this.player2State = 'attack';
-            (0, _gameUtils.tryAttack)(this, 1, this.player2, this.player1, now, false);
-            const healthRatio1 = Math.max(0, this.player1.health / MAX_HEALTH);
+            // console.log('[DEBUG] Player 2 attack');
+            (0, _gameUtilsMjs.tryAttack)(this, 1, this.player2, this.player1, now, false);
+            const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
             this.healthBar1.width = 200 * healthRatio1;
             this.time.delayedCall(400, ()=>{
                 if (this.player2State === 'attack' && !this.gameOver) {
@@ -1534,8 +1554,8 @@ class KidsFightScene extends Phaser.Scene {
             this._touchJustPressedP2S = false;
             this.player2.play('p2_special', true);
             this.player2State = 'special';
-            (0, _gameUtils.tryAttack)(this, 1, this.player2, this.player1, now, true);
-            const healthRatio1 = Math.max(0, this.player1.health / MAX_HEALTH);
+            (0, _gameUtilsMjs.tryAttack)(this, 1, this.player2, this.player1, now, true);
+            const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
             this.healthBar1.width = 200 * healthRatio1;
             this.showSpecialEffect(this.player2.x, this.player2.y - 60);
             this.time.delayedCall(700, ()=>{
@@ -1549,7 +1569,7 @@ class KidsFightScene extends Phaser.Scene {
         }
     }
     updateSceneLayout() {
-        return (0, _gameUtils.updateSceneLayout)(this);
+        return (0, _gameUtilsMjs.updateSceneLayout)(this);
     }
     // --- GAME OVER HANDLER ---
     endGame(phrase) {
@@ -1581,21 +1601,20 @@ class KidsFightScene extends Phaser.Scene {
         // --- Add 'Jogar Novamente' button ---
         const btnY = this.cameras.main.height / 2 + 90;
         const playAgainBtn = this.add.text(this.cameras.main.width / 2, btnY, 'Jogar Novamente', {
-            fontSize: '32px',
+            fontSize: '48px',
             color: '#fff',
             backgroundColor: '#44aaff',
             fontFamily: 'monospace',
             padding: {
-                left: 32,
-                right: 32,
-                top: 12,
-                bottom: 12
+                left: 48,
+                right: 48,
+                top: 24,
+                bottom: 24
             },
             align: 'center',
             stroke: '#000',
-            strokeThickness: 6,
-            borderRadius: 16,
-            fixedWidth: 320
+            strokeThickness: 8,
+            borderRadius: 24
         }).setOrigin(0.5).setDepth(10002).setAlpha(0).setInteractive({
             useHandCursor: true
         });
@@ -1612,8 +1631,8 @@ class KidsFightScene extends Phaser.Scene {
         });
         // Winner celebrates, loser lays down
         if (this.player1 && this.player2) {
-            const p1Dead = this.player1.health <= 0;
-            const p2Dead = this.player2.health <= 0;
+            const p1Dead = this.playerHealth[0] <= 0;
+            const p2Dead = this.playerHealth[1] <= 0;
             if (p1Dead && !p2Dead) {
                 // Player 2 wins
                 this.player2.setFrame(3); // Winner celebrates
@@ -1658,7 +1677,7 @@ function resizeGame(game) {
     const w = window.innerWidth;
     const h = window.innerHeight;
     game.scale.resize(w, h);
-    (0, _gameUtils.applyGameCss)();
+    (0, _gameUtilsMjs.applyGameCss)();
 }
 // --- Responsive Touch Controls Positioning ---
 KidsFightScene.prototype.updateControlPositions = function() {
@@ -1736,7 +1755,7 @@ window.onload = ()=>{
     window.addEventListener('orientationchange', resizeWithDelay);
 };
 
-},{"./scenario1.png?url":"eRKIU","./sprites-bento3.png?url":"eWn0D","./sprites-davir3.png?url":"li0YK","./gameUtils":"hkDGA","@parcel/transformer-js/src/esmodule-helpers.js":"jnFvT"}],"eRKIU":[function(require,module,exports,__globalThis) {
+},{"./scenario1.png?url":"eRKIU","./sprites-bento3.png?url":"eWn0D","./sprites-davir3.png?url":"li0YK","@parcel/transformer-js/src/esmodule-helpers.js":"jnFvT","./gameUtils.mjs":"jZW3x"}],"eRKIU":[function(require,module,exports,__globalThis) {
 module.exports = module.bundle.resolve("scenario1.b5742409.png") + "?" + Date.now();
 
 },{}],"eWn0D":[function(require,module,exports,__globalThis) {
@@ -1744,93 +1763,6 @@ module.exports = module.bundle.resolve("sprites-bento3.f7d6d963.png") + "?" + Da
 
 },{}],"li0YK":[function(require,module,exports,__globalThis) {
 module.exports = module.bundle.resolve("sprites-davir3.db13ced6.png") + "?" + Date.now();
-
-},{}],"hkDGA":[function(require,module,exports,__globalThis) {
-// Pure game logic utilities for KidsFightScene
-// Layout update logic for scene objects
-function updateSceneLayout(scene) {
-    const w = scene.scale.width;
-    const h = scene.scale.height;
-    // Background
-    if (scene.children && scene.children.list) {
-        const bg = scene.children.list.find((obj)=>obj.texture && obj.texture.key === 'scenario1');
-        if (bg) {
-            bg.setPosition(w / 2, h / 2);
-            bg.displayWidth = w;
-            bg.displayHeight = h;
-        }
-    }
-    // Platform
-    if (scene.children && scene.children.list) {
-        const platformRect = scene.children.list.find((obj)=>obj.type === 'Rectangle' && obj.fillColor === 0x8B5A2B);
-        if (platformRect) {
-            platformRect.setPosition(w / 2, 240);
-            platformRect.displayWidth = w;
-        }
-    }
-    // Camera and world bounds
-    if (scene.cameras && scene.cameras.main && scene.physics && scene.physics.world) {
-        scene.cameras.main.setBounds(0, 0, w, h);
-        scene.physics.world.setBounds(0, 0, w, h);
-    }
-    // Touch controls
-    if (typeof scene.updateControlPositions === 'function') scene.updateControlPositions();
-    // Timer text
-    if (scene.timerText) scene.timerText.setPosition(w / 2, 50);
-}
-// CSS application logic for game canvas and parent
-function applyGameCss() {
-    const canvas = document.querySelector('canvas');
-    const parent = document.getElementById('game-container');
-    if (canvas) {
-        canvas.style.position = 'fixed';
-        canvas.style.left = 'env(safe-area-inset-left, 0px)';
-        canvas.style.top = 'env(safe-area-inset-top, 0px)';
-        canvas.style.width = 'calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
-        canvas.style.height = 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))';
-        canvas.style.maxWidth = '100vw';
-        canvas.style.maxHeight = '100vh';
-        canvas.style.objectFit = 'contain';
-        canvas.style.background = '#222';
-    }
-    if (parent) {
-        parent.style.position = 'fixed';
-        parent.style.left = 'env(safe-area-inset-left, 0px)';
-        parent.style.top = 'env(safe-area-inset-top, 0px)';
-        parent.style.width = '100vw';
-        parent.style.height = '100vh';
-        parent.style.background = '#222';
-        parent.style.overflow = 'hidden';
-    }
-}
-// tryAttack logic (simplified for testability)
-function tryAttack(scene, playerIdx, attacker, defender, now, special) {
-    if (!attacker || !defender) return;
-    const ATTACK_RANGE = 100;
-    const ATTACK_COOLDOWN = 500;
-    if (!scene.lastAttackTime) scene.lastAttackTime = [
-        0,
-        0
-    ];
-    if (!scene.attackCount) scene.attackCount = [
-        0,
-        0
-    ];
-    if (now - scene.lastAttackTime[playerIdx] < ATTACK_COOLDOWN) // console.log('[DEBUG] tryAttack: Attack on cooldown for player', playerIdx);
-    return;
-    if (Math.abs(attacker.x - defender.x) > ATTACK_RANGE) // console.log('[DEBUG] tryAttack: Out of range. Attacker x:', attacker.x, 'Defender x:', defender.x);
-    return;
-    scene.lastAttackTime[playerIdx] = now;
-    scene.attackCount[playerIdx]++;
-    defender.health -= special ? 30 : 10;
-    // console.log('[DEBUG] tryAttack: Defender health after attack:', defender.health);
-    if (scene.cameras && scene.cameras.main && typeof scene.cameras.main.shake === 'function') scene.cameras.main.shake(special ? 250 : 100, special ? 0.03 : 0.01);
-}
-module.exports = {
-    updateSceneLayout,
-    applyGameCss,
-    tryAttack
-};
 
 },{}],"jnFvT":[function(require,module,exports,__globalThis) {
 exports.interopDefault = function(a) {
@@ -1862,6 +1794,151 @@ exports.export = function(dest, destName, get) {
     });
 };
 
-},{}]},["io2N8","bNJxx"], "bNJxx", "parcelRequire7a4b", {}, "./", "/")
+},{}],"jZW3x":[function(require,module,exports,__globalThis) {
+// Pure game logic utilities for KidsFightScene
+// Layout update logic for scene objects
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "updateSceneLayout", ()=>updateSceneLayout);
+parcelHelpers.export(exports, "applyGameCss", ()=>applyGameCss);
+parcelHelpers.export(exports, "tryAttack", ()=>tryAttack);
+function updateSceneLayout(scene) {
+    const w = scene.scale.width;
+    const h = scene.scale.height;
+    // Background
+    if (scene.children && scene.children.list) {
+        const bg = scene.children.list.find((obj)=>obj.texture && obj.texture.key === 'scenario1');
+        if (bg) {
+            bg.setPosition(w / 2, h / 2);
+            bg.displayWidth = w;
+            bg.displayHeight = h;
+        }
+    }
+    // Platform
+    if (scene.children && scene.children.list) {
+        const platformRect = scene.children.list.find((obj)=>obj.type === 'Rectangle' && obj.fillColor === 0x8B5A2B);
+        if (platformRect) {
+            platformRect.setPosition(w / 2, 240);
+            platformRect.displayWidth = w;
+        }
+    }
+    // Camera and world bounds
+    if (scene.cameras && scene.cameras.main && scene.physics && scene.physics.world) {
+        scene.cameras.main.setBounds(0, 0, w, h);
+        scene.physics.world.setBounds(0, 0, w, h);
+    }
+    // Touch controls
+    if (typeof scene.updateControlPositions === 'function') scene.updateControlPositions();
+    // Health bars
+    if (scene.healthBar1 && scene.healthBar2 && scene.healthBar1Border && scene.healthBar2Border) {
+        // Bar width: 25% of screen width, height: 5% of height
+        const barWidth = w * 0.25;
+        const barHeight = h * 0.05;
+        const barY = h * 0.07;
+        const bar1X = w * 0.25;
+        const bar2X = w * 0.75;
+        scene.healthBar1Border.setPosition(bar1X, barY).setSize(barWidth + 4, barHeight + 4);
+        scene.healthBar2Border.setPosition(bar2X, barY).setSize(barWidth + 4, barHeight + 4);
+        scene.healthBar1.setPosition(bar1X, barY).setSize(barWidth, barHeight);
+        scene.healthBar2.setPosition(bar2X, barY).setSize(barWidth, barHeight);
+    }
+    // Special pips (3 per player) - match main.js create()
+    if (scene.specialPips1 && scene.specialPips2) {
+        const barY = h * 0.07;
+        const pipY = barY - h * 0.035; // slightly above health bar
+        const pipR = Math.max(10, h * 0.018); // match create()
+        // Player 1: left, spaced 30px apart at 800px width
+        for(let i = 0; i < 3; i++){
+            const pip1X = w * 0.25 - pipR * 3 + i * pipR * 3;
+            if (scene.specialPips1[i]) scene.specialPips1[i].setPosition(pip1X, pipY).setRadius(pipR);
+        }
+        // Player 2: right, spaced 30px apart at 800px width
+        for(let i = 0; i < 3; i++){
+            const pip2X = w * 0.75 - pipR * 3 + i * pipR * 3;
+            if (scene.specialPips2[i]) scene.specialPips2[i].setPosition(pip2X, pipY).setRadius(pipR);
+        }
+    }
+    // Special ready circles (big S) - match main.js create()
+    if (scene.specialReady1 && scene.specialReadyText1) {
+        const r = Math.max(20, h * 0.045);
+        const x = w * 0.25;
+        const y = h * 0.13;
+        scene.specialReady1.setPosition(x, y).setRadius(r);
+        scene.specialReadyText1.setPosition(x, y);
+    }
+    if (scene.specialReady2 && scene.specialReadyText2) {
+        const r = Math.max(20, h * 0.045);
+        const x = w * 0.75;
+        const y = h * 0.13;
+        scene.specialReady2.setPosition(x, y).setRadius(r);
+        scene.specialReadyText2.setPosition(x, y);
+    }
+    // Timer text
+    if (scene.timerText) {
+        // Font size: min 32px, but scale up for large screens (e.g. 4vw)
+        const fontSize = Math.max(32, Math.round(w * 0.045));
+        scene.timerText.setFontSize(fontSize + 'px');
+        scene.timerText.setPosition(w / 2, h * 0.11);
+    }
+}
+// CSS application logic for game canvas and parent
+function applyGameCss() {
+    const canvas = document.querySelector('canvas');
+    const parent = document.getElementById('game-container');
+    if (canvas) {
+        canvas.style.position = 'fixed';
+        canvas.style.left = 'env(safe-area-inset-left, 0px)';
+        canvas.style.top = 'env(safe-area-inset-top, 0px)';
+        canvas.style.width = 'calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
+        canvas.style.height = 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))';
+        canvas.style.maxWidth = '100vw';
+        canvas.style.maxHeight = '100vh';
+        canvas.style.objectFit = 'contain';
+        canvas.style.background = '#222';
+    }
+    if (parent) {
+        parent.style.position = 'fixed';
+        parent.style.left = 'env(safe-area-inset-left, 0px)';
+        parent.style.top = 'env(safe-area-inset-top, 0px)';
+        parent.style.width = '100vw';
+        parent.style.height = '100vh';
+        parent.style.background = '#222';
+        parent.style.overflow = 'hidden';
+    }
+}
+// tryAttack logic (simplified for testability)
+function tryAttack(scene, playerIdx, attacker, defender, now, special) {
+    // Robustly determine defenderIdx
+    let defenderIdx = undefined;
+    if (defender === scene.player1) defenderIdx = 0;
+    else if (defender === scene.player2) defenderIdx = 1;
+    else {
+        console.error('[TRYATTACK] Could not determine defenderIdx!', defender, scene.player1, scene.player2);
+        return;
+    }
+    console.log('[TRYATTACK] defenderIdx:', defenderIdx, 'playerHealth before:', scene.playerHealth[defenderIdx]);
+    if (!attacker || !defender) return;
+    const ATTACK_RANGE = 180;
+    const ATTACK_COOLDOWN = 500;
+    if (!scene.lastAttackTime) scene.lastAttackTime = [
+        0,
+        0
+    ];
+    if (!scene.attackCount) scene.attackCount = [
+        0,
+        0
+    ];
+    if (now - scene.lastAttackTime[playerIdx] < ATTACK_COOLDOWN) // console.log('[DEBUG] tryAttack: Attack on cooldown for player', playerIdx);
+    return;
+    if (Math.abs(attacker.x - defender.x) > ATTACK_RANGE) // console.log('[DEBUG] tryAttack: Out of range. Attacker x:', attacker.x, 'Defender x:', defender.x);
+    return;
+    scene.lastAttackTime[playerIdx] = now;
+    scene.attackCount[playerIdx]++;
+    scene.playerHealth[defenderIdx] = (typeof scene.playerHealth[defenderIdx] === 'number' ? scene.playerHealth[defenderIdx] : 100) - (special ? 30 : 10);
+    console.log('[TRYATTACK] playerHealth after:', scene.playerHealth[defenderIdx]);
+    if (scene.cameras && scene.cameras.main && typeof scene.cameras.main.shake === 'function') scene.cameras.main.shake(special ? 250 : 100, special ? 0.03 : 0.01);
+}
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"jnFvT"}]},["io2N8","bNJxx"], "bNJxx", "parcelRequire7a4b", {}, "./", "/")
 
 //# sourceMappingURL=kidsfight.36960861.js.map

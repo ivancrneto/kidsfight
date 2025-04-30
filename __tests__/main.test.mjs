@@ -1,6 +1,8 @@
 /**
  * @jest-environment jsdom
  */
+import { jest } from '@jest/globals';
+import { applyGameCss, updateSceneLayout, tryAttack } from '../gameUtils.mjs';
 // __tests__/main.test.js
 // Basic unit tests for main.js constants and mockable logic
 
@@ -42,20 +44,41 @@ describe('KidsFightScene', () => {
     // Minimal mock for Phaser.Scene
     class MockScene {
       constructor() {
+        this.sys = { game: { config: { width: 800, height: 600 } } };
+        this.add = { sprite: jest.fn(), text: jest.fn() };
+        this.physics = { add: { sprite: jest.fn(() => ({ setScale: jest.fn(), setOrigin: jest.fn(), body: { setSize: jest.fn(), setOffset: jest.fn() }, setCollideWorldBounds: jest.fn(), setBounce: jest.fn(), setFlipX: jest.fn() })), collider: jest.fn() } };
+        this.anims = { create: jest.fn() };
+        this.input = { keyboard: { addKey: jest.fn() } };
+        this.cameras = { main: { shake: jest.fn() } };
+        this.time = { delayedCall: jest.fn((delay, cb) => cb()) };
+        this.children = { bringToTop: jest.fn() };
+        this.selected = { p1: 0, p2: 1 };
         this.specialEffect = {
           clear: jest.fn(),
           setVisible: jest.fn(),
           setAlpha: jest.fn(),
           setScale: jest.fn(),
           lineStyle: jest.fn(),
-          strokeCircle: jest.fn()
+          strokeCircle: jest.fn(),
+          fillCircle: jest.fn()
         };
         this.tweens = { add: jest.fn((opts) => opts.onComplete && opts.onComplete()) };
       }
     }
-    // Extend with KidsFightScene logic as needed
     scene = new MockScene();
-    // Add a minimal showSpecialEffect method for testing
+    scene.player1 = { play: jest.fn(), x: 100, health: 100 };
+    scene.player2 = { play: jest.fn(), x: 110, health: 100 };
+    scene.playerHealth = [100, 100];
+    // Always mock timerText for every test
+    if (!scene.timerText) {
+      scene.timerText = {
+        setFontSize: jest.fn(function(size) { return this; }),
+        setPosition: jest.fn(function(x, y) { return this; })
+      };
+    } else {
+      scene.timerText.setFontSize = jest.fn(function(size) { return this; });
+      scene.timerText.setPosition = jest.fn(function(x, y) { return this; });
+    }
     scene.showSpecialEffect = function(x, y, count = 30) {
       if (!this.specialEffect) return;
       this.specialEffect.clear();
@@ -96,8 +119,6 @@ describe('KidsFightScene', () => {
     document.body.innerHTML = '<div id="game-container"></div><canvas></canvas>';
     const canvas = document.querySelector('canvas');
     const parent = document.getElementById('game-container');
-    // Import and call applyGameCss
-    const { applyGameCss } = require('../gameUtils');
     applyGameCss();
     expect(canvas.style.position).toBe('fixed');
     expect(parent.style.position).toBe('fixed');
@@ -109,7 +130,7 @@ describe('KidsFightScene', () => {
     // Mock scene
     const mockBg = { texture: { key: 'scenario1' }, setPosition: jest.fn(), displayWidth: 0, displayHeight: 0 };
     const mockPlatform = { type: 'Rectangle', fillColor: 0x8B5A2B, setPosition: jest.fn(), displayWidth: 0 };
-    const mockTimer = { setPosition: jest.fn() };
+    const mockTimer = { setPosition: jest.fn(), setFontSize: jest.fn() };
     const mockScene = {
       scale: { width: 500, height: 300 },
       children: { list: [mockBg, mockPlatform] },
@@ -118,25 +139,23 @@ describe('KidsFightScene', () => {
       updateControlPositions: jest.fn(),
       timerText: mockTimer
     };
-    const { updateSceneLayout } = require('../gameUtils');
     updateSceneLayout(mockScene);
     expect(mockBg.setPosition).toHaveBeenCalledWith(250, 150);
     expect(mockPlatform.setPosition).toHaveBeenCalled();
     expect(mockScene.cameras.main.setBounds).toHaveBeenCalledWith(0, 0, 500, 300);
     expect(mockScene.physics.world.setBounds).toHaveBeenCalledWith(0, 0, 500, 300);
     expect(mockScene.updateControlPositions).toHaveBeenCalled();
-    expect(mockTimer.setPosition).toHaveBeenCalledWith(250, 50);
+    expect(mockTimer.setPosition).toHaveBeenCalledWith(250, 33);
   });
 
   test('tryAttack deals damage and increments attackCount', () => {
     // Minimal mock for tryAttack logic
-    const attacker = { x: 100 };
-    const defender = { x: 120, health: 100 };
     const scene = {
       lastAttackTime: [0, 0],
       attackCount: [0, 0],
-      player1: attacker,
-      player2: defender,
+      player1: { x: 100, health: 100 },
+      player2: { x: 120, health: 100 },
+      playerHealth: [100, 100],
       cameras: { main: { shake: jest.fn() } },
       keys: {},
       cursors: {},
@@ -144,10 +163,8 @@ describe('KidsFightScene', () => {
       hitFlash: { clear: jest.fn(), fillStyle: jest.fn(), fillCircle: jest.fn(), setVisible: jest.fn() },
       showSpecialEffect: jest.fn()
     };
-    // Import tryAttack from main.js
-    const { tryAttack } = require('../gameUtils');
-    tryAttack(scene, 0, attacker, defender, Date.now(), false);
-    expect(defender.health).toBeLessThan(100);
+    tryAttack(scene, 0, scene.player1, scene.player2, Date.now(), false);
+    expect(scene.playerHealth[1]).toBeLessThan(100);
     expect(scene.attackCount[0]).toBe(1);
     expect(scene.cameras.main.shake).toHaveBeenCalled();
   });

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Cartoon-style fighting game using Phaser JS",
   "scripts": {
-    "start": "parcel serve index.html",
+    "start": "parcel serve index.html --host 0.0.0.0",
     "build": "parcel build index.html",
     "test": "jest"
   },
@@ -17,5 +17,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "parcel": "^2.14.4"
-  }
+  },
+  "type": "module"
 }
+

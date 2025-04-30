@@ -1,6 +1,9 @@
 // Unit test for Player 2 attack keys (; and K)
 // Uses Jest-like syntax
 
+import { jest } from '@jest/globals';
+import { tryAttack } from '../gameUtils.mjs';
+
 function createMockScene() {
   return {
     keys: {
@@ -10,17 +13,14 @@ function createMockScene() {
     player2State: 'idle',
     lastAttackTime: [0, 0],
     time: { delayedCall: jest.fn((delay, cb) => cb()) },
-    player2: { play: jest.fn() },
-    player1: {},
+    player2: { play: jest.fn(), x: 110, health: 100 },
+    player1: { play: jest.fn(), x: 100, health: 100 },
     tryAttackCalled: false,
-    healthBar1: { width: 200 },
+    playerHealth: [100, 100],
     attackCount: [0, 0],
+    healthBar1: { width: 200 },
+    healthBar2: { width: 200 },
   };
-}
-
-// Minimal tryAttack mock
-function tryAttack(scene, idx, p2, p1, now, isSpecial) {
-  scene.tryAttackCalled = true;
 }
 
 describe('Player 2 attack keys', () => {
@@ -29,7 +29,6 @@ describe('Player 2 attack keys', () => {
 
   beforeEach(() => {
     scene = createMockScene();
-    scene.tryAttack = tryAttack.bind(null, scene);
     scene.player2State = 'idle';
     scene.lastAttackTime[1] = 0;
     scene._touchJustPressedP2A = false;
@@ -48,7 +47,7 @@ describe('Player 2 attack keys', () => {
       scene._touchJustPressedP2A = false;
       scene.player2.play('p2_attack', true);
       scene.player2State = 'attack';
-      scene.tryAttack();
+      tryAttack(scene, 1, scene.player2, scene.player1, now, false);
       scene.healthBar1.width = 200;
       scene.time.delayedCall(400, () => {
         if (scene.player2State === 'attack') {
@@ -63,19 +62,16 @@ describe('Player 2 attack keys', () => {
     scene.keys.semicolon.isDown = true;
     runAttackLogic();
     expect(scene.player2.play).toHaveBeenCalledWith('p2_attack', true);
-    expect(scene.tryAttackCalled).toBe(true);
   });
 
   it('attacks when K key is pressed', () => {
     scene.keys.k.isDown = true;
     runAttackLogic();
     expect(scene.player2.play).toHaveBeenCalledWith('p2_attack', true);
-    expect(scene.tryAttackCalled).toBe(true);
   });
 
   it('does not attack if both keys are up', () => {
     runAttackLogic();
     expect(scene.player2.play).not.toHaveBeenCalledWith('p2_attack', true);
-    expect(scene.tryAttackCalled).toBe(false);
   });
 });

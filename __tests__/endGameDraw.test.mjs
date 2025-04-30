@@ -1,6 +1,8 @@
 /**
  * @jest-environment jsdom
  */
+import { jest } from '@jest/globals';
+import { tryAttack } from '../gameUtils.mjs';
 // __tests__/endGameDraw.test.js
 // Tests that endGame correctly sets frame 5 and does not rotate on draw
 

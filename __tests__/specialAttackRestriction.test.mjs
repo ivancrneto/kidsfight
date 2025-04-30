@@ -1,6 +1,9 @@
 // Unit test for special attack restriction (must have 3 attacks)
 // Uses Jest-like syntax
 
+import { jest } from '@jest/globals';
+import { tryAttack } from '../gameUtils.mjs';
+
 function createMockScene() {
   return {
     keys: {
@@ -9,16 +12,22 @@ function createMockScene() {
     },
     player1State: 'idle',
     player2State: 'idle',
-    attackCount: [0, 0],
     _touchJustPressedP1S: false,
     _touchJustPressedP2S: false,
-    player1: { play: jest.fn() },
-    player2: { play: jest.fn() },
+    player1: { play: jest.fn(), x: 100, health: 100 },
+    player2: { play: jest.fn(), x: 110, health: 100 },
     healthBar1: { width: 200 },
     healthBar2: { width: 200 },
-    showSpecialEffect: jest.fn(),
+    playerHealth: [100, 100],
+    attackCount: [0, 0],
+    lastAttackTime: [0, 0],
     time: { delayedCall: jest.fn((delay, cb) => cb()) },
-    tryAttack: jest.fn(),
+    gameOver: false,
+    showSpecialEffect: jest.fn(),
+    tryAttack: jest.fn(function() {
+      // Simulate special attack for player 1
+      tryAttack(this, 0, this.player1, this.player2, Date.now(), true);
+    }),
   };
 }
 
