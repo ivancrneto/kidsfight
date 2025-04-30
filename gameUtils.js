@@ -69,11 +69,18 @@ function tryAttack(scene, playerIdx, attacker, defender, now, special) {
   const ATTACK_COOLDOWN = 500;
   if (!scene.lastAttackTime) scene.lastAttackTime = [0, 0];
   if (!scene.attackCount) scene.attackCount = [0, 0];
-  if (now - scene.lastAttackTime[playerIdx] < ATTACK_COOLDOWN) return;
-  if (Math.abs(attacker.x - defender.x) > ATTACK_RANGE) return;
+  if (now - scene.lastAttackTime[playerIdx] < ATTACK_COOLDOWN) {
+    // console.log('[DEBUG] tryAttack: Attack on cooldown for player', playerIdx);
+    return;
+  }
+  if (Math.abs(attacker.x - defender.x) > ATTACK_RANGE) {
+    // console.log('[DEBUG] tryAttack: Out of range. Attacker x:', attacker.x, 'Defender x:', defender.x);
+    return;
+  }
   scene.lastAttackTime[playerIdx] = now;
   scene.attackCount[playerIdx]++;
   defender.health -= special ? 30 : 10;
+  // console.log('[DEBUG] tryAttack: Defender health after attack:', defender.health);
   if (scene.cameras && scene.cameras.main && typeof scene.cameras.main.shake === 'function') {
     scene.cameras.main.shake(special ? 250 : 100, special ? 0.03 : 0.01);
   }

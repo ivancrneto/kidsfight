@@ -3,14 +3,19 @@
   "version": "1.0.0",
   "description": "Cartoon-style fighting game using Phaser JS",
   "scripts": {
-    "start": "npx http-server .",
+    "start": "parcel serve index.html",
+    "build": "parcel build index.html",
     "test": "jest"
   },
   "dependencies": {
     "phaser": "^3.60.0"
   },
   "devDependencies": {
+    "@parcel/packager-raw-url": "^2.14.4",
+    "@parcel/transformer-raw": "^2.14.4",
+    "@parcel/transformer-webmanifest": "^2.14.4",
     "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0"
+    "jest-environment-jsdom": "^29.7.0",
+    "parcel": "^2.14.4"
   }
 }

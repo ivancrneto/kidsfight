@@ -1,3 +1,12 @@
+// Parcel image imports for Phaser asset loading
+import scenario1Img from './scenario1.png?url';
+import player1RawImg from './sprites-bento3.png?url';
+import player2RawImg from './sprites-davir3.png?url';
+
+// Import pure utilities for testability
+import { updateSceneLayout, applyGameCss, tryAttack } from './gameUtils';
+
+
 // Dynamically set game size based on viewport, accounting for mobile browser UI
 const GAME_WIDTH = window.innerWidth;
 const GAME_HEIGHT = window.innerHeight;
@@ -46,9 +55,10 @@ class KidsFightScene extends Phaser.Scene {
     this.attackCount = [0, 0]; // Counts normal attacks landed by each player
     this.lungeTimer = [0, 0]; // Initialize lunge timers for both players
     this.timeLeft = 60;
-    this.player1State = 'idle'; // 'idle', 'down', 'attack', 'special'
+    this.player1State = 'idle';
+// console.log('[DEBUG] player1State set to:', this.player1State); // 'idle', 'down', 'attack', 'special'
     this.player2State = 'idle';
-    // console.log('[constructor] timeLeft:', this.timeLeft, 'ROUND_TIME:', typeof ROUND_TIME !== 'undefined' ? ROUND_TIME : 'undefined');
+    // // console.log('[constructor] timeLeft:', this.timeLeft, 'ROUND_TIME:', typeof ROUND_TIME !== 'undefined' ? ROUND_TIME : 'undefined');
   }
 
   init(data) {
@@ -56,16 +66,21 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   preload() {
+    // Debug: Print imported image URLs and types
+    // console.log('scenario1Img', scenario1Img, typeof scenario1Img);
+    // console.log('player1RawImg', player1RawImg, typeof player1RawImg);
+    // console.log('player2RawImg', player2RawImg, typeof player2RawImg);
     // Load player sprite sheets (256x256)
-    this.load.image('player1_raw', 'sprites-bento3.png');
-    this.load.image('player2_raw', 'sprites-davir3.png');
+    this.load.image('player1_raw', player1RawImg);
+    this.load.image('player2_raw', player2RawImg);
     // Load scenario background
-    this.load.image('scenario1', 'scenario1.png');
+    this.load.image('scenario1', scenario1Img);
     // Load particle spritesheet for effects
     //this.load.atlas('flares', 'flares.png', 'flares.json');
   }
 
   create() {
+    // console.log('[DEBUG] create() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
     // --- CREATE CUSTOM SPRITESHEETS FIRST ---
     // Player 1
     if (!this.textures.exists('player1')) {
@@ -106,6 +121,7 @@ class KidsFightScene extends Phaser.Scene {
       }
     }
     // Add background image
+
     const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'scenario1').setOrigin(0.5, 0.5);
     bg.displayWidth = GAME_WIDTH;
     bg.displayHeight = GAME_HEIGHT;
@@ -376,10 +392,12 @@ class KidsFightScene extends Phaser.Scene {
     for (const k of keyList) {
       if (!this.keys[k]) this.keys[k] = { isDown: false };
     }
+    // Debug: log at end of create()
+    // console.log('[DEBUG] create() called, this.keys:', this.keys);
     // Global keydown debug (disable for touch)
     if (!this.isTouch) {
       window.addEventListener('keydown', function(e) {
-        ('Key pressed:', e.key, 'code:', e.code);
+        // console.log('[GLOBAL] Key pressed:', e.key, 'code:', e.code);
       });
     }
 
@@ -456,6 +474,41 @@ class KidsFightScene extends Phaser.Scene {
 
 
   update(time, delta) {
+    // --- SPECIAL PIPS UPDATE LOGIC ---
+    // Helper: update special pips and indicators for a player
+    const updateSpecialPips = (playerIdx) => {
+      const attackCount = this.attackCount?.[playerIdx] || 0;
+      const pips = playerIdx === 0 ? this.specialPips1 : this.specialPips2;
+      const specialReady = playerIdx === 0 ? this.specialReady1 : this.specialReady2;
+      const specialReadyText = playerIdx === 0 ? this.specialReadyText1 : this.specialReadyText2;
+      // Show yellow for each attack landed, up to 3, but hide all after 3
+      if (attackCount >= 3) {
+        // Hide all pips
+        for (let i = 0; i < 3; i++) {
+          if (pips[i]) pips[i].setVisible(false);
+        }
+        if (specialReady) specialReady.setVisible(true);
+        if (specialReadyText) specialReadyText.setVisible(true);
+      } else {
+        for (let i = 0; i < 3; i++) {
+          if (pips[i]) {
+            pips[i].setFillStyle(i < attackCount ? 0xffd700 : 0x888888).setVisible(true);
+          }
+        }
+        if (specialReady) specialReady.setVisible(false);
+        if (specialReadyText) specialReadyText.setVisible(false);
+      }
+    };
+    // Call for both players
+    updateSpecialPips(0);
+    updateSpecialPips(1);
+    // console.log('[DEBUG] update() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
+    if (!this.keys || !this.keys.v) {
+      // console.log('[DEBUG] this.keys or this.keys.v is undefined in update()');
+      return;
+    }
+    // Debug: confirm update is running
+    // console.log('[DEBUG] Update running');
     // --- TOUCH CONTROLS: map to key states ---
     // --- TOUCH CONTROLS: custom justPressed for attack/special ---
     if (this.isTouch && this.touchFlags) {
@@ -618,6 +671,7 @@ class KidsFightScene extends Phaser.Scene {
         if (this.player1State !== 'idle') {
           this.player1.play('p1_idle', true);
           this.player1State = 'idle';
+// console.log('[DEBUG] player1State set to:', this.player1State);
         }
       }
     }
@@ -640,36 +694,161 @@ class KidsFightScene extends Phaser.Scene {
       }
     }
 
+    // Debug: log V key state and player1State
+    if (this.keys && this.keys.v) {
+      // console.log('[DEBUG] V key isDown:', this.keys.v.isDown, 'JustDown:', Phaser.Input.Keyboard.JustDown(this.keys.v));
+    }
+    // console.log('[DEBUG] player1State:', this.player1State);
+    // Debug: check if we reach attack check
+    // console.log('[DEBUG] Before attack check');
+    // Use isDown + cooldown for V key
+    const now = time;
+    const attackCondition = (this.keys && this.keys.v && this.keys.v.isDown && now > (this.lastAttackTime?.[0] || 0) + ATTACK_COOLDOWN && this.player1State !== 'attack' && this.player1State !== 'special') || (this._touchJustPressedP1A && this.player1State !== 'attack' && this.player1State !== 'special');
+    // console.log('[DEBUG] Attack condition:', attackCondition, 'isDown:', this.keys.v.isDown, 'lastAttackTime:', this.lastAttackTime?.[0], 'now:', now, '_touchJustPressedP1A:', this._touchJustPressedP1A);
     // Player 1 attack (V key or touch)
-    if ((this.keys && this.keys.v && Phaser.Input.Keyboard.JustDown(this.keys.v)) || this._touchJustPressedP1A) {
+    if (attackCondition) {
       this._touchJustPressedP1A = false;
-      if (this.player1State !== 'attack' && this.player1State !== 'special') {
+      // console.log('[DEBUG] Attack block entered, player1:', this.player1);
+      // Now always allowed to attack here, no further state check needed
+        // console.log('[DEBUG] Triggering attack animation');
+        // console.log('[DEBUG] Anim exists:', this.anims.exists('p1_attack'));
         this.player1.play('p1_attack', true);
         this.player1State = 'attack';
+        // console.log('[DEBUG] player1State set to:', this.player1State);
+        // Deal damage to player2 if in range
+        tryAttack(this, 0, this.player1, this.player2, now, false);
+        // Update health bar for player2
+        const healthRatio = Math.max(0, this.player2.health / MAX_HEALTH);
+        this.healthBar2.width = 200 * healthRatio;
         // Manually switch to idle after 400ms
-        this.time.delayedCall(200, () => {
+        this.time.delayedCall(400, () => {
+          if (this.player1State === 'attack') {
+            this.player1.play('p1_idle', true);
+            this.player1State = 'idle';
+            // console.log('[DEBUG] player1State set to:', this.player1State);
+          }
+        });
+    }
+
+    // Player 1 special (B key or touch)
+    const specialConditionP1 = (
+      this.keys &&
+      this.keys.b && this.keys.b.isDown &&
+      this.player1State !== 'attack' &&
+      this.player1State !== 'special' &&
+      this.attackCount[0] >= 3
+    ) || (this._touchJustPressedP1S && this.player1State !== 'attack' && this.player1State !== 'special' && this.attackCount[0] >= 3);
+    if (specialConditionP1) {
+      this._touchJustPressedP1S = false;
+      this.player1.play('p1_special', true);
+      this.player1State = 'special';
+      tryAttack(this, 0, this.player1, this.player2, now, true);
+      const healthRatio = Math.max(0, this.player2.health / MAX_HEALTH);
+      this.healthBar2.width = 200 * healthRatio;
+      this.showSpecialEffect(this.player1.x, this.player1.y - 60);
+      this.time.delayedCall(700, () => {
+        if (this.player1State === 'special') {
+          this.player1.play('p1_idle', true);
+          this.player1State = 'idle';
+          // Reset special pips after special is used
+          this.attackCount[0] = 0;
+        }
+      });
+    }
+
+    // Player 2 attack (; key or K key or touch)
+    const attackConditionP2 = (
+      this.keys &&
+      ((this.keys.semicolon && this.keys.semicolon.isDown) || (this.keys.k && this.keys.k.isDown)) &&
+      now > (this.lastAttackTime?.[1] || 0) + ATTACK_COOLDOWN &&
+      this.player2State !== 'attack' &&
+      this.player2State !== 'special'
+    ) || (this._touchJustPressedP2A && this.player2State !== 'attack' && this.player2State !== 'special');
+    if (attackConditionP2) {
+      this._touchJustPressedP2A = false;
+      this.player2.play('p2_attack', true);
+      this.player2State = 'attack';
+      tryAttack(this, 1, this.player2, this.player1, now, false);
+      const healthRatio1 = Math.max(0, this.player1.health / MAX_HEALTH);
+      this.healthBar1.width = 200 * healthRatio1;
+      this.time.delayedCall(400, () => {
+        if (this.player2State === 'attack') {
+          this.player2.play('p2_idle', true);
+          this.player2State = 'idle';
+        }
+      });
+    }
+
+    // Player 2 special (L key or touch)
+    const specialConditionP2 = (
+      this.keys &&
+      this.keys.l && this.keys.l.isDown &&
+      this.player2State !== 'attack' &&
+      this.player2State !== 'special' &&
+      this.attackCount[1] >= 3
+    ) || (this._touchJustPressedP2S && this.player2State !== 'attack' && this.player2State !== 'special' && this.attackCount[1] >= 3);
+    if (specialConditionP2) {
+      this._touchJustPressedP2S = false;
+      this.player2.play('p2_special', true);
+      this.player2State = 'special';
+      tryAttack(this, 1, this.player2, this.player1, now, true);
+      const healthRatio1 = Math.max(0, this.player1.health / MAX_HEALTH);
+      this.healthBar1.width = 200 * healthRatio1;
+      this.showSpecialEffect(this.player2.x, this.player2.y - 60);
+      this.time.delayedCall(700, () => {
+        if (this.player2State === 'special') {
+          this.player2.play('p2_idle', true);
+          this.player2State = 'idle';
+          // Reset special pips after special is used
+          this.attackCount[1] = 0;
+        }
+      });
+    }
+  }
+
+  updateSceneLayout() {
+    return updateSceneLayout(this);
+  }
+  
+  // --- GAME OVER HANDLER ---
+  endGame(phrase) {
+    if (this.gameOver) return;
+    this.gameOver = true;
+    // Centered winning phrase
+    const winText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      phrase,
+      {
+        fontSize: '48px',
+        color: '#fff',
+        fontFamily: 'monospace',
+        stroke: '#000',
+        strokeThickness: 8,
+        align: 'center',
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        padding: { left: 24, right: 24, top: 16, bottom: 16 }
+      }
+    )
+      .setOrigin(0.5)
+      .setDepth(10001);
+    // Optionally, fade in the text
+    winText.setAlpha(0);
+    this.tweens.add({
+      targets: winText,
+      alpha: 1,
+      duration: 400
     });
+    // Optionally, stop all player movement/animations
+    if (this.player1 && this.player1.anims) this.player1.anims.stop();
+    if (this.player2 && this.player2.anims) this.player2.anims.stop();
+    // Optionally, you could add a restart button or auto-restart after a delay here
   }
 }
 
-// ...
 
-// Import pure utilities for testability
-const { updateSceneLayout, applyGameCss, tryAttack } = require('./gameUtils');
 
-// Dynamically update all scene layout to match current viewport size
-KidsFightScene.prototype.updateSceneLayout = function() {
-  return updateSceneLayout(this);
-}
 
-// ...
-    parent.style.width = 'calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
-    parent.style.height = 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))';
-    parent.style.maxWidth = '100vw';
-    parent.style.maxHeight = '100vh';
-    parent.style.background = '#222';
-  }
-}
 
 function resizeGame(game) {
   // Use window.innerWidth/innerHeight for true viewport size (accounts for mobile browser UI)
@@ -717,6 +896,27 @@ KidsFightScene.prototype.updateControlPositions = function() {
   }
 }
 
+// Phaser Game Config (must be after KidsFightScene is defined)
+const config = {
+  type: Phaser.AUTO,
+  width: GAME_WIDTH,
+  height: GAME_HEIGHT,
+  backgroundColor: '#222',
+  parent: 'game-container',
+  scene: KidsFightScene,
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: GRAVITY },
+      debug: false
+    }
+  },
+  scale: {
+    mode: Phaser.Scale.RESIZE,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  }
+};
+
 window.onload = () => {
   // Set initial size to fit screen
   config.width = window.innerWidth;
@@ -735,4 +935,4 @@ window.onload = () => {
 
   window.addEventListener('resize', resizeWithDelay);
   window.addEventListener('orientationchange', resizeWithDelay);
-};
+}
