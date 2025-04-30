@@ -849,14 +849,19 @@ class KidsFightScene extends Phaser.Scene {
       this.cameras.main.height / 2,
       phrase,
       {
-        fontSize: '48px',
+        fontSize: Math.max(20, Math.min(36, Math.round(this.cameras.main.width * 0.055))) + 'px',
         color: '#fff',
         fontFamily: 'monospace',
         stroke: '#000',
         strokeThickness: 8,
         align: 'center',
         backgroundColor: 'rgba(0,0,0,0.35)',
-        padding: { left: 24, right: 24, top: 16, bottom: 16 }
+        padding: {
+          left: Math.round(this.cameras.main.width * 0.025),
+          right: Math.round(this.cameras.main.width * 0.025),
+          top: Math.round(this.cameras.main.width * 0.012),
+          bottom: Math.round(this.cameras.main.width * 0.012)
+        }
       }
     )
       .setOrigin(0.5)
@@ -876,11 +881,16 @@ class KidsFightScene extends Phaser.Scene {
       btnY,
       'Jogar Novamente',
       {
-        fontSize: '48px',
+        fontSize: Math.max(18, Math.min(30, Math.round(this.cameras.main.width * 0.045))) + 'px',
         color: '#fff',
         backgroundColor: '#44aaff',
         fontFamily: 'monospace',
-        padding: { left: 48, right: 48, top: 24, bottom: 24 },
+        padding: {
+          left: Math.round(this.cameras.main.width * 0.02),
+          right: Math.round(this.cameras.main.width * 0.02),
+          top: Math.round(this.cameras.main.width * 0.01),
+          bottom: Math.round(this.cameras.main.width * 0.01)
+        },
         align: 'center',
         stroke: '#000',
         strokeThickness: 8,
