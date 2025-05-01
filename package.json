@@ -4,7 +4,7 @@
   "description": "Cartoon-style fighting game using Phaser JS",
   "type": "module",
   "scripts": {
-    "start": "parcel serve index.html --host 0.0.0.0",
+    "start": "parcel serve index.html --host 0.0.0.0 --no-cache",
     "build": "parcel build index.html",
     "test": "jest",
     "test:esm": "node --experimental-vm-modules ./node_modules/.bin/jest"

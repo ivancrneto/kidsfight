@@ -89,6 +89,8 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   create() {
+    window.scene = this;
+
     // --- RESET ALL GAME STATE ON RESTART ---
     this.gameOver = false;
     this.player1State = 'idle';
@@ -893,7 +895,9 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   updateSceneLayout() {
+    console.log('=== [KidsFight] updateSceneLayout called ===')
     return updateSceneLayout(this);
+    console.log('=== [KidsFight] updateSceneLayout finish called ===')
   }
   
   // --- GAME OVER HANDLER ---

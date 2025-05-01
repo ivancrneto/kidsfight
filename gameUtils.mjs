@@ -1,7 +1,9 @@
+
 // Pure game logic utilities for KidsFightScene
 
 // Layout update logic for scene objects
 function updateSceneLayout(scene) {
+
   // Defensive: Only update layout if scene is fully initialized
   if (!scene.isReady) {
     // Uncomment for debugging:
@@ -20,14 +22,37 @@ function updateSceneLayout(scene) {
     }
   }
   // Platform
+  // --- PLAYER RESIZE & REPOSITION ---
+  // Responsive player scale based on height (max 28% of screen height)
+  const playerMaxHeight = 0.28; // 28% of screen height
+  const frameHeight = 512;
+  let scale = (h * playerMaxHeight) / frameHeight;
+  // Clamp scale to not exceed 1 (prevents upscaling on small screens)
+  if (scale > 1) scale = 1;
+  // Adjust platform/player Y for landscape
+  let PLATFORM_Y, PLAYER_PLATFORM_OFFSET;
+  // Place player bottoms at 45% of screen height (above middle)
+  const playerY = h * 0.45;
+  const PLATFORM_HEIGHT = h * 0.045;
+  PLATFORM_Y = playerY + PLATFORM_HEIGHT / 2 // Platform top edge at player feet
+  PLAYER_PLATFORM_OFFSET = w > h ? 50 : 20;
+
+
+  // Player X positions (spread further apart)
+  const p1X = w * 0.18;
+  const p2X = w * 0.82;
+  const PLAYER_VERTICAL_OFFSET = 0;
+
+
+
+
+
+  // Platform
   if (scene.children && scene.children.list) {
-    const PLATFORM_Y = h * 0.7;
-    const PLATFORM_HEIGHT = h * 0.045;
-    const PLAYER_PLATFORM_OFFSET = 20;
     const platformRect = scene.children.list.find(obj => obj.type === 'Rectangle' && obj.fillColor === 0x8B5A2B);
     if (platformRect) {
       if (typeof platformRect.setPosition === 'function' && typeof platformRect.setSize === 'function') {
-        platformRect.setPosition(w / 2, PLATFORM_Y + PLATFORM_HEIGHT / 2);
+        platformRect.setPosition(w / 2, PLATFORM_Y);
         platformRect.setSize(w, PLATFORM_HEIGHT);
       } else {
         console.error('[KidsFight] platformRect is missing setPosition or setSize:', platformRect);
@@ -48,7 +73,7 @@ function updateSceneLayout(scene) {
         const plat = children[0];
         if (plat) {
           plat.setDisplaySize(w, PLATFORM_HEIGHT);
-          plat.setPosition(w / 2, PLATFORM_Y + PLATFORM_HEIGHT / 2);
+          plat.setPosition(w / 2, PLATFORM_Y);
           if (typeof plat.refreshBody === 'function') plat.refreshBody();
           if (plat.body) {
             console.log('[KidsFight] platform.y:', plat.y, 'platform.body.y:', plat.body.y, 'displayHeight:', plat.displayHeight);
@@ -69,28 +94,6 @@ function updateSceneLayout(scene) {
     scene.physics.world.setBounds(0, 0, w, h);
   }
 
-  // --- PLAYER RESIZE & REPOSITION ---
-  // Responsive player scale based on height (max 28% of screen height)
-  const playerMaxHeight = 0.28; // 28% of screen height
-  const frameHeight = 512;
-  let scale = (h * playerMaxHeight) / frameHeight;
-  // Clamp scale to not exceed 1 (prevents upscaling on small screens)
-  if (scale > 1) scale = 1;
-  // Adjust platform/player Y for landscape
-  let PLATFORM_Y, PLAYER_PLATFORM_OFFSET;
-  if (w > h) { // landscape
-    PLATFORM_Y = h * 0.55;
-    PLAYER_PLATFORM_OFFSET = 0;
-  } else { // portrait
-    PLATFORM_Y = h * 0.7;
-    PLAYER_PLATFORM_OFFSET = 20;
-  }
-  const PLATFORM_HEIGHT = h * 0.045;
-  // Player X positions (spread further apart)
-  const p1X = w * 0.18;
-  const p2X = w * 0.82;
-  const playerY = PLATFORM_Y + 1; // Just above the platform
-
   // Calculate min spacing based on scaled width
   const minSpacing = 0.1 * w + (scene.player1 && scene.player1.displayWidth ? scene.player1.displayWidth : 0);
 
@@ -104,6 +107,7 @@ function updateSceneLayout(scene) {
     }
     scene.player1.x = p1X;
     scene.player1.y = playerY;
+    console.log('[KidsFight][updateSceneLayout] After setPosition: player1.y:', scene.player1.y, 'player1.body.y:', scene.player1.body && scene.player1.body.y);
     if (scene.player1.body && typeof scene.player1.body.updateFromGameObject === 'function') {
       scene.player1.body.updateFromGameObject();
       console.log('[KidsFight] player1.y:', scene.player1.y, 'player1.body.y:', scene.player1.body.y);
@@ -119,6 +123,7 @@ function updateSceneLayout(scene) {
     }
     scene.player2.x = p2X;
     scene.player2.y = playerY;
+    console.log('[KidsFight][updateSceneLayout] After setPosition: player2.y:', scene.player2.y, 'player2.body.y:', scene.player2.body && scene.player2.body.y);
     if (scene.player2.body && typeof scene.player2.body.updateFromGameObject === 'function') {
       scene.player2.body.updateFromGameObject();
       console.log('[KidsFight] player2.y:', scene.player2.y, 'player2.body.y:', scene.player2.body.y);
