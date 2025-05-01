@@ -503,44 +503,45 @@ class KidsFightScene extends Phaser.Scene {
   update(time, delta) {
     // Only show debug overlay in development mode
     const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || (typeof __DEV__ !== 'undefined' && __DEV__);
-    if (!DEV) {
-      if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
-      // Do NOT return here; allow controls and game logic to run in production
-      return; // Prevent debug overlay setup in production
-    }
-    if (!this.debugText || !this.debugText.scene) {
-      if (this.add && this.add.text) {
-        this.debugText = this.add.text(10, 10, '', { fontSize: '16px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)', fontFamily: 'monospace' }).setDepth(99999).setScrollFactor(0).setOrigin(0,0);
-      } else {
-        return;
+
+    if (DEV) {
+      if (!this.debugText || !this.debugText.scene) {
+        if (this.add && this.add.text) {
+          this.debugText = this.add.text(10, 10, '', { fontSize: '16px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)', fontFamily: 'monospace' }).setDepth(99999).setScrollFactor(0).setOrigin(0,0);
+        } else {
+          return;
+        }
       }
-    }
-    // Debug overlay: show only in landscape (DEV only)
-    const w = this.scale.width;
-    const h = this.scale.height;
-    if (w > h) {
-      const PLATFORM_Y = h * 0.55;
-      const PLATFORM_HEIGHT = h * 0.045;
-      const PLAYER_PLATFORM_OFFSET = 0;
-      const scale = (h * 0.28) / 512;
-      const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
-      let player1y = (this.player1 && this.player1.scene) ? this.player1.y : 'n/a';
-      let player1h = (this.player1 && this.player1.scene) ? this.player1.displayHeight : 'n/a';
-      let player1bodyy = (this.player1 && this.player1.body && this.player1.scene) ? this.player1.body.y : 'n/a';
-      if (this.debugText && this.debugText.scene) {
-        this.debugText.setText([
-          `w: ${w}, h: ${h}`,
-          `PLATFORM_Y: ${PLATFORM_Y}`,
-          `playerY: ${playerY}`,
-          `scale: ${scale}`,
-          `player1.y: ${player1y}`,
-          `player1.displayHeight: ${player1h}`,
-          `player1.body.y: ${player1bodyy}`
-        ].join('\n')).setVisible(true);
+      // Debug overlay: show only in landscape (DEV only)
+      const w = this.scale.width;
+      const h = this.scale.height;
+      if (w > h) {
+        const PLATFORM_Y = h * 0.55;
+        const PLATFORM_HEIGHT = h * 0.045;
+        const PLAYER_PLATFORM_OFFSET = 0;
+        const scale = (h * 0.28) / 512;
+        const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
+        let player1y = (this.player1 && this.player1.scene) ? this.player1.y : 'n/a';
+        let player1h = (this.player1 && this.player1.scene) ? this.player1.displayHeight : 'n/a';
+        let player1bodyy = (this.player1 && this.player1.body && this.player1.scene) ? this.player1.body.y : 'n/a';
+        if (this.debugText && this.debugText.scene) {
+          this.debugText.setText([
+            `w: ${w}, h: ${h}`,
+            `PLATFORM_Y: ${PLATFORM_Y}`,
+            `playerY: ${playerY}`,
+            `scale: ${scale}`,
+            `player1.y: ${player1y}`,
+            `player1.displayHeight: ${player1h}`,
+            `player1.body.y: ${player1bodyy}`
+          ].join('\n')).setVisible(true);
+        }
+      } else {
+        if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
       }
     } else {
       if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
     }
+
     if (this.gameOver) return;
     // --- SPECIAL PIPS UPDATE LOGIC ---
     // Helper: update special pips and indicators for a player
