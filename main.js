@@ -1,7 +1,16 @@
+// Utility: Mobile and orientation detection
+function isMobile() {
+  return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+}
+function isLandscape() {
+  return window.matchMedia("(orientation: landscape)").matches;
+}
+
 // Parcel image imports for Phaser asset loading
 import scenario1Img from './scenario1.png?url';
 import player1RawImg from './sprites-bento3.png?url';
 import player2RawImg from './sprites-davir3.png?url';
+import RotatePromptScene from './rotate_prompt_scene.js';
 
 // Import pure utilities for testability
 import { updateSceneLayout, applyGameCss, tryAttack } from './gameUtils.mjs';
@@ -244,6 +253,7 @@ class KidsFightScene extends Phaser.Scene {
     .setDisplaySize(GAME_WIDTH, PLATFORM_HEIGHT)
     .setVisible(false)
     .refreshBody();
+  this.platform = platform;
 
   // --- DEFENSIVE: Ensure valid selected and sprite keys ---
   const playerSpritesSafe = ['player1', 'player2'];
@@ -457,34 +467,71 @@ class KidsFightScene extends Phaser.Scene {
     this.specialReadyText2 = this.add.text(600, 60, 'S', { fontSize: '26px', color: '#000', fontFamily: 'monospace', fontStyle: 'bold' }).setOrigin(0.5).setDepth(16).setVisible(false);
 
     // Timer text display
-    this.timerText = this.add.text(GAME_WIDTH / 2, 50, Math.ceil(this.timeLeft), {
-      fontSize: '32px',
-      color: '#fff',
-      fontFamily: 'monospace',
-      align: 'center',
-      stroke: '#000',
-      strokeThickness: 4
+    this.timerText = this.add.text(this.cameras.main.width / 2, 50, Math.ceil(this.timeLeft), {
+      fontSize: '32px', color: '#fff', fontFamily: 'monospace', align: 'center', stroke: '#000', strokeThickness: 4
     }).setOrigin(0.5);
 
-    // --- FORCE RESIZE after scene (re)start ---
-    if (typeof resizeGame === 'function') {
-      resizeGame(this.game);
+    // Mark scene as ready so updateSceneLayout can safely run
+    this.isReady = true;
+
+    // --- FINAL updateSceneLayout ---
+    if (typeof this.updateSceneLayout === 'function') {
+      console.log('[KidsFight] Calling updateSceneLayout at end of create');
+      this.updateSceneLayout();
     }
-    // Update all scene layout to match new size
-    this.updateSceneLayout();
+
     // Listen for Phaser's resize event and re-apply CSS AND update layout
     this.scale.on('resize', () => {
       if (typeof applyGameCss === 'function') {
         applyGameCss();
       }
-      if (typeof this.updateSceneLayout === 'function') {
+      if (typeof this.updateSceneLayout === 'function' && isLandscape()) {
+        console.log('[KidsFight] Calling updateSceneLayout at end of create');
         this.updateSceneLayout();
       }
     });
   }
 
-
   update(time, delta) {
+    // Only show debug overlay in development mode
+    const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || (typeof __DEV__ !== 'undefined' && __DEV__);
+    if (!DEV) {
+      if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
+      return;
+    }
+    if (!this.debugText || !this.debugText.scene) {
+      if (this.add && this.add.text) {
+        this.debugText = this.add.text(10, 10, '', { fontSize: '16px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)', fontFamily: 'monospace' }).setDepth(99999).setScrollFactor(0).setOrigin(0,0);
+      } else {
+        return;
+      }
+    }
+    // Debug overlay: show only in landscape
+    const w = this.scale.width;
+    const h = this.scale.height;
+    if (w > h) {
+      const PLATFORM_Y = h * 0.55;
+      const PLATFORM_HEIGHT = h * 0.045;
+      const PLAYER_PLATFORM_OFFSET = 0;
+      const scale = (h * 0.28) / 512;
+      const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
+      let player1y = (this.player1 && this.player1.scene) ? this.player1.y : 'n/a';
+      let player1h = (this.player1 && this.player1.scene) ? this.player1.displayHeight : 'n/a';
+      let player1bodyy = (this.player1 && this.player1.body && this.player1.scene) ? this.player1.body.y : 'n/a';
+      if (this.debugText && this.debugText.scene) {
+        this.debugText.setText([
+          `w: ${w}, h: ${h}`,
+          `PLATFORM_Y: ${PLATFORM_Y}`,
+          `playerY: ${playerY}`,
+          `scale: ${scale}`,
+          `player1.y: ${player1y}`,
+          `player1.displayHeight: ${player1h}`,
+          `player1.body.y: ${player1bodyy}`
+        ].join('\n')).setVisible(true);
+      }
+    } else {
+      if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
+    }
     if (this.gameOver) return;
     // --- SPECIAL PIPS UPDATE LOGIC ---
     // Helper: update special pips and indicators for a player
@@ -973,6 +1020,15 @@ function resizeGame(game) {
   const h = window.innerHeight;
   game.scale.resize(w, h);
   applyGameCss();
+  // --- Ensure ALL active scenes reposition after resize/orientation change ---
+  if (game.scene && typeof game.scene.getScenes === 'function') {
+    const allScenes = game.scene.getScenes(true); // true = only active scenes
+    allScenes.forEach(scene => {
+      if (typeof scene.updateSceneLayout === 'function') {
+        scene.updateSceneLayout();
+      }
+    });
+  }
 }
 
 
@@ -1020,7 +1076,7 @@ const config = {
   height: GAME_HEIGHT,
   backgroundColor: '#222',
   parent: 'game-container',
-  scene: KidsFightScene,
+  scene: [RotatePromptScene, KidsFightScene],
   physics: {
     default: 'arcade',
     arcade: {
@@ -1036,20 +1092,102 @@ const config = {
 
 window.onload = () => {
   // Set initial size to fit screen
-  config.width = window.innerWidth;
-  config.height = window.innerHeight;
-  config.scale.width = window.innerWidth;
-  config.scale.height = window.innerHeight;
-  const game = new Phaser.Game(config);
-  // Initial resize to account for mobile browser UI
-  resizeGame(game);
+  let game = null;
+  function ensureGameContainerSize() {
+    const container = document.getElementById('game-container');
+    if (container) {
+      container.style.width = window.innerWidth + 'px';
+      container.style.height = window.innerHeight + 'px';
+      container.style.position = 'fixed';
+      container.style.left = '0';
+      container.style.top = '0';
+    }
+  }
+
+  function createGame(startScene) {
+    ensureGameContainerSize();
+    // Log sizes for debugging
+    const container = document.getElementById('game-container');
+    console.log('[KidsFight] Creating game with:', {
+      windowW: window.innerWidth,
+      windowH: window.innerHeight,
+      containerW: container ? container.offsetWidth : 'n/a',
+      containerH: container ? container.offsetHeight : 'n/a'
+    });
+    config.width = window.innerWidth;
+    config.height = window.innerHeight;
+    config.scale.width = window.innerWidth;
+    config.scale.height = window.innerHeight;
+    config.scene = [RotatePromptScene, KidsFightScene];
+    game = new Phaser.Game(config);
+    if (startScene === 'RotatePromptScene') {
+      game.scene.start('RotatePromptScene');
+    } else {
+      game.scene.start('KidsFightScene');
+    }
+    return game;
+  }
+
+
+
+  let lastWasPortrait = null;
+  let recreateTimeout = null;
+  function showCorrectScene() {
+    const portrait = isMobile() && !isLandscape();
+    if (portrait) {
+      if (!game) {
+        game = createGame('RotatePromptScene');
+      } else {
+        game.scene.stop('KidsFightScene');
+        game.scene.start('RotatePromptScene');
+      }
+      lastWasPortrait = true;
+    } else {
+      if (lastWasPortrait) {
+        // Destroy and recreate the game instance for a clean landscape start, with a delay to allow resize
+        if (game) {
+          game.destroy(true);
+          game = null;
+        }
+        // Remove all canvas elements from #game-container to ensure a clean slate
+        const container = document.getElementById('game-container');
+        if (container) {
+          const canvases = container.querySelectorAll('canvas');
+          canvases.forEach(c => c.parentNode.removeChild(c));
+        }
+        if (recreateTimeout) clearTimeout(recreateTimeout);
+        recreateTimeout = setTimeout(() => {
+          game = createGame('KidsFightScene');
+        }, 120);
+        lastWasPortrait = false;
+      } else {
+        if (!game) {
+          game = createGame('KidsFightScene');
+        } else {
+          game.scene.stop('RotatePromptScene');
+          if (!game.scene.isActive('KidsFightScene')) {
+            game.scene.start('KidsFightScene');
+          }
+        }
+      }
+    }
+  }
+
+  // Initial scene selection
+  showCorrectScene();
 
   // Helper: double-resize to fix mobile browser chrome issues
   function resizeWithDelay() {
-    resizeGame(game);
-    setTimeout(() => resizeGame(game), 250); // Second resize after browser chrome settles
+    showCorrectScene();
+    // Only resize and update layout if in landscape
+    if (game && isLandscape()) {
+      resizeGame(game);
+      setTimeout(() => resizeGame(game), 250);
+    }
   }
 
   window.addEventListener('resize', resizeWithDelay);
   window.addEventListener('orientationchange', resizeWithDelay);
 }
+
+
