@@ -2,6 +2,12 @@
 
 // Layout update logic for scene objects
 function updateSceneLayout(scene) {
+  // Defensive: Only update layout if scene is fully initialized
+  if (!scene.isReady) {
+    // Uncomment for debugging:
+    // console.warn('[KidsFight] updateSceneLayout called before scene is ready');
+    return;
+  }
   const w = scene.scale.width;
   const h = scene.scale.height;
   // Background
@@ -15,10 +21,46 @@ function updateSceneLayout(scene) {
   }
   // Platform
   if (scene.children && scene.children.list) {
+    const PLATFORM_Y = h * 0.7;
+    const PLATFORM_HEIGHT = h * 0.045;
+    const PLAYER_PLATFORM_OFFSET = 20;
     const platformRect = scene.children.list.find(obj => obj.type === 'Rectangle' && obj.fillColor === 0x8B5A2B);
     if (platformRect) {
-      platformRect.setPosition(w / 2, 230 + 20 / 2);
+      if (typeof platformRect.setPosition === 'function' && typeof platformRect.setSize === 'function') {
+        platformRect.setPosition(w / 2, PLATFORM_Y + PLATFORM_HEIGHT / 2);
+        platformRect.setSize(w, PLATFORM_HEIGHT);
+      } else {
+        console.error('[KidsFight] platformRect is missing setPosition or setSize:', platformRect);
+      }
       platformRect.displayWidth = w;
+      platformRect.displayHeight = PLATFORM_HEIGHT;
+    }
+    // Also update static physics platform if present
+    if (scene.physics && scene.physics.world && scene.physics.world.staticBodies) {
+      // Debug: log platform group and children
+      console.log('[KidsFight] scene.platform:', scene.platform);
+      if (scene.platform && typeof scene.platform.getChildren === 'function') {
+        const children = scene.platform.getChildren();
+        console.log('[KidsFight] scene.platform children:', children);
+        if (children.length === 0) {
+          console.error('[KidsFight] scene.platform has no children');
+        }
+        const plat = children[0];
+        if (plat) {
+          plat.setDisplaySize(w, PLATFORM_HEIGHT);
+          plat.setPosition(w / 2, PLATFORM_Y + PLATFORM_HEIGHT / 2);
+          if (typeof plat.refreshBody === 'function') plat.refreshBody();
+          if (plat.body) {
+            console.log('[KidsFight] platform.y:', plat.y, 'platform.body.y:', plat.body.y, 'displayHeight:', plat.displayHeight);
+          } else {
+            console.error('[KidsFight] Platform body missing after refreshBody');
+          }
+        } else {
+          console.error('[KidsFight] No platform child found');
+        }
+      } else {
+        console.error('[KidsFight] scene.platform missing or getChildren not a function');
+      }
     }
   }
   // Camera and world bounds
@@ -26,57 +68,210 @@ function updateSceneLayout(scene) {
     scene.cameras.main.setBounds(0, 0, w, h);
     scene.physics.world.setBounds(0, 0, w, h);
   }
+
+  // --- PLAYER RESIZE & REPOSITION ---
+  // Responsive player scale based on height (max 28% of screen height)
+  const playerMaxHeight = 0.28; // 28% of screen height
+  const frameHeight = 512;
+  let scale = (h * playerMaxHeight) / frameHeight;
+  // Clamp scale to not exceed 1 (prevents upscaling on small screens)
+  if (scale > 1) scale = 1;
+  // Adjust platform/player Y for landscape
+  let PLATFORM_Y, PLAYER_PLATFORM_OFFSET;
+  if (w > h) { // landscape
+    PLATFORM_Y = h * 0.55;
+    PLAYER_PLATFORM_OFFSET = 0;
+  } else { // portrait
+    PLATFORM_Y = h * 0.7;
+    PLAYER_PLATFORM_OFFSET = 20;
+  }
+  const PLATFORM_HEIGHT = h * 0.045;
+  // Player X positions (spread further apart)
+  const p1X = w * 0.18;
+  const p2X = w * 0.82;
+  const playerY = PLATFORM_Y + 1; // Just above the platform
+
+  // Calculate min spacing based on scaled width
+  const minSpacing = 0.1 * w + (scene.player1 && scene.player1.displayWidth ? scene.player1.displayWidth : 0);
+
+  if (scene.player1 && typeof scene.player1.setScale === 'function' && typeof scene.player1.setOrigin === 'function') {
+    scene.player1.setScale(scale);
+    scene.player1.setOrigin(0.5, 1);
+    if (scene.player1.body) {
+      if (typeof scene.player1.body.setSize === 'function') scene.player1.body.setSize(scene.player1.displayWidth, scene.player1.displayHeight);
+      if (typeof scene.player1.body.setOffset === 'function') scene.player1.body.setOffset(0, -scene.player1.displayHeight);
+      if (typeof scene.player1.body.updateFromGameObject === 'function') scene.player1.body.updateFromGameObject();
+    }
+    scene.player1.x = p1X;
+    scene.player1.y = playerY;
+    if (scene.player1.body && typeof scene.player1.body.updateFromGameObject === 'function') {
+      scene.player1.body.updateFromGameObject();
+      console.log('[KidsFight] player1.y:', scene.player1.y, 'player1.body.y:', scene.player1.body.y);
+    }
+  }
+  if (scene.player2 && typeof scene.player2.setScale === 'function' && typeof scene.player2.setOrigin === 'function') {
+    scene.player2.setScale(scale);
+    scene.player2.setOrigin(0.5, 1);
+    if (scene.player2.body) {
+      if (typeof scene.player2.body.setSize === 'function') scene.player2.body.setSize(scene.player2.displayWidth, scene.player2.displayHeight);
+      if (typeof scene.player2.body.setOffset === 'function') scene.player2.body.setOffset(0, -scene.player2.displayHeight);
+      if (typeof scene.player2.body.updateFromGameObject === 'function') scene.player2.body.updateFromGameObject();
+    }
+    scene.player2.x = p2X;
+    scene.player2.y = playerY;
+    if (scene.player2.body && typeof scene.player2.body.updateFromGameObject === 'function') {
+      scene.player2.body.updateFromGameObject();
+      console.log('[KidsFight] player2.y:', scene.player2.y, 'player2.body.y:', scene.player2.body.y);
+    }
+    // Ensure players never overlap (optional safety)
+    if (scene.player1 && typeof scene.player2.x === 'number' && typeof scene.player1.x === 'number' && Math.abs(scene.player2.x - scene.player1.x) < minSpacing) {
+      scene.player2.x = scene.player1.x + minSpacing;
+    }
+  }
   // Touch controls
   if (typeof scene.updateControlPositions === 'function') {
     scene.updateControlPositions();
   }
   // Health bars
-  if (scene.healthBar1 && scene.healthBar2 && scene.healthBar1Border && scene.healthBar2Border) {
-    // Bar width: 25% of screen width, height: 5% of height
+  // Defensive: Health Bar 1 Border
+  if (!scene.healthBar1Border || typeof scene.healthBar1Border !== 'object') {
+    console.warn('[KidsFight] healthBar1Border is missing or not an object:', scene.healthBar1Border);
+  } else if (
+    typeof scene.healthBar1Border.setPosition !== 'function' ||
+    typeof scene.healthBar1Border.setSize !== 'function'
+  ) {
+    console.warn('[KidsFight] healthBar1Border.setPosition or setSize is not a function', scene.healthBar1Border, typeof scene.healthBar1Border);
+  } else {
     const barWidth = w * 0.25;
     const barHeight = h * 0.05;
     const barY = h * 0.07;
     const bar1X = w * 0.25;
+    if (
+      scene.healthBar1Border &&
+      typeof scene.healthBar1Border.setPosition === 'function' &&
+      typeof scene.healthBar1Border.setSize === 'function'
+    ) {
+      scene.healthBar1Border.setPosition(bar1X, barY).setSize(barWidth + 4, barHeight + 4);
+    } else {
+      console.error('[KidsFight] Tried to set layout on healthBar1Border but it is null or invalid:', scene.healthBar1Border);
+      // Prevent crash: do not call setSize
+    }
+  }
+
+  // Defensive: Health Bar 2 Border
+  if (!scene.healthBar2Border || typeof scene.healthBar2Border !== 'object') {
+    console.warn('[KidsFight] healthBar2Border is missing or not an object:', scene.healthBar2Border);
+  } else if (
+    typeof scene.healthBar2Border.setPosition !== 'function' ||
+    typeof scene.healthBar2Border.setSize !== 'function'
+  ) {
+    console.warn('[KidsFight] healthBar2Border.setPosition or setSize is not a function', scene.healthBar2Border, typeof scene.healthBar2Border);
+  } else {
+    const barWidth = w * 0.25;
+    const barHeight = h * 0.05;
+    const barY = h * 0.07;
     const bar2X = w * 0.75;
-    scene.healthBar1Border.setPosition(bar1X, barY).setSize(barWidth + 4, barHeight + 4);
-    scene.healthBar2Border.setPosition(bar2X, barY).setSize(barWidth + 4, barHeight + 4);
-    scene.healthBar1.setPosition(bar1X, barY).setSize(barWidth, barHeight);
-    scene.healthBar2.setPosition(bar2X, barY).setSize(barWidth, barHeight);
+    if (
+      scene.healthBar2Border &&
+      typeof scene.healthBar2Border.setPosition === 'function' &&
+      typeof scene.healthBar2Border.setSize === 'function'
+    ) {
+      scene.healthBar2Border.setPosition(bar2X, barY).setSize(barWidth + 4, barHeight + 4);
+    } else {
+      console.error('[KidsFight] Tried to set layout on healthBar2Border but it is null or invalid:', scene.healthBar2Border);
+      // Prevent crash: do not call setSize
+    }
+  }
+
+  // Defensive: Health Bar 1
+  if (!scene.healthBar1 || typeof scene.healthBar1 !== 'object') {
+    console.warn('[KidsFight] healthBar1 is missing or not an object:', scene.healthBar1);
+  } else if (
+    typeof scene.healthBar1.setPosition !== 'function' ||
+    typeof scene.healthBar1.setSize !== 'function'
+  ) {
+    console.warn('[KidsFight] healthBar1.setPosition or setSize is not a function', scene.healthBar1, typeof scene.healthBar1);
+  } else {
+    const barWidth = w * 0.25;
+    const barHeight = h * 0.05;
+    const barY = h * 0.07;
+    const bar1X = w * 0.25;
+    if (scene.healthBar1 && typeof scene.healthBar1.setPosition === 'function' && typeof scene.healthBar1.setSize === 'function') {
+      scene.healthBar1.setPosition(bar1X, barY).setSize(barWidth, barHeight);
+    } else {
+      console.error('[KidsFight] Tried to set layout on healthBar1 but it is null or invalid:', scene.healthBar1);
+    }
+  }
+
+  // Defensive: Health Bar 2
+  if (!scene.healthBar2 || typeof scene.healthBar2 !== 'object') {
+    console.warn('[KidsFight] healthBar2 is missing or not an object:', scene.healthBar2);
+  } else if (
+    typeof scene.healthBar2.setPosition !== 'function' ||
+    typeof scene.healthBar2.setSize !== 'function'
+  ) {
+    console.warn('[KidsFight] healthBar2.setPosition or setSize is not a function', scene.healthBar2, typeof scene.healthBar2);
+  } else {
+    const barWidth = w * 0.25;
+    const barHeight = h * 0.05;
+    const barY = h * 0.07;
+    const bar2X = w * 0.75;
+    if (scene.healthBar2 && typeof scene.healthBar2.setPosition === 'function' && typeof scene.healthBar2.setSize === 'function') {
+      scene.healthBar2.setPosition(bar2X, barY).setSize(barWidth, barHeight);
+    } else {
+      console.error('[KidsFight] Tried to set layout on healthBar2 but it is null or invalid:', scene.healthBar2);
+    }
   }
   // Special pips (3 per player) - match main.js create()
-  if (scene.specialPips1 && scene.specialPips2) {
+  if (scene.specialPips1 && Array.isArray(scene.specialPips1)) {
     const barY = h * 0.07;
     const pipY = barY - h * 0.035; // slightly above health bar
     const pipR = Math.max(10, h * 0.018); // match create()
-    // Player 1: left, spaced 30px apart at 800px width
     for (let i = 0; i < 3; i++) {
       const pip1X = w * 0.25 - pipR * 3 + i * pipR * 3;
-      if (scene.specialPips1[i]) scene.specialPips1[i].setPosition(pip1X, pipY).setRadius(pipR);
+      const pip = scene.specialPips1[i];
+      if (pip && typeof pip.setPosition === 'function' && typeof pip.setRadius === 'function') {
+        pip.setPosition(pip1X, pipY).setRadius(pipR);
+      }
     }
-    // Player 2: right, spaced 30px apart at 800px width
+  }
+  if (scene.specialPips2 && Array.isArray(scene.specialPips2)) {
+    const barY = h * 0.07;
+    const pipY = barY - h * 0.035;
+    const pipR = Math.max(10, h * 0.018);
     for (let i = 0; i < 3; i++) {
       const pip2X = w * 0.75 - pipR * 3 + i * pipR * 3;
-      if (scene.specialPips2[i]) scene.specialPips2[i].setPosition(pip2X, pipY).setRadius(pipR);
+      const pip = scene.specialPips2[i];
+      if (pip && typeof pip.setPosition === 'function' && typeof pip.setRadius === 'function') {
+        pip.setPosition(pip2X, pipY).setRadius(pipR);
+      }
     }
   }
   // Special ready circles (big S) - match main.js create()
-  if (scene.specialReady1 && scene.specialReadyText1) {
+  if (scene.specialReady1 && typeof scene.specialReady1.setPosition === 'function' && typeof scene.specialReady1.setRadius === 'function') {
     const r = Math.max(20, h * 0.045);
     const x = w * 0.25;
     const y = h * 0.13;
     scene.specialReady1.setPosition(x, y).setRadius(r);
+  }
+  if (scene.specialReadyText1 && typeof scene.specialReadyText1.setPosition === 'function') {
+    const x = w * 0.25;
+    const y = h * 0.13;
     scene.specialReadyText1.setPosition(x, y);
   }
-  if (scene.specialReady2 && scene.specialReadyText2) {
+  if (scene.specialReady2 && typeof scene.specialReady2.setPosition === 'function' && typeof scene.specialReady2.setRadius === 'function') {
     const r = Math.max(20, h * 0.045);
     const x = w * 0.75;
     const y = h * 0.13;
     scene.specialReady2.setPosition(x, y).setRadius(r);
+  }
+  if (scene.specialReadyText2 && typeof scene.specialReadyText2.setPosition === 'function') {
+    const x = w * 0.75;
+    const y = h * 0.13;
     scene.specialReadyText2.setPosition(x, y);
   }
   // Timer text
-  if (scene.timerText) {
-    // Font size: min 32px, but scale up for large screens (e.g. 4vw)
+  if (scene.timerText && typeof scene.timerText.setFontSize === 'function' && typeof scene.timerText.setPosition === 'function') {
     const fontSize = Math.max(32, Math.round(w * 0.045));
     scene.timerText.setFontSize(fontSize + 'px');
     scene.timerText.setPosition(w / 2, h * 0.11);
@@ -135,7 +330,7 @@ function tryAttack(scene, playerIdx, attacker, defender, now, special) {
   }
   scene.lastAttackTime[playerIdx] = now;
   scene.attackCount[playerIdx]++;
-  scene.playerHealth[defenderIdx] = (typeof scene.playerHealth[defenderIdx] === 'number' ? scene.playerHealth[defenderIdx] : 100) - (special ? 30 : 10);
+  scene.playerHealth[defenderIdx] = Math.max(0, (typeof scene.playerHealth[defenderIdx] === 'number' ? scene.playerHealth[defenderIdx] : 100) - (special ? 30 : 10));
   console.log('[TRYATTACK] playerHealth after:', scene.playerHealth[defenderIdx]);
   if (scene.cameras && scene.cameras.main && typeof scene.cameras.main.shake === 'function') {
     scene.cameras.main.shake(special ? 250 : 100, special ? 0.03 : 0.01);

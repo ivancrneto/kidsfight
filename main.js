@@ -158,6 +158,14 @@ class KidsFightScene extends Phaser.Scene {
     }
     // --- TOUCH CONTROLS ---
     this.touchControls = { p1: {}, p2: {} };
+    // --- KEYBOARD CONTROLS ---
+    // Always initialize keyboard keys and cursors
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys({
+      a: 'A', d: 'D', w: 'W',
+      v: 'V', b: 'B', n: 'N', s: 'S',
+      k: 'K', l: 'L', semicolon: 'SEMICOLON'
+    });
     // Robust touch detection (works on iOS and all browsers)
     const debugAlwaysShowTouch = false; // set to true to force show for debugging
     this.isTouch = debugAlwaysShowTouch || (typeof window !== 'undefined' && (
@@ -186,10 +194,10 @@ class KidsFightScene extends Phaser.Scene {
       this.touchFlags = { p1: {left:false,right:false,jump:false,down:false,attack:false,special:false}, p2: {left:false,right:false,jump:false,down:false,attack:false,special:false} };
       // Setup touch events for all buttons
       const setupBtn = (btn, flagObj, flag) => {
-        btn.on('pointerdown', ()=>{flagObj[flag]=true;});
-        btn.on('pointerup', ()=>{flagObj[flag]=false;});
-        btn.on('pointerout', ()=>{flagObj[flag]=false;});
-        btn.on('pointerupoutside', ()=>{flagObj[flag]=false;});
+        btn.on('pointerdown', (e)=>{flagObj[flag]=true; if (e && e.stopPropagation) e.stopPropagation(); console.log('[TOUCH] pointerdown', flag);});
+        btn.on('pointerup', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); console.log('[TOUCH] pointerup', flag);});
+        btn.on('pointerout', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); console.log('[TOUCH] pointerout', flag);});
+        btn.on('pointerupoutside', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); console.log('[TOUCH] pointerupoutside', flag);});
       };
       Object.entries(this.touchControls.p1).forEach(([k,btn])=>setupBtn(btn, this.touchFlags.p1, k));
       Object.entries(this.touchControls.p2).forEach(([k,btn])=>setupBtn(btn, this.touchFlags.p2, k));
@@ -497,7 +505,7 @@ class KidsFightScene extends Phaser.Scene {
     const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || (typeof __DEV__ !== 'undefined' && __DEV__);
     if (!DEV) {
       if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
-      return;
+      // Do NOT return here; allow controls and game logic to run in production
     }
     if (!this.debugText || !this.debugText.scene) {
       if (this.add && this.add.text) {

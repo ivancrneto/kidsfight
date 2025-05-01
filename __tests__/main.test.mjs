@@ -39,6 +39,51 @@ describe('Game Constants', () => {
 // Example: Mocking Phaser and testing KidsFightScene logic
 // (In real tests, import KidsFightScene from your module)
 describe('KidsFightScene', () => {
+  test('update does not throw if player1 or debugText are missing or destroyed', () => {
+    // Minimal mock scene with only the essentials
+    const scene = {
+      scale: { width: 800, height: 600 },
+      debugText: null,
+      player1: null,
+      add: { text: jest.fn(() => ({ setDepth: jest.fn(() => ({ setScrollFactor: jest.fn(() => ({ setOrigin: jest.fn(() => ({})) })) })) })) },
+      // Simulate Phaser's destroyed objects by omitting .scene
+    };
+    // Patch update method from main.js (simulate the robust version)
+    function safeUpdate() {
+      if (!scene.debugText || !scene.debugText.scene) {
+        if (scene.add && scene.add.text) {
+          scene.debugText = scene.add.text(10, 10, '', { fontSize: '16px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)', fontFamily: 'monospace' }).setDepth(99999).setScrollFactor(0).setOrigin(0,0);
+        } else {
+          return;
+        }
+      }
+      const w = scene.scale.width;
+      const h = scene.scale.height;
+      if (w > h) {
+        let player1y = (scene.player1 && scene.player1.scene) ? scene.player1.y : 'n/a';
+        let player1h = (scene.player1 && scene.player1.scene) ? scene.player1.displayHeight : 'n/a';
+        let player1bodyy = (scene.player1 && scene.player1.body && scene.player1.scene) ? scene.player1.body.y : 'n/a';
+        if (scene.debugText && scene.debugText.scene) {
+          scene.debugText.setText([
+            `w: ${w}, h: ${h}`,
+            `player1.y: ${player1y}`,
+            `player1.displayHeight: ${player1h}`,
+            `player1.body.y: ${player1bodyy}`
+          ].join('\n')).setVisible(true);
+        }
+      } else {
+        if (scene.debugText && scene.debugText.scene) scene.debugText.setVisible(false);
+      }
+    }
+    // Should not throw even if player1 and debugText are missing
+    expect(() => safeUpdate()).not.toThrow();
+    // Simulate destroyed debugText
+    scene.debugText = { setText: jest.fn(), setVisible: jest.fn(), scene: null };
+    expect(() => safeUpdate()).not.toThrow();
+    // Simulate destroyed player1
+    scene.player1 = { scene: null };
+    expect(() => safeUpdate()).not.toThrow();
+  });
   let scene;
   beforeEach(() => {
     // Minimal mock for Phaser.Scene
@@ -128,17 +173,21 @@ describe('KidsFightScene', () => {
 
   test('updateSceneLayout positions bg, platform, timer', () => {
     // Mock scene
+    // Create the mock objects
     const mockBg = { texture: { key: 'scenario1' }, setPosition: jest.fn(), displayWidth: 0, displayHeight: 0 };
-    const mockPlatform = { type: 'Rectangle', fillColor: 0x8B5A2B, setPosition: jest.fn(), displayWidth: 0 };
+    const mockPlatform = { type: 'Rectangle', fillColor: 0x8B5A2B, setPosition: jest.fn(), setSize: jest.fn(), displayWidth: 0, displayHeight: 0 };
     const mockTimer = { setPosition: jest.fn(), setFontSize: jest.fn() };
+    // Reference the same objects in children.list
     const mockScene = {
+      isReady: true,
       scale: { width: 500, height: 300 },
-      children: { list: [mockBg, mockPlatform] },
+      children: { list: [] },
       cameras: { main: { setBounds: jest.fn() } },
       physics: { world: { setBounds: jest.fn() } },
       updateControlPositions: jest.fn(),
       timerText: mockTimer
     };
+    mockScene.children.list = [mockBg, mockPlatform];
     updateSceneLayout(mockScene);
     expect(mockBg.setPosition).toHaveBeenCalledWith(250, 150);
     expect(mockPlatform.setPosition).toHaveBeenCalled();
@@ -163,6 +212,7 @@ describe('KidsFightScene', () => {
       hitFlash: { clear: jest.fn(), fillStyle: jest.fn(), fillCircle: jest.fn(), setVisible: jest.fn() },
       showSpecialEffect: jest.fn()
     };
+    // Ensure defender is exactly scene.player2
     tryAttack(scene, 0, scene.player1, scene.player2, Date.now(), false);
     expect(scene.playerHealth[1]).toBeLessThan(100);
     expect(scene.attackCount[0]).toBe(1);

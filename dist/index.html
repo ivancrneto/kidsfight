@@ -34,6 +34,11 @@ canvas {
   height: 100% !important;
   max-height: 100vh !important;
 }
+
+#game-container, canvas {
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
 </style>
   <link rel="stylesheet" href="/kidsfight.026902eb.css">
 </head>
@@ -46,6 +51,7 @@ canvas {
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+
   <script type="module" src="/kidsfight.36960861.js"></script>
   <script>function checkLandscape() {
     const isMobile = /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);

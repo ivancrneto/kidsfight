@@ -2,10 +2,12 @@
   "name": "kidsfight",
   "version": "1.0.0",
   "description": "Cartoon-style fighting game using Phaser JS",
+  "type": "module",
   "scripts": {
     "start": "parcel serve index.html --host 0.0.0.0",
     "build": "parcel build index.html",
-    "test": "jest"
+    "test": "jest",
+    "test:esm": "node --experimental-vm-modules ./node_modules/.bin/jest"
   },
   "dependencies": {
     "phaser": "^3.60.0"
@@ -15,9 +17,9 @@
     "@parcel/transformer-raw": "^2.14.4",
     "@parcel/transformer-webmanifest": "^2.14.4",
     "jest": "^29.7.0",
+    "jest-canvas-mock": "^2.5.2",
     "jest-environment-jsdom": "^29.7.0",
-    "parcel": "^2.14.4"
-  },
-  "type": "module"
+    "parcel": "^2.14.4",
+    "process": "^0.11.10"
+  }
 }
-

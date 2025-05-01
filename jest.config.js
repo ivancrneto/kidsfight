@@ -1,8 +1,11 @@
 export default {
-  transform: {},
   testEnvironment: 'jsdom',
+  setupFiles: ["jest-canvas-mock"],
+  testMatch: ["**/?(*.)+(test).[jt]s", "**/?(*.)+(test).mjs"],
+  transform: {},
   moduleNameMapper: {
-    '\\.(png|jpg|jpeg|gif|svg)$': '<rootDir>/__mocks__/fileMock.js'
+    '^phaser3spectorjs$': '<rootDir>/test_helpers/phaser3spectorjs.mjs',
+    '\.(png|jpg|jpeg|gif|svg)$': '<rootDir>/__mocks__/fileMock.js'
   },
   transformIgnorePatterns: []
 };

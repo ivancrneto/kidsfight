@@ -30,6 +30,10 @@
       height: 100% !important;
       margin: 0 auto;
     }
+    #game-container, canvas {
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
   </style>
   <link rel="stylesheet" href="landscape.css" />
 </head>
@@ -42,6 +46,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+
   <script type="module" src="main.js"></script>
   <script>
     function checkLandscape() {

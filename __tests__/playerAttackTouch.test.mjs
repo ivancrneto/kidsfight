@@ -47,6 +47,7 @@ describe('Touch attack flags for both players', () => {
       scene._touchJustPressedP1A = false;
       scene.player1.play('p1_attack', true);
       scene.player1State = 'attack';
+      // Ensure defender is exactly scene.player2
       tryAttack(scene, 0, scene.player1, scene.player2, now, false);
       setTimeout(() => {
         expect(scene._touchJustPressedP1A).toBe(false);
@@ -64,6 +65,7 @@ describe('Touch attack flags for both players', () => {
       scene._touchJustPressedP2A = false;
       scene.player2.play('p2_attack', true);
       scene.player2State = 'attack';
+      // Ensure defender is exactly scene.player1
       tryAttack(scene, 1, scene.player2, scene.player1, now, false);
       setTimeout(() => {
         expect(scene._touchJustPressedP2A).toBe(false);
