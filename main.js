@@ -506,6 +506,7 @@ class KidsFightScene extends Phaser.Scene {
     if (!DEV) {
       if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
       // Do NOT return here; allow controls and game logic to run in production
+      return; // Prevent debug overlay setup in production
     }
     if (!this.debugText || !this.debugText.scene) {
       if (this.add && this.add.text) {
@@ -514,7 +515,7 @@ class KidsFightScene extends Phaser.Scene {
         return;
       }
     }
-    // Debug overlay: show only in landscape
+    // Debug overlay: show only in landscape (DEV only)
     const w = this.scale.width;
     const h = this.scale.height;
     if (w > h) {
