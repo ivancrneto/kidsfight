@@ -1,8 +1,7 @@
 // Unit test for Player 2 attack keys (; and K)
 // Uses Jest-like syntax
 
-import { jest } from '@jest/globals';
-import { tryAttack } from '../gameUtils.mjs';
+const { tryAttack } = require('../gameUtils.cjs');
 
 function createMockScene() {
   return {

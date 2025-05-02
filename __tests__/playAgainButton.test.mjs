@@ -1,8 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { jest } from '@jest/globals';
-import { tryAttack } from '../gameUtils.mjs';
+const { tryAttack } = require('../gameUtils.cjs');
 // __tests__/playAgainButton.test.js
 // Ensures the 'Jogar Novamente' button always shows the full text (no fixedWidth)
 

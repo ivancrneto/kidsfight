@@ -342,4 +342,5 @@ function tryAttack(scene, playerIdx, attacker, defender, now, special) {
   }
 }
 
+// Export the functions - ES modules only
 export { updateSceneLayout, applyGameCss, tryAttack };

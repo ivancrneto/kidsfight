@@ -1,8 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { jest } from '@jest/globals';
-import { tryAttack } from '../gameUtils.mjs';
+const { tryAttack } = require('../gameUtils.cjs');
 
 // Minimal mock for Phaser.Scene and player objects
 function createMockScene() {

@@ -1,5 +1,5 @@
-import { tryAttack } from '../gameUtils.mjs';
-import { fn } from 'jest-mock';
+const { tryAttack } = require('../gameUtils.cjs');
+const fn = jest.fn;
 
 describe('tryAttack', () => {
   function makeSceneWithPlayerHealth() {

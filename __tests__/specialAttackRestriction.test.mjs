@@ -1,8 +1,7 @@
 // Unit test for special attack restriction (must have 3 attacks)
 // Uses Jest-like syntax
 
-import { jest } from '@jest/globals';
-import { tryAttack } from '../gameUtils.mjs';
+const { tryAttack } = require('../gameUtils.cjs');
 
 function createMockScene() {
   return {

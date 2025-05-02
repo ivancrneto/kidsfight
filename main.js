@@ -11,6 +11,7 @@ import scenario1Img from './scenario1.png?url';
 import player1RawImg from './sprites-bento3.png?url';
 import player2RawImg from './sprites-davir3.png?url';
 import RotatePromptScene from './rotate_prompt_scene.js';
+import PlayerSelectScene from './player_select_scene.js';
 
 // Import pure utilities for testability
 import { updateSceneLayout, applyGameCss, tryAttack } from './gameUtils.mjs';
@@ -30,7 +31,7 @@ const MAX_HEALTH = 100;
 
 const ROUND_TIME = 60;
 
-// import PlayerSelectScene from './player_select_scene.js';
+import PlayerSelectScene from './player_select_scene.js';
 
 
 class KidsFightScene extends Phaser.Scene {
@@ -266,10 +267,30 @@ class KidsFightScene extends Phaser.Scene {
   this.platform = platform;
 
   // --- DEFENSIVE: Ensure valid selected and sprite keys ---
-  const playerSpritesSafe = ['player1', 'player2'];
-  const selectedSafe = (this.selected && typeof this.selected.p1 === 'number' && typeof this.selected.p2 === 'number') ? this.selected : { p1: 0, p2: 1 };
-  const p1Key = playerSpritesSafe[selectedSafe.p1] || 'player1';
-  const p2Key = playerSpritesSafe[selectedSafe.p2] || 'player2';
+  console.log('[KidsFightScene] Selected data received:', this.selected);
+  
+  // Default to Bento (0) for P1 and Davi R (1) for P2 if no selection data
+  const selectedSafe = (this.selected && typeof this.selected.p1 === 'number' && typeof this.selected.p2 === 'number') 
+    ? this.selected 
+    : { p1: 0, p2: 1 };
+    
+  console.log('[KidsFightScene] Using selections:', selectedSafe);
+  
+  // Map selection indices to player sprite keys
+  // 0 = Bento (player1), 1 = Davi R (player2)
+  // Use the existing playerSprites array defined earlier
+  const p1Key = selectedSafe.p1 === 0 ? 'player1' : 'player2';
+  const p2Key = selectedSafe.p2 === 0 ? 'player1' : 'player2';
+  
+  // Store the selected keys for later use in animations
+  this.p1SpriteKey = p1Key;
+  this.p2SpriteKey = p2Key;
+  
+  // Store if players selected the same character (for tinting)
+  this.sameCharacterSelected = p1Key === p2Key;
+  
+  console.log('[KidsFightScene] Using sprite keys:', { p1Key, p2Key });
+  console.log('[KidsFightScene] Same character selected:', this.sameCharacterSelected);
   const PLAYER_PLATFORM_OFFSET = 20;
   // Responsive player spawn positions
   const p1X = GAME_WIDTH * 0.25;
@@ -280,6 +301,12 @@ class KidsFightScene extends Phaser.Scene {
   this.player1.setOrigin(0.5, 1); // bottom center
   this.player1.body.setSize(this.player1.displayWidth, this.player1.displayHeight);
   this.player1.body.setOffset(0, 0);
+  
+  // Apply red tint to Player 1 if both players selected the same character
+  if (this.sameCharacterSelected) {
+    this.player1.setTint(0xff9999); // Light red tint
+  }
+  
   // Enable collision with platform
   this.physics.add.collider(this.player1, platform);
   this.player1.setCollideWorldBounds(true);
@@ -291,6 +318,12 @@ class KidsFightScene extends Phaser.Scene {
   this.player2.setOrigin(0.5, 1); // bottom center
   this.player2.body.setSize(this.player2.displayWidth, this.player2.displayHeight);
   this.player2.body.setOffset(0, 0);
+  
+  // Apply blue tint to Player 2 if both players selected the same character
+  if (this.sameCharacterSelected) {
+    this.player2.setTint(0x9999ff); // Light blue tint
+  }
+  
   // Enable collision with platform
   this.physics.add.collider(this.player2, platform);
   this.player2.setCollideWorldBounds(true);
@@ -299,105 +332,166 @@ class KidsFightScene extends Phaser.Scene {
   this.player2.setFlipX(true); // Invert horizontally
 
     // Player 1 Animations (custom frames)
-    if (!this.anims.exists('p1_idle')) {
-      this.anims.create({
-        key: 'p1_idle',
-        frames: [{ key: 'player1', frame: 0 }],
-        frameRate: 1,
-        repeat: -1
-      });
+    // Create or recreate p1 animations with the correct sprite key
+    // We need to recreate these animations each time to use the correct sprite key
+    console.log('[KidsFightScene] Creating animations for P1 with sprite key:', this.p1SpriteKey);
+    
+    // First check if the sprite key exists
+    if (!this.textures.exists(this.p1SpriteKey)) {
+      console.error(`[KidsFightScene] Sprite key ${this.p1SpriteKey} does not exist!`);
+      // Fall back to player1 if the selected sprite doesn't exist
+      this.p1SpriteKey = 'player1';
     }
-    if (!this.anims.exists('p1_walk')) {
-      this.anims.create({
-        key: 'p1_walk',
-        frames: [
-          { key: 'player1', frame: 1 },
-          { key: 'player1', frame: 2 }
-        ],
-        frameRate: 6,
-        repeat: -1
-      });
+    
+    const p1AnimKey = 'p1_idle_' + this.p1SpriteKey;
+    if (this.anims.exists(p1AnimKey)) {
+      this.anims.remove(p1AnimKey);
     }
-    if (!this.anims.exists('p1_attack')) {
-      this.anims.create({
-        key: 'p1_attack',
-        frames: [{ key: 'player1', frame: 4 }], // Use frame 4 for hit
-        frameRate: 1,
-        repeat: 0,
-        duration: 200 // Show hit frame for 200ms
-      });
+    this.anims.create({
+      key: p1AnimKey,
+      frames: [{ key: this.p1SpriteKey, frame: 0 }],
+      frameRate: 1,
+      repeat: -1
+    });
+    // Create or recreate p1_walk animation
+    const p1WalkKey = 'p1_walk_' + this.p1SpriteKey;
+    if (this.anims.exists(p1WalkKey)) {
+      this.anims.remove(p1WalkKey);
     }
-    if (!this.anims.exists('p1_special')) {
-      this.anims.create({
-        key: 'p1_special',
-        frames: [{ key: 'player1', frame: 6 }], // Use frame 6 for special
-        frameRate: 1,
-        repeat: 0,
-        duration: 900 // Show special frame for 900ms
-      });
+    this.anims.create({
+      key: p1WalkKey,
+      frames: [
+        { key: this.p1SpriteKey, frame: 1 },
+        { key: this.p1SpriteKey, frame: 2 }
+      ],
+      frameRate: 6,
+      repeat: -1
+    });
+    
+    // Create or recreate p1_attack animation
+    const p1AttackKey = 'p1_attack_' + this.p1SpriteKey;
+    if (this.anims.exists(p1AttackKey)) {
+      this.anims.remove(p1AttackKey);
     }
-    // Down/crouch animations
-    if (!this.anims.exists('p1_down')) {
-      this.anims.create({
-        key: 'p1_down',
-        frames: [{ key: 'player1', frame: 5 }], // Use 6th image (index 5)
-        frameRate: 1,
-        repeat: -1
-      });
+    this.anims.create({
+      key: p1AttackKey,
+      frames: [{ key: this.p1SpriteKey, frame: 4 }], // Use frame 4 for hit
+      frameRate: 1,
+      repeat: 0,
+      duration: 200 // Show hit frame for 200ms
+    });
+    
+    // Create or recreate p1_special animation
+    const p1SpecialKey = 'p1_special_' + this.p1SpriteKey;
+    if (this.anims.exists(p1SpecialKey)) {
+      this.anims.remove(p1SpecialKey);
     }
+    this.anims.create({
+      key: p1SpecialKey,
+      frames: [{ key: this.p1SpriteKey, frame: 6 }], // Use frame 6 for special
+      frameRate: 1,
+      repeat: 0,
+      duration: 900 // Show special frame for 900ms
+    });
+    
+    // Create or recreate p1_down animation
+    const p1DownKey = 'p1_down_' + this.p1SpriteKey;
+    if (this.anims.exists(p1DownKey)) {
+      this.anims.remove(p1DownKey);
+    }
+    this.anims.create({
+      key: p1DownKey,
+      frames: [{ key: this.p1SpriteKey, frame: 5 }], // Use 6th image (index 5)
+      frameRate: 1,
+      repeat: -1
+    });
 
-    // Animations
-    if (!this.anims.exists('p2_idle')) {
-      this.anims.create({
-        key: 'p2_idle',
-        frames: [{ key: 'player2', frame: 0 }],
-        frameRate: 1,
-        repeat: -1
-      });
+    // Player 2 Animations (custom frames)
+    // Create or recreate p2 animations with the correct sprite key
+    console.log('[KidsFightScene] Creating animations for P2 with sprite key:', this.p2SpriteKey);
+    
+    // First check if the sprite key exists
+    if (!this.textures.exists(this.p2SpriteKey)) {
+      console.error(`[KidsFightScene] Sprite key ${this.p2SpriteKey} does not exist!`);
+      // Fall back to player2 if the selected sprite doesn't exist
+      this.p2SpriteKey = 'player2';
     }
-    if (!this.anims.exists('p2_walk')) {
-      this.anims.create({
-        key: 'p2_walk',
-        frames: [
-          { key: 'player2', frame: 0 },
-          { key: 'player2', frame: 1 }
-        ],
-        frameRate: 6,
-        repeat: -1
-      });
+    
+    const p2AnimKey = 'p2_idle_' + this.p2SpriteKey;
+    if (this.anims.exists(p2AnimKey)) {
+      this.anims.remove(p2AnimKey);
     }
-    if (!this.anims.exists('p2_attack')) {
-      this.anims.create({
-        key: 'p2_attack',
-        frames: [{ key: 'player2', frame: 4 }], // Use frame 4 for hit
-        frameRate: 1,
-        repeat: 0,
-        duration: 200 // Show hit frame for 200ms
-      });
+    this.anims.create({
+      key: p2AnimKey,
+      frames: [{ key: this.p2SpriteKey, frame: 0 }],
+      frameRate: 1,
+      repeat: -1
+    });
+    
+    // Create or recreate p2_walk animation
+    const p2WalkKey = 'p2_walk_' + this.p2SpriteKey;
+    if (this.anims.exists(p2WalkKey)) {
+      this.anims.remove(p2WalkKey);
     }
-    if (!this.anims.exists('p2_down')) {
-      this.anims.create({
-        key: 'p2_down',
-        frames: [{ key: 'player2', frame: 5 }], // Use 6th image (index 5)
-        frameRate: 1,
-        repeat: -1
-      });
+    this.anims.create({
+      key: p2WalkKey,
+      frames: [
+        { key: this.p2SpriteKey, frame: 1 },
+        { key: this.p2SpriteKey, frame: 2 }
+      ],
+      frameRate: 6,
+      repeat: -1
+    });
+    
+    // Create or recreate p2_attack animation
+    const p2AttackKey = 'p2_attack_' + this.p2SpriteKey;
+    if (this.anims.exists(p2AttackKey)) {
+      this.anims.remove(p2AttackKey);
     }
-    if (!this.anims.exists('p2_special')) {
-      this.anims.create({
-        key: 'p2_special',
-        frames: [{ key: 'player2', frame: 6 }], // Use frame 6 for special
-        frameRate: 1,
-        repeat: 0,
-        duration: 900 // Show special frame for 900ms
-      });
+    this.anims.create({
+      key: p2AttackKey,
+      frames: [{ key: this.p2SpriteKey, frame: 4 }], // Use frame 4 for hit
+      frameRate: 1,
+      repeat: 0,
+      duration: 200 // Show hit frame for 200ms
+    });
+    
+    // Create or recreate p2_down animation
+    const p2DownKey = 'p2_down_' + this.p2SpriteKey;
+    if (this.anims.exists(p2DownKey)) {
+      this.anims.remove(p2DownKey);
     }
-    this.player1.play('p1_idle');
+    this.anims.create({
+      key: p2DownKey,
+      frames: [{ key: this.p2SpriteKey, frame: 5 }], // Use 6th image (index 5)
+      frameRate: 1,
+      repeat: -1
+    });
+    
+    // Create or recreate p2_special animation
+    const p2SpecialKey = 'p2_special_' + this.p2SpriteKey;
+    if (this.anims.exists(p2SpecialKey)) {
+      this.anims.remove(p2SpecialKey);
+    }
+    this.anims.create({
+      key: p2SpecialKey,
+      frames: [{ key: this.p2SpriteKey, frame: 6 }], // Use frame 6 for special
+      frameRate: 1,
+      repeat: 0,
+      duration: 900 // Show special frame for 900ms
+    });
+    // Play the correct animations for each player using the dynamic animation keys
+    this.player1.play('p1_idle_' + this.p1SpriteKey);
     this.player1.angle = 0;
     this.player2.angle = 0;
+    if (!this.gameOver) this.player2.play('p2_idle_' + this.p2SpriteKey);
+    
+    console.log('[KidsFightScene] Playing animations:', {
+      p1: 'p1_idle_' + this.p1SpriteKey,
+      p2: 'p2_idle_' + this.p2SpriteKey
+    });
     // Reset loser y offset (in case of rematch)
     this.playerY = playerY; // Store globally for use in endGame
-    if (!this.gameOver) this.player2.play('p2_idle');
     // Store original Y for laying down math
     this.player1._originalY = this.player1.y;
     this.player2._originalY = this.player2.y;
@@ -645,18 +739,22 @@ class KidsFightScene extends Phaser.Scene {
     // Health-based win detection
     if (!this.gameOver && this.player1 && this.player2) {
       if (this.playerHealth[0] <= 0) {
-        this.endGame('Davi R Venceu!');
-        return;
+        // Player 2 won (Player 1 health is 0)
+        const winner = this.p2SpriteKey === 'player1' ? 'Bento' : 'Davi R';
+        return this.endGame(`${winner} Venceu!`);
       } else if (this.playerHealth[1] <= 0) {
-        this.endGame('Bento Venceu!');
-        return;
+        // Player 1 won (Player 2 health is 0)
+        const winner = this.p1SpriteKey === 'player1' ? 'Bento' : 'Davi R';
+        return this.endGame(`${winner} Venceu!`);
       }
     }
     if (this.timeLeft === 0) {
       if (this.playerHealth[0] > this.playerHealth[1]) {
-        this.endGame('Bento Venceu!');
+        const winner = this.p1SpriteKey === 'player1' ? 'Bento' : 'Davi R';
+        this.endGame(`${winner} Venceu!`);
       } else if (this.playerHealth[1] > this.playerHealth[0]) {
-        this.endGame('Davi R Venceu!');
+        const winner = this.p2SpriteKey === 'player1' ? 'Bento' : 'Davi R';
+        this.endGame(`${winner} Venceu!`);
       } else {
         this.endGame('Empate!');
       }
@@ -692,15 +790,16 @@ class KidsFightScene extends Phaser.Scene {
         p1.onFloor() &&
         !this.gameOver
       ) {
-        if (this.player1.anims.currentAnim?.key !== 'p1_walk') {
-          this.player1.play('p1_walk', true);
+        const p1WalkKey = 'p1_walk_' + this.p1SpriteKey;
+        if (this.player1.anims.currentAnim?.key !== p1WalkKey) {
+          this.player1.play(p1WalkKey, true);
         }
       } else if (
         this.player1State === 'idle' &&
-        this.player1.anims.currentAnim?.key === 'p1_walk' &&
+        this.player1.anims.currentAnim?.key === ('p1_walk_' + this.p1SpriteKey) &&
         !this.gameOver
       ) {
-        if (!this.gameOver) this.player1.play('p1_idle', true);
+        if (!this.gameOver) this.player1.play('p1_idle_' + this.p1SpriteKey, true);
       }
     }
     // Player 2 movement
@@ -728,15 +827,16 @@ class KidsFightScene extends Phaser.Scene {
         p2.onFloor() &&
         !this.gameOver
       ) {
-        if (this.player2.anims.currentAnim?.key !== 'p2_walk') {
-          this.player2.play('p2_walk', true);
+        const p2WalkKey = 'p2_walk_' + this.p2SpriteKey;
+        if (this.player2.anims.currentAnim?.key !== p2WalkKey) {
+          this.player2.play(p2WalkKey, true);
         }
       } else if (
         this.player2State === 'idle' &&
-        this.player2.anims.currentAnim?.key === 'p2_walk' &&
+        this.player2.anims.currentAnim?.key === ('p2_walk_' + this.p2SpriteKey) &&
         !this.gameOver
       ) {
-        if (!this.gameOver) this.player2.play('p2_idle', true);
+        if (!this.gameOver) this.player2.play('p2_idle_' + this.p2SpriteKey, true);
       }
     }
 
@@ -746,13 +846,13 @@ class KidsFightScene extends Phaser.Scene {
         // Do not interrupt attack/special
       } else if (this.keys && ((this.keys.n && this.keys.n.isDown) || (this.keys.s && this.keys.s.isDown))) {
         if (this.player1State !== 'down') {
-          this.player1.play('p1_down', true);
+          this.player1.play('p1_down_' + this.p1SpriteKey, true);
           this.player1State = 'down';
         }
       } else {
         if (this.player1State !== 'idle') {
           // Only play idle if game is not over
-          if (!this.gameOver) this.player1.play('p1_idle', true);
+          if (!this.gameOver) this.player1.play('p1_idle_' + this.p1SpriteKey, true);
           this.player1State = 'idle';
 // console.log('[DEBUG] player1State set to:', this.player1State);
         }
@@ -764,14 +864,14 @@ class KidsFightScene extends Phaser.Scene {
         // Do not interrupt attack/special
       } else if ((this.cursors && this.cursors.down && this.cursors.down.isDown) || (this.keys && this.keys.semicolon && this.keys.semicolon.isDown)) {
         if (this.player2State !== 'down') {
-          this.player2.play('p2_down', true);
+          this.player2.play('p2_down_' + this.p2SpriteKey, true);
           this.player2.setFlipX(true);
           this.player2State = 'down';
         }
       } else {
         if (this.player2State !== 'idle') {
           // Only play idle if game is not over
-          if (!this.gameOver) this.player2.play('p2_idle', true);
+          if (!this.gameOver) this.player2.play('p2_idle_' + this.p2SpriteKey, true);
           this.player2.setFlipX(true);
           this.player2State = 'idle';
         }
@@ -796,8 +896,9 @@ class KidsFightScene extends Phaser.Scene {
       // console.log('[DEBUG] Attack block entered, player1:', this.player1);
       // Now always allowed to attack here, no further state check needed
         // console.log('[DEBUG] Triggering attack animation');
-        // console.log('[DEBUG] Anim exists:', this.anims.exists('p1_attack'));
-        this.player1.play('p1_attack', true);
+        const p1AttackKey = 'p1_attack_' + this.p1SpriteKey;
+        // console.log('[DEBUG] Using attack animation key:', p1AttackKey);
+        this.player1.play(p1AttackKey, true);
         this.player1State = 'attack';
         // console.log('[DEBUG] player1State set to:', this.player1State);
         // Deal damage to player2 if in range
@@ -809,7 +910,7 @@ class KidsFightScene extends Phaser.Scene {
         // Manually switch to idle after 400ms
         this.time.delayedCall(400, () => {
           if (this.player1State === 'attack' && !this.gameOver) {
-            this.player1.play('p1_idle', true);
+            this.player1.play('p1_idle_' + this.p1SpriteKey, true);
             this.player1State = 'idle';
             // console.log('[DEBUG] player1State set to:', this.player1State);
           }
@@ -826,15 +927,16 @@ class KidsFightScene extends Phaser.Scene {
     ) || (this._touchJustPressedP1S && this.player1State !== 'attack' && this.player1State !== 'special' && this.attackCount[0] >= 3);
     if (specialConditionP1) {
       this._touchJustPressedP1S = false;
-      this.player1.play('p1_special', true);
+      const p1SpecialKey = 'p1_special_' + this.p1SpriteKey;
+      this.player1.play(p1SpecialKey, true);
       this.player1State = 'special';
       tryAttack(this, 0, this.player1, this.player2, now, true);
       const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
       this.healthBar2.width = 200 * healthRatio;
       this.showSpecialEffect(this.player1.x, this.player1.y - 60);
       this.time.delayedCall(700, () => {
-         if (this.player1State === 'special' && !this.gameOver) {
-           this.player1.play('p1_idle', true);
+          if (this.player1State === 'special' && !this.gameOver) {
+           this.player1.play('p1_idle_' + this.p1SpriteKey, true);
            this.player1State = 'idle';
            // Reset special pips after special is used
            this.attackCount[0] = 0;
@@ -853,7 +955,8 @@ class KidsFightScene extends Phaser.Scene {
     if (attackConditionP2) {
       // Always reset touch flag after attack (fixes mobile bug for Player 2)
       this._touchJustPressedP2A = false;
-      this.player2.play('p2_attack', true);
+      const p2AttackKey = 'p2_attack_' + this.p2SpriteKey;
+      this.player2.play(p2AttackKey, true);
       this.player2State = 'attack';
       // console.log('[DEBUG] Player 2 attack');
       tryAttack(this, 1, this.player2, this.player1, now, false);
@@ -861,7 +964,7 @@ class KidsFightScene extends Phaser.Scene {
       this.healthBar1.width = 200 * healthRatio1;
       this.time.delayedCall(400, () => {
          if (this.player2State === 'attack' && !this.gameOver) {
-           this.player2.play('p2_idle', true);
+           this.player2.play('p2_idle_' + this.p2SpriteKey, true);
            this.player2State = 'idle';
          }
        });
@@ -877,7 +980,8 @@ class KidsFightScene extends Phaser.Scene {
     ) || (this._touchJustPressedP2S && this.player2State !== 'attack' && this.player2State !== 'special' && this.attackCount[1] >= 3);
     if (specialConditionP2) {
       this._touchJustPressedP2S = false;
-      this.player2.play('p2_special', true);
+      const p2SpecialKey = 'p2_special_' + this.p2SpriteKey;
+      this.player2.play(p2SpecialKey, true);
       this.player2State = 'special';
       tryAttack(this, 1, this.player2, this.player1, now, true);
       const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
@@ -885,7 +989,7 @@ class KidsFightScene extends Phaser.Scene {
       this.showSpecialEffect(this.player2.x, this.player2.y - 60);
       this.time.delayedCall(700, () => {
         if (this.player2State === 'special' && !this.gameOver) {
-          this.player2.play('p2_idle', true);
+          this.player2.play('p2_idle_' + this.p2SpriteKey, true);
           this.player2State = 'idle';
           // Reset special pips after special is used
           this.attackCount[1] = 0;
@@ -971,7 +1075,8 @@ class KidsFightScene extends Phaser.Scene {
     playAgainBtn.on('pointerdown', () => {
       winText.destroy();
       playAgainBtn.destroy();
-      this.scene.restart();
+      // Go to player selection screen instead of restarting the current scene
+      this.scene.start('PlayerSelectScene');
     });
     // Winner celebrates, loser lays down
     if (this.player1 && this.player2) {
@@ -1090,7 +1195,7 @@ const config = {
   height: GAME_HEIGHT,
   backgroundColor: '#222',
   parent: 'game-container',
-  scene: [RotatePromptScene, KidsFightScene],
+  scene: [RotatePromptScene, PlayerSelectScene, KidsFightScene],
   physics: {
     default: 'arcade',
     arcade: {
@@ -1132,12 +1237,14 @@ window.onload = () => {
     config.height = window.innerHeight;
     config.scale.width = window.innerWidth;
     config.scale.height = window.innerHeight;
-    config.scene = [RotatePromptScene, KidsFightScene];
+    config.scene = [RotatePromptScene, PlayerSelectScene, KidsFightScene];
+    console.log('[KidsFight] Game scenes:', config.scene.map(scene => scene.name || scene.prototype.constructor.name));
+    console.log('[KidsFight] PlayerSelectScene included:', config.scene.some(scene => scene === PlayerSelectScene));
     game = new Phaser.Game(config);
     if (startScene === 'RotatePromptScene') {
       game.scene.start('RotatePromptScene');
     } else {
-      game.scene.start('KidsFightScene');
+      game.scene.start('PlayerSelectScene');
     }
     return game;
   }
@@ -1147,12 +1254,22 @@ window.onload = () => {
   let lastWasPortrait = null;
   let recreateTimeout = null;
   function showCorrectScene() {
-    const portrait = isMobile() && !isLandscape();
+    // For debugging: Always show the game regardless of orientation
+    const portrait = false; // Force landscape mode for testing
+    console.log('[KidsFight] Orientation check:', { 
+      isMobile: isMobile(), 
+      isLandscape: isLandscape(), 
+      portrait: portrait,
+      windowWidth: window.innerWidth,
+      windowHeight: window.innerHeight
+    });
+    
     if (portrait) {
       if (!game) {
         game = createGame('RotatePromptScene');
       } else {
         game.scene.stop('KidsFightScene');
+        game.scene.stop('PlayerSelectScene');
         game.scene.start('RotatePromptScene');
       }
       lastWasPortrait = true;
@@ -1171,16 +1288,16 @@ window.onload = () => {
         }
         if (recreateTimeout) clearTimeout(recreateTimeout);
         recreateTimeout = setTimeout(() => {
-          game = createGame('KidsFightScene');
+          game = createGame('PlayerSelectScene');
         }, 120);
         lastWasPortrait = false;
       } else {
         if (!game) {
-          game = createGame('KidsFightScene');
+          game = createGame('PlayerSelectScene');
         } else {
           game.scene.stop('RotatePromptScene');
-          if (!game.scene.isActive('KidsFightScene')) {
-            game.scene.start('KidsFightScene');
+          if (!game.scene.isActive('PlayerSelectScene') && !game.scene.isActive('KidsFightScene')) {
+            game.scene.start('PlayerSelectScene');
           }
         }
       }

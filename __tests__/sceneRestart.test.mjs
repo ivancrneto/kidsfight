@@ -1,8 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { jest } from '@jest/globals';
-import { tryAttack } from '../gameUtils.mjs';
+const { tryAttack } = require('../gameUtils.cjs');
 // __tests__/sceneRestart.test.js
 // Tests that KidsFightScene resets all state and keyboard input works after restart
 
