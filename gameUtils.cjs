@@ -189,5 +189,96 @@ function tryAttack(scene, playerIdx, attacker, defender, now, special) {
   }
 }
 
+// Mock KidsFightScene class for testing
+class KidsFightScene {
+  constructor() {
+    this.gameOver = false;
+    this.playerHealth = [100, 100];
+    this.p1SpriteKey = 'player1';
+    this.p2SpriteKey = 'player2';
+    this.timeLeft = 60;
+    this.isReady = true;
+    this.scale = { width: 800, height: 600 };
+    
+    // Mock Phaser objects
+    this.add = {
+      text: jest.fn().mockReturnValue({
+        setOrigin: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis()
+      }),
+      rectangle: jest.fn().mockReturnValue({
+        setInteractive: jest.fn().mockReturnThis(),
+        on: jest.fn()
+      })
+    };
+    
+    this.tweens = {
+      add: jest.fn()
+    };
+    
+    this.scene = {
+      start: jest.fn()
+    };
+  }
+  
+  // Helper method to get character name from sprite key
+  getCharacterName(spriteKey) {
+    switch(spriteKey) {
+      case 'player1': return 'Bento';
+      case 'player2': return 'Davi R';
+      case 'player3': return 'José';
+      case 'player4': return 'Davi S';
+      default: return 'Jogador';
+    }
+  }
+  
+  // Simplified checkWinner method for testing
+  checkWinner() {
+    if (this.gameOver) return;
+    
+    if (this.playerHealth[0] <= 0) {
+      // Player 2 won
+      const winner = this.getCharacterName(this.p2SpriteKey);
+      this.endGame(`${winner} Venceu!`);
+      return true;
+    } else if (this.playerHealth[1] <= 0) {
+      // Player 1 won
+      const winner = this.getCharacterName(this.p1SpriteKey);
+      this.endGame(`${winner} Venceu!`);
+      return true;
+    } else if (this.timeLeft <= 0) {
+      // Time's up - check who has more health
+      if (this.playerHealth[0] > this.playerHealth[1]) {
+        const winner = this.getCharacterName(this.p1SpriteKey);
+        this.endGame(`${winner} Venceu!`);
+      } else if (this.playerHealth[1] > this.playerHealth[0]) {
+        const winner = this.getCharacterName(this.p2SpriteKey);
+        this.endGame(`${winner} Venceu!`);
+      } else {
+        this.endGame('Empate!');
+      }
+      return true;
+    }
+    
+    return false;
+  }
+  
+  // Simplified endGame method for testing
+  endGame(message) {
+    this.gameOver = true;
+    this.gameOverMessage = message;
+    this.add.text(400, 300, message, {
+      fontSize: '32px',
+      fill: '#ffffff'
+    }).setOrigin(0.5).setDepth(1000);
+    
+    const playAgainBtn = this.add.rectangle(400, 350, 200, 50, 0x00ff00);
+    playAgainBtn.setInteractive();
+    playAgainBtn.on('pointerdown', () => {
+      this.scene.start('PlayerSelectScene');
+    });
+  }
+}
+
 // CommonJS exports
-module.exports = { updateSceneLayout, applyGameCss, tryAttack };
+module.exports = { updateSceneLayout, applyGameCss, tryAttack, KidsFightScene };

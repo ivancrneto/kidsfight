@@ -10,6 +10,8 @@ function isLandscape() {
 import scenario1Img from './scenario1.png?url';
 import player1RawImg from './sprites-bento3.png?url';
 import player2RawImg from './sprites-davir3.png?url';
+import player3RawImg from './sprites-jose3.png?url';
+import player4RawImg from './sprites-davis3.png?url';
 import RotatePromptScene from './rotate_prompt_scene.js';
 import PlayerSelectScene from './player_select_scene.js';
 
@@ -35,6 +37,16 @@ import PlayerSelectScene from './player_select_scene.js';
 
 
 class KidsFightScene extends Phaser.Scene {
+  // Helper method to get character name from sprite key
+  getCharacterName(spriteKey) {
+    switch(spriteKey) {
+      case 'player1': return 'Bento';
+      case 'player2': return 'Davi R';
+      case 'player3': return 'José';
+      case 'player4': return 'Davi S';
+      default: return 'Jogador';
+    }
+  }
   // --- EFFECTS: Special Effect Helper (Phaser 3.60+ workaround) ---
   showSpecialEffect(x, y, count = 30) {
     if (!this.specialEffect) return;
@@ -76,13 +88,12 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   preload() {
-    // Debug: Print imported image URLs and types
-    // console.log('scenario1Img', scenario1Img, typeof scenario1Img);
-    // console.log('player1RawImg', player1RawImg, typeof player1RawImg);
-    // console.log('player2RawImg', player2RawImg, typeof player2RawImg);
-    // Load player sprite sheets (256x256)
+    console.log('[KidsFightScene] Preloading assets...');
+    this.load.image('scenario1', scenario1Img);
     this.load.image('player1_raw', player1RawImg);
     this.load.image('player2_raw', player2RawImg);
+    this.load.image('player3_raw', player3RawImg);
+    this.load.image('player4_raw', player4RawImg);
     // Load scenario background
     this.load.image('scenario1', scenario1Img);
     // Load particle spritesheet for effects
@@ -103,16 +114,17 @@ class KidsFightScene extends Phaser.Scene {
     this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
     // console.log('[DEBUG] create() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
     // --- CREATE CUSTOM SPRITESHEETS FIRST ---
-    // Player 1
+    // Player 1 Spritesheet
     if (!this.textures.exists('player1')) {
-      const frameWidths = [300, 300, 400, 460, 500, 440, 440, 440];
+      console.log('[KidsFightScene] Creating player1 spritesheet');
+      const frameWidths = [300, 300, 430, 580, 580, 440, 440, 440];
       const frameHeight = 512;
       const player1Texture = this.textures.get('player1_raw').getSourceImage();
       this.textures.addSpriteSheet('player1', player1Texture, {
         frameWidth: 430,
         frameHeight: frameHeight,
         startFrame: 0,
-        endFrame: 6
+        endFrame: frameWidths.length - 1
       });
       const tex = this.textures.get('player1');
       tex.frames = { __BASE: tex.frames['__BASE'] };
@@ -122,23 +134,67 @@ class KidsFightScene extends Phaser.Scene {
         x += frameWidths[i];
       }
     }
-    // Player 2
+
+    // Player 2 Spritesheet
     if (!this.textures.exists('player2')) {
-      const frameWidths2 = [300, 300, 400, 460, 500, 400, 400, 400];
-      const frameHeight2 = 512;
+      console.log('[KidsFightScene] Creating player2 spritesheet');
+      const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
+      const frameHeight = 512;
       const player2Texture = this.textures.get('player2_raw').getSourceImage();
       this.textures.addSpriteSheet('player2', player2Texture, {
         frameWidth: 400,
-        frameHeight: frameHeight2,
+        frameHeight: frameHeight,
         startFrame: 0,
-        endFrame: frameWidths2.length - 1
+        endFrame: frameWidths.length - 1
       });
-      const tex2 = this.textures.get('player2');
-      tex2.frames = { __BASE: tex2.frames['__BASE'] };
-      let x2 = 0;
-      for (let i = 0; i < frameWidths2.length; i++) {
-        tex2.add(i, 0, x2, 0, frameWidths2[i], frameHeight2);
-        x2 += frameWidths2[i];
+      const tex = this.textures.get('player2');
+      tex.frames = { __BASE: tex.frames['__BASE'] };
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
+      }
+    }
+    
+    // Player 3 (José) Spritesheet
+    if (!this.textures.exists('player3')) {
+      console.log('[KidsFightScene] Creating player3 spritesheet');
+      const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
+      const frameHeight = 512;
+      const player3Texture = this.textures.get('player3_raw').getSourceImage();
+      this.textures.addSpriteSheet('player3', player3Texture, {
+        frameWidth: 400,
+        frameHeight: frameHeight,
+        startFrame: 0,
+        endFrame: frameWidths.length - 1
+      });
+      const tex = this.textures.get('player3');
+      tex.frames = { __BASE: tex.frames['__BASE'] };
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
+      }
+    }
+    
+    // Player 4 (Davi S) Spritesheet
+    if (!this.textures.exists('player4')) {
+      console.log('[KidsFightScene] Creating player4 spritesheet');
+      const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
+      const frameHeight = 512;
+      const player4Texture = this.textures.get('player4_raw').getSourceImage();
+      this.textures.addSpriteSheet('player4', player4Texture, {
+        frameWidth: 400,
+        frameHeight: frameHeight,
+        startFrame: 0,
+        endFrame: frameWidths.length - 1
+      });
+      const tex = this.textures.get('player4');
+      tex.frames = { __BASE: tex.frames['__BASE'] };
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
       }
     }
     // Add background image
@@ -236,7 +292,7 @@ class KidsFightScene extends Phaser.Scene {
 
   // --- EFFECTS ---
   // --- PLAYER SPAWN LOGIC (moved from orphaned code) ---
-  const playerSprites = ['player1', 'player2'];
+  const playerSprites = ['player1', 'player2', 'player3', 'player4'];
   // Responsive player scale based on height (target ~38% of screen height)
   const scale = (GAME_HEIGHT * 0.38) / 512;
   const frameHeight = 512;
@@ -277,10 +333,10 @@ class KidsFightScene extends Phaser.Scene {
   console.log('[KidsFightScene] Using selections:', selectedSafe);
   
   // Map selection indices to player sprite keys
-  // 0 = Bento (player1), 1 = Davi R (player2)
+  // 0 = Bento (player1), 1 = Davi R (player2), 2 = José (player3), 3 = Davi S (player4)
   // Use the existing playerSprites array defined earlier
-  const p1Key = selectedSafe.p1 === 0 ? 'player1' : 'player2';
-  const p2Key = selectedSafe.p2 === 0 ? 'player1' : 'player2';
+  const p1Key = playerSprites[selectedSafe.p1] || 'player1';
+  const p2Key = playerSprites[selectedSafe.p2] || 'player2';
   
   // Store the selected keys for later use in animations
   this.p1SpriteKey = p1Key;
@@ -740,20 +796,24 @@ class KidsFightScene extends Phaser.Scene {
     if (!this.gameOver && this.player1 && this.player2) {
       if (this.playerHealth[0] <= 0) {
         // Player 2 won (Player 1 health is 0)
-        const winner = this.p2SpriteKey === 'player1' ? 'Bento' : 'Davi R';
+        // Get the correct character name based on sprite key
+        const winner = this.getCharacterName(this.p2SpriteKey);
         return this.endGame(`${winner} Venceu!`);
       } else if (this.playerHealth[1] <= 0) {
         // Player 1 won (Player 2 health is 0)
-        const winner = this.p1SpriteKey === 'player1' ? 'Bento' : 'Davi R';
+        // Get the correct character name based on sprite key
+        const winner = this.getCharacterName(this.p1SpriteKey);
         return this.endGame(`${winner} Venceu!`);
       }
     }
     if (this.timeLeft === 0) {
       if (this.playerHealth[0] > this.playerHealth[1]) {
-        const winner = this.p1SpriteKey === 'player1' ? 'Bento' : 'Davi R';
+        // Get the correct character name based on sprite key
+        const winner = this.getCharacterName(this.p1SpriteKey);
         this.endGame(`${winner} Venceu!`);
       } else if (this.playerHealth[1] > this.playerHealth[0]) {
-        const winner = this.p2SpriteKey === 'player1' ? 'Bento' : 'Davi R';
+        // Get the correct character name based on sprite key
+        const winner = this.getCharacterName(this.p2SpriteKey);
         this.endGame(`${winner} Venceu!`);
       } else {
         this.endGame('Empate!');
