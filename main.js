@@ -7,15 +7,15 @@ function isLandscape() {
 }
 
 // Parcel image imports for Phaser asset loading
-import scenario1Img from './scenario1.png?url';
-import player1RawImg from './sprites-bento3.png?url';
-import player2RawImg from './sprites-davir3.png?url';
-import player3RawImg from './sprites-jose3.png?url';
-import player4RawImg from './sprites-davis3.png?url';
-import player5RawImg from './sprites-carol3.png?url';
-import player6RawImg from './sprites-roni3.png?url';
-import player7RawImg from './sprites-jacqueline3.png?url';
-import player8RawImg from './sprites-ivan3.png?url';
+import scenario1Img from './scenario1.png';
+import player1RawImg from './sprites-bento3.png';
+import player2RawImg from './sprites-davir3.png';
+import player3RawImg from './sprites-jose3.png';
+import player4RawImg from './sprites-davis3.png';
+import player5RawImg from './sprites-carol3.png';
+import player6RawImg from './sprites-roni3.png';
+import player7RawImg from './sprites-jacqueline3.png';
+import player8RawImg from './sprites-ivan3.png';
 import RotatePromptScene from './rotate_prompt_scene.js';
 import PlayerSelectScene from './player_select_scene.js';
 
