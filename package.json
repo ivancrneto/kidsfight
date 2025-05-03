@@ -2,7 +2,7 @@
   "name": "kidsfight",
   "version": "1.0.0",
   "description": "Cartoon-style fighting game using Phaser JS",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "start": "parcel serve index.html --host 0.0.0.0 --no-cache",
     "build": "parcel build index.html",

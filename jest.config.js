@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   testEnvironment: 'jsdom',
   setupFiles: ["jest-canvas-mock"],
   testMatch: ["**/?(*.)+(test).[jt]s", "**/?(*.)+(test).mjs"],

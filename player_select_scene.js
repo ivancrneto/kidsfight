@@ -44,8 +44,8 @@ class PlayerSelectScene extends Phaser.Scene {
     // Create a simple background
     const bg = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
     
-    // Add title text
-    this.add.text(400, 100, 'ESCOLHA SEUS LUTADORES', {
+    // Add title text at the very top
+    this.add.text(400, 40, 'ESCOLHA SEUS LUTADORES', {
       fontSize: '32px',
       fill: '#ffffff',
       fontStyle: 'bold'
@@ -342,7 +342,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     p1Option6.on('pointerdown', () => {
       this.selected.p1 = 5;
-      this.p1Selector.setPosition(185, 290);
+      this.p1Selector.setPosition(150, 290);
       console.log('[PlayerSelectScene] Player 1 selected Roni (5)', this.selected);
     });
     
@@ -390,7 +390,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     p2Option6.on('pointerdown', () => {
       this.selected.p2 = 5;
-      this.p2Selector.setPosition(615, 290);
+      this.p2Selector.setPosition(580, 290);
       console.log('[PlayerSelectScene] Player 2 selected Roni (5)', this.selected);
     });
     
@@ -406,8 +406,8 @@ class PlayerSelectScene extends Phaser.Scene {
       console.log('[PlayerSelectScene] Player 2 selected Ivan (7)', this.selected);
     });
     
-    // Start button - position it even higher on the screen
-    const buttonY = Math.min(screenHeight * 0.40, 290); // Much higher position - 40% of screen height, capped at 290px
+    // Start button - move it well below the portraits
+    const buttonY = Math.max(screenHeight * 0.65, 390); // Always below last row, with margin
     
     // Make button more visible with brighter color, larger size, and border
     const startBtn = this.add.rectangle(400, buttonY, 240, 70, 0x00ff00)

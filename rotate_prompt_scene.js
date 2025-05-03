@@ -29,7 +29,8 @@ class RotatePromptScene extends Phaser.Scene {
 
   update() {
     if (this.scale.orientation === Phaser.Scale.LANDSCAPE) {
-      this.scene.start('KidsFightScene');
+      console.log('[RotatePromptScene] Starting PlayerSelectScene');
+      this.scene.start('PlayerSelectScene');
     }
   }
 }
