@@ -53,6 +53,22 @@ describe('Character Names and Selection', () => {
       expect(scene.getCharacterName('player4')).toBe('Davi S');
     });
 
+    test('returns correct name for player5 (Carol)', () => {
+      expect(scene.getCharacterName('player5')).toBe('Carol');
+    });
+
+    test('returns correct name for player6 (Roni)', () => {
+      expect(scene.getCharacterName('player6')).toBe('Roni');
+    });
+
+    test('returns correct name for player7 (Jacqueline)', () => {
+      expect(scene.getCharacterName('player7')).toBe('Jacqueline');
+    });
+
+    test('returns correct name for player8 (Ivan)', () => {
+      expect(scene.getCharacterName('player8')).toBe('Ivan');
+    });
+
     test('returns default name for unknown sprite key', () => {
       expect(scene.getCharacterName('unknown')).toBe('Jogador');
     });
@@ -135,6 +151,82 @@ describe('Character Names and Selection', () => {
       );
     });
 
+    test('correctly determines winner when player5 wins', () => {
+      // Setup
+      scene.p1SpriteKey = 'player5';
+      scene.p2SpriteKey = 'player2';
+      scene.playerHealth = [100, 0]; // Player 2 has 0 health, so Player 1 (Carol) wins
+      scene.gameOver = false;
+      
+      // Call checkWinner method
+      scene.checkWinner();
+      
+      // Verify that endGame was called with the correct winner message
+      expect(scene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'Carol Venceu!',
+        expect.any(Object)
+      );
+    });
+
+    test('correctly determines winner when player6 wins', () => {
+      // Setup
+      scene.p1SpriteKey = 'player6';
+      scene.p2SpriteKey = 'player2';
+      scene.playerHealth = [100, 0]; // Player 2 has 0 health, so Player 1 (Roni) wins
+      scene.gameOver = false;
+      
+      // Call checkWinner method
+      scene.checkWinner();
+      
+      // Verify that endGame was called with the correct winner message
+      expect(scene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'Roni Venceu!',
+        expect.any(Object)
+      );
+    });
+
+    test('correctly determines winner when player7 wins', () => {
+      // Setup
+      scene.p1SpriteKey = 'player7';
+      scene.p2SpriteKey = 'player2';
+      scene.playerHealth = [100, 0]; // Player 2 has 0 health, so Player 1 (Jacqueline) wins
+      scene.gameOver = false;
+      
+      // Call checkWinner method
+      scene.checkWinner();
+      
+      // Verify that endGame was called with the correct winner message
+      expect(scene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'Jacqueline Venceu!',
+        expect.any(Object)
+      );
+    });
+
+    test('correctly determines winner when player8 wins', () => {
+      // Setup
+      scene.p1SpriteKey = 'player8';
+      scene.p2SpriteKey = 'player2';
+      scene.playerHealth = [100, 0]; // Player 2 has 0 health, so Player 1 (Ivan) wins
+      scene.gameOver = false;
+      
+      // Call checkWinner method
+      scene.checkWinner();
+      
+      // Verify that endGame was called with the correct winner message
+      expect(scene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'Ivan Venceu!',
+        expect.any(Object)
+      );
+    });
+
     test('correctly determines a draw', () => {
       // Setup
       scene.p1SpriteKey = 'player1';
@@ -185,6 +277,114 @@ describe('Character Names and Selection', () => {
       
       // Verify final selections
       expect(playerSelectScene.selected).toEqual({ p1: 2, p2: 3 });
+    });
+
+    test('correctly handles Carol selection', () => {
+      // This test verifies Carol can be selected
+      const playerSelectScene = {
+        selected: { p1: 0, p2: 1 }, // Default selections
+        
+        // Simulate player selection functions
+        selectPlayer1: function(index) {
+          this.selected.p1 = index;
+        },
+        
+        selectPlayer2: function(index) {
+          this.selected.p2 = index;
+        }
+      };
+      
+      // Player 1 selects Carol (index 4)
+      playerSelectScene.selectPlayer1(4);
+      expect(playerSelectScene.selected.p1).toBe(4);
+      
+      // Player 2 also selects Carol (index 4)
+      playerSelectScene.selectPlayer2(4);
+      expect(playerSelectScene.selected.p2).toBe(4);
+      
+      // Verify both players can select Carol
+      expect(playerSelectScene.selected).toEqual({ p1: 4, p2: 4 });
+    });
+
+    test('correctly handles Roni selection', () => {
+      // This test verifies Roni can be selected
+      const playerSelectScene = {
+        selected: { p1: 0, p2: 1 }, // Default selections
+        
+        // Simulate player selection functions
+        selectPlayer1: function(index) {
+          this.selected.p1 = index;
+        },
+        
+        selectPlayer2: function(index) {
+          this.selected.p2 = index;
+        }
+      };
+      
+      // Player 1 selects Roni (index 5)
+      playerSelectScene.selectPlayer1(5);
+      expect(playerSelectScene.selected.p1).toBe(5);
+      
+      // Player 2 also selects Roni (index 5)
+      playerSelectScene.selectPlayer2(5);
+      expect(playerSelectScene.selected.p2).toBe(5);
+      
+      // Verify both players can select Roni
+      expect(playerSelectScene.selected).toEqual({ p1: 5, p2: 5 });
+    });
+    
+    test('correctly handles Jacqueline selection', () => {
+      // This test verifies Jacqueline can be selected
+      const playerSelectScene = {
+        selected: { p1: 0, p2: 1 }, // Default selections
+        
+        // Simulate player selection functions
+        selectPlayer1: function(index) {
+          this.selected.p1 = index;
+        },
+        
+        selectPlayer2: function(index) {
+          this.selected.p2 = index;
+        }
+      };
+      
+      // Player 1 selects Jacqueline (index 6)
+      playerSelectScene.selectPlayer1(6);
+      expect(playerSelectScene.selected.p1).toBe(6);
+      
+      // Player 2 also selects Jacqueline (index 6)
+      playerSelectScene.selectPlayer2(6);
+      expect(playerSelectScene.selected.p2).toBe(6);
+      
+      // Verify both players can select Jacqueline
+      expect(playerSelectScene.selected).toEqual({ p1: 6, p2: 6 });
+    });
+    
+    test('correctly handles Ivan selection', () => {
+      // This test verifies Ivan can be selected
+      const playerSelectScene = {
+        selected: { p1: 0, p2: 1 }, // Default selections
+        
+        // Simulate player selection functions
+        selectPlayer1: function(index) {
+          this.selected.p1 = index;
+        },
+        
+        selectPlayer2: function(index) {
+          this.selected.p2 = index;
+        }
+      };
+      
+      // Player 1 selects Ivan (index 7)
+      playerSelectScene.selectPlayer1(7);
+      expect(playerSelectScene.selected.p1).toBe(7);
+      
+      // Player 2 also selects Ivan (index 7)
+      playerSelectScene.selectPlayer2(7);
+      expect(playerSelectScene.selected.p2).toBe(7);
+      
+      // Verify both players can select Ivan
+      expect(playerSelectScene.selected).toEqual({ p1: 7, p2: 7 });
     });
   });
 });

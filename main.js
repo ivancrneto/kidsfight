@@ -12,11 +12,15 @@ import player1RawImg from './sprites-bento3.png?url';
 import player2RawImg from './sprites-davir3.png?url';
 import player3RawImg from './sprites-jose3.png?url';
 import player4RawImg from './sprites-davis3.png?url';
+import player5RawImg from './sprites-carol3.png?url';
+import player6RawImg from './sprites-roni3.png?url';
+import player7RawImg from './sprites-jacqueline3.png?url';
+import player8RawImg from './sprites-ivan3.png?url';
 import RotatePromptScene from './rotate_prompt_scene.js';
 import PlayerSelectScene from './player_select_scene.js';
 
-// Import pure utilities for testability
-import { updateSceneLayout, applyGameCss, tryAttack } from './gameUtils.mjs';
+// Load gameUtils.js via script tag instead of import
+// The functions will be available globally
 
 
 // Dynamically set game size based on viewport, accounting for mobile browser UI
@@ -44,6 +48,10 @@ class KidsFightScene extends Phaser.Scene {
       case 'player2': return 'Davi R';
       case 'player3': return 'José';
       case 'player4': return 'Davi S';
+      case 'player5': return 'Carol';
+      case 'player6': return 'Roni';
+      case 'player7': return 'Jacqueline';
+      case 'player8': return 'Ivan';
       default: return 'Jogador';
     }
   }
@@ -94,6 +102,10 @@ class KidsFightScene extends Phaser.Scene {
     this.load.image('player2_raw', player2RawImg);
     this.load.image('player3_raw', player3RawImg);
     this.load.image('player4_raw', player4RawImg);
+    this.load.image('player5_raw', player5RawImg);
+    this.load.image('player6_raw', player6RawImg);
+    this.load.image('player7_raw', player7RawImg);
+    this.load.image('player8_raw', player8RawImg);
     // Load scenario background
     this.load.image('scenario1', scenario1Img);
     // Load particle spritesheet for effects
@@ -197,6 +209,90 @@ class KidsFightScene extends Phaser.Scene {
         x += frameWidths[i];
       }
     }
+    
+    // Player 5 (Carol) Spritesheet
+    if (!this.textures.exists('player5')) {
+      console.log('[KidsFightScene] Creating player5 spritesheet');
+      const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
+      const frameHeight = 512;
+      const player5Texture = this.textures.get('player5_raw').getSourceImage();
+      this.textures.addSpriteSheet('player5', player5Texture, {
+        frameWidth: 400,
+        frameHeight: frameHeight,
+        startFrame: 0,
+        endFrame: frameWidths.length - 1
+      });
+      const tex = this.textures.get('player5');
+      tex.frames = { __BASE: tex.frames['__BASE'] };
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
+      }
+    }
+    
+    // Player 6 (Roni) Spritesheet
+    if (!this.textures.exists('player6')) {
+      console.log('[KidsFightScene] Creating player6 spritesheet');
+      const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
+      const frameHeight = 512;
+      const player6Texture = this.textures.get('player6_raw').getSourceImage();
+      this.textures.addSpriteSheet('player6', player6Texture, {
+        frameWidth: 400,
+        frameHeight: frameHeight,
+        startFrame: 0,
+        endFrame: frameWidths.length - 1
+      });
+      const tex = this.textures.get('player6');
+      tex.frames = { __BASE: tex.frames['__BASE'] };
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
+      }
+    }
+    
+    // Player 7 (Jacqueline) Spritesheet
+    if (!this.textures.exists('player7')) {
+      console.log('[KidsFightScene] Creating player7 spritesheet');
+      const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
+      const frameHeight = 512;
+      const player7Texture = this.textures.get('player7_raw').getSourceImage();
+      this.textures.addSpriteSheet('player7', player7Texture, {
+        frameWidth: 400,
+        frameHeight: frameHeight,
+        startFrame: 0,
+        endFrame: frameWidths.length - 1
+      });
+      const tex = this.textures.get('player7');
+      tex.frames = { __BASE: tex.frames['__BASE'] };
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
+      }
+    }
+    
+    // Player 8 (Ivan) Spritesheet
+    if (!this.textures.exists('player8')) {
+      console.log('[KidsFightScene] Creating player8 spritesheet');
+      const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
+      const frameHeight = 512;
+      const player8Texture = this.textures.get('player8_raw').getSourceImage();
+      this.textures.addSpriteSheet('player8', player8Texture, {
+        frameWidth: 400,
+        frameHeight: frameHeight,
+        startFrame: 0,
+        endFrame: frameWidths.length - 1
+      });
+      const tex = this.textures.get('player8');
+      tex.frames = { __BASE: tex.frames['__BASE'] };
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
+      }
+    }
     // Add background image
 
     const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'scenario1').setOrigin(0.5, 0.5);
@@ -292,7 +388,7 @@ class KidsFightScene extends Phaser.Scene {
 
   // --- EFFECTS ---
   // --- PLAYER SPAWN LOGIC (moved from orphaned code) ---
-  const playerSprites = ['player1', 'player2', 'player3', 'player4'];
+  const playerSprites = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
   // Responsive player scale based on height (target ~38% of screen height)
   const scale = (GAME_HEIGHT * 0.38) / 512;
   const frameHeight = 512;
@@ -333,7 +429,7 @@ class KidsFightScene extends Phaser.Scene {
   console.log('[KidsFightScene] Using selections:', selectedSafe);
   
   // Map selection indices to player sprite keys
-  // 0 = Bento (player1), 1 = Davi R (player2), 2 = José (player3), 3 = Davi S (player4)
+  // 0 = Bento (player1), 1 = Davi R (player2), 2 = José (player3), 3 = Davi S (player4), 4 = Carol (player5), 5 = Roni (player6), 6 = Jacqueline (player7), 7 = Ivan (player8)
   // Use the existing playerSprites array defined earlier
   const p1Key = playerSprites[selectedSafe.p1] || 'player1';
   const p2Key = playerSprites[selectedSafe.p2] || 'player2';

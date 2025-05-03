@@ -228,6 +228,10 @@ class KidsFightScene {
       case 'player2': return 'Davi R';
       case 'player3': return 'José';
       case 'player4': return 'Davi S';
+      case 'player5': return 'Carol';
+      case 'player6': return 'Roni';
+      case 'player7': return 'Jacqueline';
+      case 'player8': return 'Ivan';
       default: return 'Jogador';
     }
   }
