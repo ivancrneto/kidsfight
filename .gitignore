@@ -6,3 +6,10 @@ node_modules/
 .env
 # Deployment
 .netlify/
+.parcel-cache/
+.idea/
+dist/
+cache/
+__pycache__/
+temp_main_fix.js
+test-results.json
