@@ -13,3 +13,4 @@ cache/
 __pycache__/
 temp_main_fix.js
 test-results.json
+.parcel-cache/
