@@ -43,6 +43,14 @@
     <div>
       <img src="landscape.gif" alt="Rotate icon" />
       <div>Por favor, gire seu dispositivo para o modo paisagem.</div>
+      <div id="orientation-spinner" style="display:none;margin-top:24px;text-align:center;">
+        <svg id="orientation-spinner-svg" width="48" height="48" viewBox="0 0 50 50" style="display:inline-block;vertical-align:middle;">
+          <circle cx="25" cy="25" r="20" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-dasharray="31.4 31.4" transform="rotate(-90 25 25)">
+            <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="0.8s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+        <div style="font-size:1rem;margin-top:4px;">Carregando…</div>
+      </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
@@ -51,18 +59,30 @@
   <script>
     function checkLandscape() {
       const isMobile = /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+      const spinner = document.getElementById('orientation-spinner');
       if (!isMobile) {
         document.getElementById('landscape-overlay').classList.remove('visible');
+        if (spinner) spinner.style.display = 'none';
         return;
       }
       const landscape = window.matchMedia("(orientation: landscape)").matches;
       if (landscape) {
         document.getElementById('landscape-overlay').classList.remove('visible');
+        if (spinner) spinner.style.display = 'none';
       } else {
         document.getElementById('landscape-overlay').classList.add('visible');
+        if (spinner) spinner.style.display = 'none';
       }
     }
-    window.addEventListener('orientationchange', checkLandscape);
+    window.addEventListener('orientationchange', function() {
+      const spinner = document.getElementById('orientation-spinner');
+      if (spinner) {
+        spinner.style.display = 'block';
+        spinner.style.opacity = '1';
+        setTimeout(function() { spinner.style.opacity = '0'; spinner.style.display = 'none'; }, 1200);
+      }
+      setTimeout(checkLandscape, 400); // Give time for orientation to stabilize
+    });
     window.addEventListener('resize', checkLandscape);
     window.addEventListener('DOMContentLoaded', checkLandscape);
   </script>

@@ -16,10 +16,12 @@ class PlayerSelectScene extends Phaser.Scene {
     this.selected = { p1: 0, p2: 1 }; // Default selections
   }
   
-  init() {
+  init(data) {
     // Reset selections when scene is restarted
     console.log('[PlayerSelectScene] Init called, resetting selections');
     this.selected = { p1: 0, p2: 1 };
+    this.selectedScenario = data && data.scenario ? data.scenario : 'scenario1';
+    this.scenarioKey = this.selectedScenario; // Store scenario key for KidsFightScene
   }
   
   preload() {
@@ -46,8 +48,15 @@ class PlayerSelectScene extends Phaser.Scene {
     // Create a simple background
     const bg = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
     
-    // Move the logo slightly to the left for better alignment
-    this.add.image(this.cameras.main.centerX - 30, 175, 'game_logo').setOrigin(0.5).setScale(0.65).setAlpha(0.93); // adjust x if needed
+    // --- LOGO ---
+    this.logo = this.add.image(this.cameras.main.centerX, 175, 'game_logo').setOrigin(0.5).setScale(0.65).setAlpha(0.93);
+    
+    // Responsive logo centering on resize/orientation
+    this.scale.on('resize', () => {
+      if (this.logo && this.cameras && this.cameras.main) {
+        this.logo.setPosition(this.cameras.main.centerX, 175);
+      }
+    });
     
     // Add title text at the very top
     this.add.text(400, 40, 'ESCOLHA SEUS LUTADORES', {
@@ -359,13 +368,18 @@ class PlayerSelectScene extends Phaser.Scene {
       
       // Create a new object with the exact format expected by KidsFightScene
       // KidsFightScene expects { p1: number, p2: number }
-      this.scene.start('KidsFightScene', {
-        p1: this.selected.p1,
-        p2: this.selected.p2
-      });
+      this.startFight();
     });
     
     console.log('[PlayerSelectScene] UI created');
+  }
+  
+  startFight() {
+    // Instead of starting KidsFightScene, go to ScenarioSelectScene again
+    this.scene.start('ScenarioSelectScene', {
+      p1: this.selected.p1,
+      p2: this.selected.p2
+    });
   }
 }
 

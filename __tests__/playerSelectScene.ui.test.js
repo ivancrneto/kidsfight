@@ -22,6 +22,7 @@ describe('PlayerSelectScene UI (mocked Phaser)', () => {
     scene.selected = { p1: 0, p2: 0 };
     scene.input = { on: jest.fn() };
     scene.load = { image: jest.fn() };
+    scene.scale = { on: jest.fn() };
   });
 
   test('creates selector circles aligned with face backgrounds', () => {
