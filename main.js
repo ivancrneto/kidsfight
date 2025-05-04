@@ -37,9 +37,6 @@ const MAX_HEALTH = 100;
 
 const ROUND_TIME = 60;
 
-import PlayerSelectScene from './player_select_scene.js';
-
-
 class KidsFightScene extends Phaser.Scene {
   // Helper method to get character name from sprite key
   getCharacterName(spriteKey) {
@@ -313,6 +310,8 @@ class KidsFightScene extends Phaser.Scene {
     }
     // --- TOUCH CONTROLS ---
     this.touchControls = { p1: {}, p2: {} };
+    // Enable multi-touch support
+    this.input.addPointer(3); // Allow up to 4 simultaneous touches (1 default + 3 extra)
     // --- KEYBOARD CONTROLS ---
     // Always initialize keyboard keys and cursors
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -349,10 +348,39 @@ class KidsFightScene extends Phaser.Scene {
       this.touchFlags = { p1: {left:false,right:false,jump:false,down:false,attack:false,special:false}, p2: {left:false,right:false,jump:false,down:false,attack:false,special:false} };
       // Setup touch events for all buttons
       const setupBtn = (btn, flagObj, flag) => {
-        btn.on('pointerdown', (e)=>{flagObj[flag]=true; if (e && e.stopPropagation) e.stopPropagation(); console.log('[TOUCH] pointerdown', flag);});
-        btn.on('pointerup', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); console.log('[TOUCH] pointerup', flag);});
-        btn.on('pointerout', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); console.log('[TOUCH] pointerout', flag);});
-        btn.on('pointerupoutside', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); console.log('[TOUCH] pointerupoutside', flag);});
+        btn.on('pointerdown', (e) => {
+          flagObj[flag] = true;
+          if (e && e.stopPropagation) e.stopPropagation();
+          // Track active pointer ids for this button
+          if (!btn.activePointers) btn.activePointers = new Set();
+          btn.activePointers.add(e.pointerId);
+          console.log('[TOUCH] pointerdown', flag, e.pointerId);
+        });
+        btn.on('pointerup', (e) => {
+          if (btn.activePointers) btn.activePointers.delete(e.pointerId);
+          // Only set flag to false if no other active pointers
+          if (!btn.activePointers || btn.activePointers.size === 0) {
+            flagObj[flag] = false;
+          }
+          if (e && e.stopPropagation) e.stopPropagation();
+          console.log('[TOUCH] pointerup', flag, e.pointerId);
+        });
+        btn.on('pointerout', (e) => {
+          if (btn.activePointers) btn.activePointers.delete(e.pointerId);
+          if (!btn.activePointers || btn.activePointers.size === 0) {
+            flagObj[flag] = false;
+          }
+          if (e && e.stopPropagation) e.stopPropagation();
+          console.log('[TOUCH] pointerout', flag, e.pointerId);
+        });
+        btn.on('pointerupoutside', (e) => {
+          if (btn.activePointers) btn.activePointers.delete(e.pointerId);
+          if (!btn.activePointers || btn.activePointers.size === 0) {
+            flagObj[flag] = false;
+          }
+          if (e && e.stopPropagation) e.stopPropagation();
+          console.log('[TOUCH] pointerupoutside', flag, e.pointerId);
+        });
       };
       Object.entries(this.touchControls.p1).forEach(([k,btn])=>setupBtn(btn, this.touchFlags.p1, k));
       Object.entries(this.touchControls.p2).forEach(([k,btn])=>setupBtn(btn, this.touchFlags.p2, k));
@@ -1476,5 +1504,3 @@ window.onload = () => {
   window.addEventListener('resize', resizeWithDelay);
   window.addEventListener('orientationchange', resizeWithDelay);
 }
-
-

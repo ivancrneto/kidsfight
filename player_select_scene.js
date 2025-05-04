@@ -7,6 +7,7 @@ import player5RawImg from './sprites-carol3.png';
 import player6RawImg from './sprites-roni3.png';
 import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
+import gameLogoImg from './android-chrome-192x192.png';
 
 class PlayerSelectScene extends Phaser.Scene {
   constructor() {
@@ -32,6 +33,7 @@ class PlayerSelectScene extends Phaser.Scene {
     this.load.image('player6_raw', player6RawImg);
     this.load.image('player7_raw', player7RawImg);
     this.load.image('player8_raw', player8RawImg);
+    this.load.image('game_logo', gameLogoImg);
     console.log('[PlayerSelectScene] Assets queued for loading');
   }
   
@@ -44,6 +46,9 @@ class PlayerSelectScene extends Phaser.Scene {
     // Create a simple background
     const bg = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
     
+    // Move the logo slightly to the left for better alignment
+    this.add.image(this.cameras.main.centerX - 30, 175, 'game_logo').setOrigin(0.5).setScale(0.65).setAlpha(0.93); // adjust x if needed
+    
     // Add title text at the very top
     this.add.text(400, 40, 'ESCOLHA SEUS LUTADORES', {
       fontSize: '32px',
@@ -51,19 +56,9 @@ class PlayerSelectScene extends Phaser.Scene {
       fontStyle: 'bold'
     }).setOrigin(0.5);
     
-    // Player 1 section
-    this.add.text(200, 150, 'JOGADOR 1', {
-      fontSize: '24px',
-      fill: '#ff0000',
-      fontStyle: 'bold'
-    }).setOrigin(0.5);
-    
-    // Player 2 section
-    this.add.text(600, 150, 'JOGADOR 2', {
-      fontSize: '24px',
-      fill: '#0000ff',
-      fontStyle: 'bold'
-    }).setOrigin(0.5);
+    // Move 'Jogador 1' and 'Jogador 2' labels up, keeping their original colors
+    this.add.text(180, 120, 'JOGADOR 1', { fontSize: '24px', fill: '#ff0000', fontStyle: 'bold', backgroundColor: 'rgba(0,0,0,0.18)' }).setOrigin(0.5).setAlpha(0.9);
+    this.add.text(620, 120, 'JOGADOR 2', { fontSize: '24px', fill: '#0000ff', fontStyle: 'bold', backgroundColor: 'rgba(0,0,0,0.18)' }).setOrigin(0.5).setAlpha(0.9);
     
     // --- CREATE CUSTOM SPRITESHEETS FIRST ---
     // Player 1
@@ -234,186 +229,124 @@ class PlayerSelectScene extends Phaser.Scene {
       }
     }
     
-    // Create player sprites for selection - with space between player 1 and player 2 groups
-    // Player 1 options - First row (4 players)
-    const p1Option1 = this.add.sprite(80, 220, 'player1', 0).setScale(0.15);
-    const p1Option2 = this.add.sprite(150, 220, 'player2', 0).setScale(0.15);
-    const p1Option3 = this.add.sprite(220, 220, 'player3', 0).setScale(0.15);
-    const p1Option4 = this.add.sprite(290, 220, 'player4', 0).setScale(0.15);
-    // Player 1 options - Second row (4 players)
-    const p1Option5 = this.add.sprite(80, 290, 'player5', 0).setScale(0.15);
-    const p1Option6 = this.add.sprite(150, 290, 'player6', 0).setScale(0.15);
-    const p1Option7 = this.add.sprite(220, 290, 'player7', 0).setScale(0.15);
-    const p1Option8 = this.add.sprite(290, 290, 'player8', 0).setScale(0.15);
+    // Create player face-only sprites for selection - crop to top half of first frame
+    const faceRadius = 32; // Circle button radius
+    const p1FaceX = [80, 150, 220, 290];
+    const p2FaceX = [510, 580, 650, 720];
+    const faceY1 = 170;
+    const faceY2 = 230;
+    const frameW = 250; // adjust if needed
+    const frameH = 350; // adjust if needed (should match your spritesheet frame height)
+    const cropH = frameH / 1.3;
+    const cropY = 15; // move crop area just a little bit further up
+    const faceOffsetY = 18; // move player images down inside the circles
     
-    // Player 2 options - First row (4 players)
-    const p2Option1 = this.add.sprite(510, 220, 'player1', 0).setScale(0.15);
-    const p2Option2 = this.add.sprite(580, 220, 'player2', 0).setScale(0.15);
-    const p2Option3 = this.add.sprite(650, 220, 'player3', 0).setScale(0.15);
-    const p2Option4 = this.add.sprite(720, 220, 'player4', 0).setScale(0.15);
-    // Player 2 options - Second row (4 players)
-    const p2Option5 = this.add.sprite(510, 290, 'player5', 0).setScale(0.15);
-    const p2Option6 = this.add.sprite(580, 290, 'player6', 0).setScale(0.15);
-    const p2Option7 = this.add.sprite(650, 290, 'player7', 0).setScale(0.15);
-    const p2Option8 = this.add.sprite(720, 290, 'player8', 0).setScale(0.15);
+    // Player 1 faces
+    const p1FaceBGs = [];
+    const p1Options = [];
+    for (let i = 0; i < 4; i++) {
+      p1FaceBGs.push(this.add.circle(p1FaceX[i], faceY1, faceRadius, 0x222222));
+      let s1 = this.add.sprite(p1FaceX[i], faceY1 + faceOffsetY, `player${i+1}`, 0).setScale(0.18);
+      s1.setCrop(0, cropY, frameW, cropH);
+      p1Options.push(s1);
+      p1FaceBGs.push(this.add.circle(p1FaceX[i], faceY2, faceRadius, 0x222222));
+      let s2 = this.add.sprite(p1FaceX[i], faceY2 + faceOffsetY, `player${i+5}`, 0).setScale(0.18);
+      s2.setCrop(0, cropY, frameW, cropH);
+      p1Options.push(s2);
+    }
+    // Player 2 faces
+    const p2FaceBGs = [];
+    const p2Options = [];
+    for (let i = 0; i < 4; i++) {
+      p2FaceBGs.push(this.add.circle(p2FaceX[i], faceY1, faceRadius, 0x222222));
+      let s1 = this.add.sprite(p2FaceX[i], faceY1 + faceOffsetY, `player${i+1}`, 0).setScale(0.18);
+      s1.setCrop(0, cropY, frameW, cropH);
+      p2Options.push(s1);
+      p2FaceBGs.push(this.add.circle(p2FaceX[i], faceY2, faceRadius, 0x222222));
+      let s2 = this.add.sprite(p2FaceX[i], faceY2 + faceOffsetY, `player${i+5}`, 0).setScale(0.18);
+      s2.setCrop(0, cropY, frameW, cropH);
+      p2Options.push(s2);
+    }
     
-    // Add player names
+    // Player names for both rows, in the middle of the circle with transparency
+    const playerNames = ['Bento', 'Davi R', 'José', 'Davi S', 'Carol', 'Roni', 'Jacque', 'Ivan'];
     const nameStyle = {
-      fontSize: '16px',
+      fontSize: '14px',
       fill: '#ffffff',
-      fontStyle: 'bold'
+      fontStyle: 'bold',
+      align: 'center',
+      backgroundColor: 'rgba(0,0,0,0.35)'
     };
-    
-    // Player 1 names - First row
-    this.add.text(80, 255, 'Bento', nameStyle).setOrigin(0.5);
-    this.add.text(150, 255, 'Davi R', nameStyle).setOrigin(0.5);
-    this.add.text(220, 255, 'José', nameStyle).setOrigin(0.5);
-    this.add.text(290, 255, 'Davi S', nameStyle).setOrigin(0.5);
-    // Player 1 names - Second row
-    this.add.text(80, 325, 'Carol', nameStyle).setOrigin(0.5);
-    this.add.text(150, 325, 'Roni', nameStyle).setOrigin(0.5);
-    this.add.text(220, 325, 'Jacqueline', nameStyle).setOrigin(0.5);
-    this.add.text(290, 325, 'Ivan', nameStyle).setOrigin(0.5);
-    
-    // Player 2 names - First row
-    this.add.text(510, 255, 'Bento', nameStyle).setOrigin(0.5);
-    this.add.text(580, 255, 'Davi R', nameStyle).setOrigin(0.5);
-    this.add.text(650, 255, 'José', nameStyle).setOrigin(0.5);
-    this.add.text(720, 255, 'Davi S', nameStyle).setOrigin(0.5);
-    // Player 2 names - Second row
-    this.add.text(510, 325, 'Carol', nameStyle).setOrigin(0.5);
-    this.add.text(580, 325, 'Roni', nameStyle).setOrigin(0.5);
-    this.add.text(650, 325, 'Jacqueline', nameStyle).setOrigin(0.5);
-    this.add.text(720, 325, 'Ivan', nameStyle).setOrigin(0.5);
+    const nameYOffset = 22; // move names a little bit more down
+    // Player 1 names
+    for (let i = 0; i < 4; i++) {
+      this.add.text(p1FaceX[i], faceY1 + nameYOffset, playerNames[i], nameStyle).setOrigin(0.5).setAlpha(0.8);
+      this.add.text(p1FaceX[i], faceY2 + nameYOffset, playerNames[i+4], nameStyle).setOrigin(0.5).setAlpha(0.8);
+    }
+    // Player 2 names
+    for (let i = 0; i < 4; i++) {
+      this.add.text(p2FaceX[i], faceY1 + nameYOffset, playerNames[i], nameStyle).setOrigin(0.5).setAlpha(0.8);
+      this.add.text(p2FaceX[i], faceY2 + nameYOffset, playerNames[i+4], nameStyle).setOrigin(0.5).setAlpha(0.8);
+    }
     
     // Make options interactive
-    p1Option1.setInteractive();
-    p1Option2.setInteractive();
-    p1Option3.setInteractive();
-    p1Option4.setInteractive();
-    p1Option5.setInteractive();
-    p1Option6.setInteractive();
-    p1Option7.setInteractive();
-    p1Option8.setInteractive();
-    p2Option1.setInteractive();
-    p2Option2.setInteractive();
-    p2Option3.setInteractive();
-    p2Option4.setInteractive();
-    p2Option5.setInteractive();
-    p2Option6.setInteractive();
-    p2Option7.setInteractive();
-    p2Option8.setInteractive();
+    for (let i = 0; i < p1Options.length; i++) {
+      p1Options[i].setInteractive();
+      p2Options[i].setInteractive();
+    }
     
     // Add selection indicators - store them as class properties so we can access them in other methods
     // Smaller selection indicators to match smaller sprites
-    this.p1Selector = this.add.rectangle(80, 220, 70, 70).setStrokeStyle(4, 0xffff00).setFillStyle();
-    this.p2Selector = this.add.rectangle(510, 220, 70, 70).setStrokeStyle(4, 0xffff00).setFillStyle();
+    this.p1Selector = this.add.circle(p1FaceX[0], faceY1, faceRadius + 6, 0xffff00, 0.18).setStrokeStyle(4, 0xffff00);
+    this.p2Selector = this.add.circle(p2FaceX[0], faceY1, faceRadius + 6, 0x0000ff, 0.18).setStrokeStyle(4, 0x0000ff);
     
     // Add click handlers
-    p1Option1.on('pointerdown', () => {
-      this.selected.p1 = 0;
-      this.p1Selector.setPosition(80, 220);
-      console.log('[PlayerSelectScene] Player 1 selected Bento (0)', this.selected);
-    });
+    for (let i = 0; i < p1Options.length; i++) {
+      const option = p1Options[i];
+      option.setInteractive();
+      option.on('pointerdown', () => {
+        this.selected.p1 = i;
+        this.p1Selector.setPosition(option.x, option.y - faceOffsetY);
+        console.log('[PlayerSelectScene] Player 1 selected', this.selected);
+      });
+    }
     
-    p1Option2.on('pointerdown', () => {
-      this.selected.p1 = 1;
-      this.p1Selector.setPosition(150, 220);
-      console.log('[PlayerSelectScene] Player 1 selected Davi R (1)', this.selected);
-    });
+    for (let i = 0; i < p2Options.length; i++) {
+      const option = p2Options[i];
+      option.setInteractive();
+      option.on('pointerdown', () => {
+        this.selected.p2 = i;
+        this.p2Selector.setPosition(option.x, option.y - faceOffsetY);
+        console.log('[PlayerSelectScene] Player 2 selected', this.selected);
+      });
+    }
     
-    p1Option3.on('pointerdown', () => {
-      this.selected.p1 = 2;
-      this.p1Selector.setPosition(220, 220);
-      console.log('[PlayerSelectScene] Player 1 selected José (2)', this.selected);
-    });
+    // Start button - always place near the bottom, centered, responsive width
+    const cam = this.cameras.main;
+    const centerX = cam.centerX;
+    const screenW = cam.width;
+    const screenH = cam.height;
+    const buttonW = Math.max(180, Math.min(0.9 * screenW, 320));
+    const buttonH = 70;
+    const margin = 24;
+    const buttonY = screenH - buttonH / 2 - margin;
     
-    p1Option4.on('pointerdown', () => {
-      this.selected.p1 = 3;
-      this.p1Selector.setPosition(290, 220);
-      console.log('[PlayerSelectScene] Player 1 selected Davi S (3)', this.selected);
-    });
+    // Calculate area available for avatars/options above the button
+    const avatarBottomLimit = buttonY - buttonH / 2 - margin;
+    // Example: Adjust a top margin and grid height for avatars/options
+    // (Assume avatars/options are laid out using a Y offset or grid height variable)
+    // If you have a variable like gridTop or gridHeight, set it here:
+    // const gridTop = Math.max(40, avatarBottomLimit - desiredGridHeight);
+    // If you use fixed Y positions for avatars, clamp them:
+    // For each avatar/option: y = Math.min(originalY, avatarBottomLimit - avatarHeight/2)
+    // (You may need to adapt this depending on your actual layout code)
     
-    p1Option5.on('pointerdown', () => {
-      this.selected.p1 = 4;
-      this.p1Selector.setPosition(100, 290);
-      console.log('[PlayerSelectScene] Player 1 selected Carol (4)', this.selected);
-    });
-    
-    p1Option6.on('pointerdown', () => {
-      this.selected.p1 = 5;
-      this.p1Selector.setPosition(150, 290);
-      console.log('[PlayerSelectScene] Player 1 selected Roni (5)', this.selected);
-    });
-    
-    p1Option7.on('pointerdown', () => {
-      this.selected.p1 = 6;
-      this.p1Selector.setPosition(220, 290);
-      console.log('[PlayerSelectScene] Player 1 selected Jacqueline (6)', this.selected);
-    });
-    
-    p1Option8.on('pointerdown', () => {
-      this.selected.p1 = 7;
-      this.p1Selector.setPosition(290, 290);
-      console.log('[PlayerSelectScene] Player 1 selected Ivan (7)', this.selected);
-    });
-    
-    p2Option1.on('pointerdown', () => {
-      this.selected.p2 = 0;
-      this.p2Selector.setPosition(510, 220);
-      console.log('[PlayerSelectScene] Player 2 selected Bento (0)', this.selected);
-    });
-    
-    p2Option2.on('pointerdown', () => {
-      this.selected.p2 = 1;
-      this.p2Selector.setPosition(580, 220);
-      console.log('[PlayerSelectScene] Player 2 selected Davi R (1)', this.selected);
-    });
-    
-    p2Option3.on('pointerdown', () => {
-      this.selected.p2 = 2;
-      this.p2Selector.setPosition(650, 220);
-      console.log('[PlayerSelectScene] Player 2 selected José (2)', this.selected);
-    });
-    
-    p2Option4.on('pointerdown', () => {
-      this.selected.p2 = 3;
-      this.p2Selector.setPosition(720, 220);
-      console.log('[PlayerSelectScene] Player 2 selected Davi S (3)', this.selected);
-    });
-    
-    p2Option5.on('pointerdown', () => {
-      this.selected.p2 = 4;
-      this.p2Selector.setPosition(530, 290);
-      console.log('[PlayerSelectScene] Player 2 selected Carol (4)', this.selected);
-    });
-    
-    p2Option6.on('pointerdown', () => {
-      this.selected.p2 = 5;
-      this.p2Selector.setPosition(580, 290);
-      console.log('[PlayerSelectScene] Player 2 selected Roni (5)', this.selected);
-    });
-    
-    p2Option7.on('pointerdown', () => {
-      this.selected.p2 = 6;
-      this.p2Selector.setPosition(650, 290);
-      console.log('[PlayerSelectScene] Player 2 selected Jacqueline (6)', this.selected);
-    });
-    
-    p2Option8.on('pointerdown', () => {
-      this.selected.p2 = 7;
-      this.p2Selector.setPosition(720, 290);
-      console.log('[PlayerSelectScene] Player 2 selected Ivan (7)', this.selected);
-    });
-    
-    // Start button - move it well below the portraits
-    const buttonY = Math.max(screenHeight * 0.65, 390); // Always below last row, with margin
-    
-    // Make button more visible with brighter color, larger size, and border
-    const startBtn = this.add.rectangle(400, buttonY, 240, 70, 0x00ff00)
+    // Move the start button and text a bit to the left (e.g., 18px)
+    const buttonX = centerX - 18;
+    const startBtn = this.add.rectangle(buttonX, buttonY, buttonW, buttonH, 0x00ff00)
       .setStrokeStyle(4, 0x000000); // Add black border for better visibility
-    const startText = this.add.text(400, buttonY, 'COMEÇAR LUTA!', {
-      fontSize: Math.max(18, Math.min(24, Math.round(this.cameras.main.width * 0.06))) + 'px', // Responsive font size
+    const startText = this.add.text(buttonX, buttonY, 'COMEÇAR LUTA!', {
+      fontSize: Math.max(18, Math.min(24, Math.round(screenW * 0.06))) + 'px', // Responsive font size
       fill: '#000000',
       fontStyle: 'bold'
     }).setOrigin(0.5);
