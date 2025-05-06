@@ -713,15 +713,37 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     this.specialReady2 = this.add.circle(600, 60, 22, 0xffd700, 0.93).setStrokeStyle(3, 0x000).setDepth(15).setVisible(false);
     this.specialReadyText2 = this.add.text(600, 60, 'S', { fontSize: '26px', color: '#000', fontFamily: 'monospace', fontStyle: 'bold' }).setOrigin(0.5).setDepth(16).setVisible(false);
 
+    // Fight state and countdown
+    this.fightStarted = false;
+    this.countdownValue = 3;
+    
     // Timer text display
     this.timerText = this.add.text(
       this.cameras.main.width / 2,
       50,
-      Math.ceil(this.timeLeft), {
+      'PRONTOS?', {
         fontSize: '32px', color: '#fff', fontFamily: 'monospace', align: 'center', stroke: '#000', strokeThickness: 4
       }
     )
       .setOrigin(0.5);
+    
+    // Start countdown after a short delay
+    this.time.delayedCall(1000, () => {
+      const countdownInterval = setInterval(() => {
+        this.countdownValue--;
+        if (this.countdownValue > 0) {
+          this.timerText.setText(this.countdownValue);
+        } else if (this.countdownValue === 0) {
+          this.timerText.setText('LUTEM!');
+          this.time.delayedCall(1000, () => {
+            this.fightStarted = true;
+            this.lastTimerUpdate = this.time.now;
+            this.timerText.setText(Math.ceil(this.timeLeft));
+          });
+          clearInterval(countdownInterval);
+        }
+      }, 1000);
+    });
 
     // Mark scene as ready so updateSceneLayout can safely run
     this.isReady = true;
@@ -859,7 +881,7 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
 
 
     // Timer logic (regressive)
-    if (!this.gameOver) {
+    if (!this.gameOver && this.fightStarted) {
       if (typeof this.lastTimerUpdate !== 'number' || isNaN(this.lastTimerUpdate)) this.lastTimerUpdate = time;
       if (typeof this.timeLeft !== 'number' || isNaN(this.timeLeft)) {
         this.timeLeft = ROUND_TIME;
@@ -868,10 +890,10 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
       if (timerElapsed > 0) {
         this.timeLeft = Math.max(0, this.timeLeft - timerElapsed);
         this.lastTimerUpdate += timerElapsed * 1000;
+        // Update timer display only when it changes
+        if (this.timerText) this.timerText.setText(Math.ceil(this.timeLeft));
       }
     }
-    // Update timer display
-    if (this.timerText) this.timerText.setText(Math.ceil(this.timeLeft));
 
     // Invert frames if players cross each other
     if (this.player1 && this.player2) {

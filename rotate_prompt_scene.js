@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import PlayerSelectScene from './player_select_scene.js';
+import ScenarioSelectScene from './scenario_select_scene.js';
+import KidsFightScene from './kidsfight_scene.js';
 
 class RotatePromptScene extends Phaser.Scene {
   constructor() {
@@ -8,7 +11,7 @@ class RotatePromptScene extends Phaser.Scene {
   create() {
     const w = this.scale.width;
     const h = this.scale.height;
-    this.bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 0.95);
+    this.bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
     this.text = this.add.text(w/2, h/2, 'Por favor, gire seu dispositivo para o modo paisagem.', {
       fontSize: Math.max(24, Math.round(w * 0.045)) + 'px',
       color: '#fff',
@@ -29,7 +32,16 @@ class RotatePromptScene extends Phaser.Scene {
 
   update() {
     if (this.scale.orientation === Phaser.Scale.LANDSCAPE) {
+      // Add the other scenes dynamically when in landscape mode
+      if (!this.scenesAdded) {
+        console.log('[RotatePromptScene] Adding game scenes');
+        this.scene.add('PlayerSelectScene', PlayerSelectScene, false);
+        this.scene.add('ScenarioSelectScene', ScenarioSelectScene, false);
+        this.scene.add('KidsFightScene', KidsFightScene, false);
+        this.scenesAdded = true;
+      }
       console.log('[RotatePromptScene] Starting PlayerSelectScene');
+      this.scene.stop();
       this.scene.start('PlayerSelectScene');
     }
   }

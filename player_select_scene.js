@@ -13,13 +13,17 @@ class PlayerSelectScene extends Phaser.Scene {
   constructor() {
     super({ key: 'PlayerSelectScene' });
     console.log('PlayerSelectScene constructor called');
-    this.selected = { p1: 0, p2: 1 }; // Default selections
+    // Character sprite keys for mapping
+    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    this.selected = { p1: 0, p2: 1 }; // Default selections using numeric indices
   }
   
   init(data) {
     // Reset selections when scene is restarted
     console.log('[PlayerSelectScene] Init called, resetting selections');
-    this.selected = { p1: 0, p2: 1 };
+    // Character sprite keys for mapping
+    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    this.selected = { p1: 0, p2: 1 }; // Default selections using numeric indices
     this.selectedScenario = data && data.scenario ? data.scenario : 'scenario1';
     this.scenarioKey = this.selectedScenario; // Store scenario key for KidsFightScene
   }
@@ -40,35 +44,42 @@ class PlayerSelectScene extends Phaser.Scene {
   }
   
   create() {
+    // Add solid background
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
+    this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
+
     // Log screen dimensions for debugging
-    const screenWidth = this.cameras.main.width;
-    const screenHeight = this.cameras.main.height;
+    const cam = this.cameras.main;
+    const screenWidth = cam.width;
+    const screenHeight = cam.height;
     console.log(`[PlayerSelectScene] Create called - Screen dimensions: ${screenWidth}x${screenHeight}`);
     
-    // Create a simple background
-    const bg = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
-    
-    // --- LOGO ---
-    this.logo = this.add.image(this.cameras.main.centerX, 175, 'game_logo').setOrigin(0.5).setScale(0.65).setAlpha(0.93);
-    
+    // Responsive background and logo
+    const bg = this.add.rectangle(screenWidth / 2, screenHeight / 2, screenWidth, screenHeight, 0x000000, 0.7);
+    this.logo = this.add.image(cam.centerX, screenHeight * 0.19, 'game_logo').setOrigin(0.5).setScale(0.65).setAlpha(0.93);
     // Responsive logo centering on resize/orientation
     this.scale.on('resize', () => {
       if (this.logo && this.cameras && this.cameras.main) {
-        this.logo.setPosition(this.cameras.main.centerX, 175);
+        const cam = this.cameras.main;
+        this.logo.setPosition(cam.centerX, cam.height * 0.19);
+        bg.setPosition(cam.width / 2, cam.height / 2);
+        bg.displayWidth = cam.width;
+        bg.displayHeight = cam.height;
       }
     });
-    
-    // Add title text at the very top
-    this.add.text(400, 40, 'ESCOLHA SEUS LUTADORES', {
-      fontSize: '32px',
+
+    // Responsive title
+    this.titleText = this.add.text(cam.centerX, screenHeight * 0.08, 'ESCOLHA SEUS LUTADORES', {
+      fontSize: Math.round(Math.max(24, Math.min(40, screenWidth * 0.05))) + 'px',
       fill: '#ffffff',
       fontStyle: 'bold'
     }).setOrigin(0.5);
-    
-    // Move 'Jogador 1' and 'Jogador 2' labels up, keeping their original colors
-    this.add.text(180, 120, 'JOGADOR 1', { fontSize: '24px', fill: '#ff0000', fontStyle: 'bold', backgroundColor: 'rgba(0,0,0,0.18)' }).setOrigin(0.5).setAlpha(0.9);
-    this.add.text(620, 120, 'JOGADOR 2', { fontSize: '24px', fill: '#0000ff', fontStyle: 'bold', backgroundColor: 'rgba(0,0,0,0.18)' }).setOrigin(0.5).setAlpha(0.9);
-    
+
+    // Responsive player labels
+    this.p1Label = this.add.text(screenWidth * 0.23, screenHeight * 0.23, 'JOGADOR 1', { fontSize: '24px', fill: '#ff0000', fontStyle: 'bold', backgroundColor: 'rgba(0,0,0,0.18)' }).setOrigin(0.5).setAlpha(0.9);
+    this.p2Label = this.add.text(screenWidth * 0.77, screenHeight * 0.23, 'JOGADOR 2', { fontSize: '24px', fill: '#0000ff', fontStyle: 'bold', backgroundColor: 'rgba(0,0,0,0.18)' }).setOrigin(0.5).setAlpha(0.9);
+
     // --- CREATE CUSTOM SPRITESHEETS FIRST ---
     // Player 1
     if (!this.textures.exists('player1')) {
@@ -240,64 +251,84 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Create player face-only sprites for selection - crop to top half of first frame
     const faceRadius = 32; // Circle button radius
-    const p1FaceX = [80, 150, 220, 290];
-    const p2FaceX = [510, 580, 650, 720];
-    const faceY1 = 170;
-    const faceY2 = 230;
+    const cols = 4;
+    // X positions: 4 columns, offset blocks with 8% shift
+    const avatarSpacing = screenWidth * 0.08;
+    const blockWidth = avatarSpacing * (cols - 1);
+    const centerX = screenWidth / 2;
+    const middleGap = screenWidth * 0.12;
+    // Offset: Player 1 block 8% left, Player 2 block 8% right
+    const p1BlockCenter = centerX - middleGap - screenWidth * 0.08;
+    const p2BlockCenter = centerX + middleGap + screenWidth * 0.08;
+    const p1FaceX = Array.from({length: 4}, (_, i) => p1BlockCenter - blockWidth / 2 + i * avatarSpacing);
+    const p2FaceX = Array.from({length: 4}, (_, i) => p2BlockCenter - blockWidth / 2 + i * avatarSpacing);
+    // Y positions: two rows, responsive
+    const faceY1 = screenHeight * 0.38;
+    const faceY2 = screenHeight * 0.52;
     const frameW = 250; // adjust if needed
     const frameH = 350; // adjust if needed (should match your spritesheet frame height)
     const cropH = frameH / 1.3;
     const cropY = 15; // move crop area just a little bit further up
     const faceOffsetY = 18; // move player images down inside the circles
     
+    // Character sprite keys for mapping
+    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    
     // Player 1 faces
     const p1FaceBGs = [];
     const p1Options = [];
+    // First row (indices 0-3)
     for (let i = 0; i < 4; i++) {
       p1FaceBGs.push(this.add.circle(p1FaceX[i], faceY1, faceRadius, 0x222222));
-      let s1 = this.add.sprite(p1FaceX[i], faceY1 + faceOffsetY, `player${i+1}`, 0).setScale(0.18);
+      let s1 = this.add.sprite(p1FaceX[i], faceY1 + faceOffsetY, CHARACTER_KEYS[i], 0).setScale(0.18);
       s1.setCrop(0, cropY, frameW, cropH);
       p1Options.push(s1);
+    }
+    // Second row (indices 4-7)
+    for (let i = 0; i < 4; i++) {
       p1FaceBGs.push(this.add.circle(p1FaceX[i], faceY2, faceRadius, 0x222222));
-      let s2 = this.add.sprite(p1FaceX[i], faceY2 + faceOffsetY, `player${i+5}`, 0).setScale(0.18);
+      let s2 = this.add.sprite(p1FaceX[i], faceY2 + faceOffsetY, CHARACTER_KEYS[i+4], 0).setScale(0.18);
       s2.setCrop(0, cropY, frameW, cropH);
       p1Options.push(s2);
     }
+
     // Player 2 faces
     const p2FaceBGs = [];
     const p2Options = [];
+    // First row (indices 0-3)
     for (let i = 0; i < 4; i++) {
       p2FaceBGs.push(this.add.circle(p2FaceX[i], faceY1, faceRadius, 0x222222));
-      let s1 = this.add.sprite(p2FaceX[i], faceY1 + faceOffsetY, `player${i+1}`, 0).setScale(0.18);
+      let s1 = this.add.sprite(p2FaceX[i], faceY1 + faceOffsetY, CHARACTER_KEYS[i], 0).setScale(0.18);
       s1.setCrop(0, cropY, frameW, cropH);
       p2Options.push(s1);
+    }
+    // Second row (indices 4-7)
+    for (let i = 0; i < 4; i++) {
       p2FaceBGs.push(this.add.circle(p2FaceX[i], faceY2, faceRadius, 0x222222));
-      let s2 = this.add.sprite(p2FaceX[i], faceY2 + faceOffsetY, `player${i+5}`, 0).setScale(0.18);
+      let s2 = this.add.sprite(p2FaceX[i], faceY2 + faceOffsetY, CHARACTER_KEYS[i+4], 0).setScale(0.18);
       s2.setCrop(0, cropY, frameW, cropH);
       p2Options.push(s2);
     }
     
-    // Player names for both rows, in the middle of the circle with transparency
+    // Responsive player names
     const playerNames = ['Bento', 'Davi R', 'José', 'Davi S', 'Carol', 'Roni', 'Jacque', 'Ivan'];
     const nameStyle = {
-      fontSize: '14px',
+      fontSize: Math.round(Math.max(12, Math.min(18, screenWidth * 0.025))) + 'px',
       fill: '#ffffff',
       fontStyle: 'bold',
       align: 'center',
       backgroundColor: 'rgba(0,0,0,0.35)'
     };
-    const nameYOffset = 22; // move names a little bit more down
-    // Player 1 names
+    const nameYOffset = 22;
     for (let i = 0; i < 4; i++) {
       this.add.text(p1FaceX[i], faceY1 + nameYOffset, playerNames[i], nameStyle).setOrigin(0.5).setAlpha(0.8);
       this.add.text(p1FaceX[i], faceY2 + nameYOffset, playerNames[i+4], nameStyle).setOrigin(0.5).setAlpha(0.8);
     }
-    // Player 2 names
     for (let i = 0; i < 4; i++) {
       this.add.text(p2FaceX[i], faceY1 + nameYOffset, playerNames[i], nameStyle).setOrigin(0.5).setAlpha(0.8);
       this.add.text(p2FaceX[i], faceY2 + nameYOffset, playerNames[i+4], nameStyle).setOrigin(0.5).setAlpha(0.8);
     }
-    
+
     // Make options interactive
     for (let i = 0; i < p1Options.length; i++) {
       p1Options[i].setInteractive();
@@ -314,6 +345,7 @@ class PlayerSelectScene extends Phaser.Scene {
       const option = p1Options[i];
       option.setInteractive();
       option.on('pointerdown', () => {
+        // The index in p1Options array directly maps to the character index (0-7)
         this.selected.p1 = i;
         this.p1Selector.setPosition(option.x, option.y - faceOffsetY);
         console.log('[PlayerSelectScene] Player 1 selected', this.selected);
@@ -324,6 +356,7 @@ class PlayerSelectScene extends Phaser.Scene {
       const option = p2Options[i];
       option.setInteractive();
       option.on('pointerdown', () => {
+        // The index in p2Options array directly maps to the character index (0-7)
         this.selected.p2 = i;
         this.p2Selector.setPosition(option.x, option.y - faceOffsetY);
         console.log('[PlayerSelectScene] Player 2 selected', this.selected);
@@ -331,14 +364,10 @@ class PlayerSelectScene extends Phaser.Scene {
     }
     
     // Start button - always place near the bottom, centered, responsive width
-    const cam = this.cameras.main;
-    const centerX = cam.centerX;
-    const screenW = cam.width;
-    const screenH = cam.height;
-    const buttonW = Math.max(180, Math.min(0.9 * screenW, 320));
+    const buttonW = Math.max(180, Math.min(0.9 * screenWidth, 320));
     const buttonH = 70;
     const margin = 24;
-    const buttonY = screenH - buttonH / 2 - margin;
+    const buttonY = screenHeight - buttonH / 2 - margin;
     
     // Calculate area available for avatars/options above the button
     const avatarBottomLimit = buttonY - buttonH / 2 - margin;
@@ -351,11 +380,11 @@ class PlayerSelectScene extends Phaser.Scene {
     // (You may need to adapt this depending on your actual layout code)
     
     // Move the start button and text a bit to the left (e.g., 18px)
-    const buttonX = centerX - 18;
+    const buttonX = cam.centerX - 18;
     const startBtn = this.add.rectangle(buttonX, buttonY, buttonW, buttonH, 0x00ff00)
       .setStrokeStyle(4, 0x000000); // Add black border for better visibility
     const startText = this.add.text(buttonX, buttonY, 'COMEÇAR LUTA!', {
-      fontSize: Math.max(18, Math.min(24, Math.round(screenW * 0.06))) + 'px', // Responsive font size
+      fontSize: Math.max(18, Math.min(24, Math.round(screenWidth * 0.06))) + 'px', // Responsive font size
       fill: '#000000',
       fontStyle: 'bold'
     }).setOrigin(0.5);
@@ -372,6 +401,43 @@ class PlayerSelectScene extends Phaser.Scene {
     });
     
     console.log('[PlayerSelectScene] UI created');
+    
+    // Update all positions on resize
+    this.scale.on('resize', () => {
+      const cam = this.cameras.main;
+      const screenWidth = cam.width;
+      const screenHeight = cam.height;
+      bg.setPosition(screenWidth / 2, screenHeight / 2);
+      bg.displayWidth = screenWidth;
+      bg.displayHeight = screenHeight;
+      this.logo.setPosition(cam.centerX, screenHeight * 0.19);
+      this.titleText.setPosition(cam.centerX, screenHeight * 0.08);
+      this.p1Label.setPosition(screenWidth * 0.23, screenHeight * 0.23);
+      this.p2Label.setPosition(screenWidth * 0.77, screenHeight * 0.23);
+      // Offset blocks with 8% shift
+      const avatarSpacing = screenWidth * 0.08;
+      const cols = 4;
+      const blockWidth = avatarSpacing * (cols - 1);
+      const centerX = screenWidth / 2;
+      const middleGap = screenWidth * 0.12;
+      const p1BlockCenter = centerX - middleGap - screenWidth * 0.08;
+      const p2BlockCenter = centerX + middleGap + screenWidth * 0.08;
+      const p1FaceX = Array.from({length: 4}, (_, i) => p1BlockCenter - blockWidth / 2 + i * avatarSpacing);
+      const p2FaceX = Array.from({length: 4}, (_, i) => p2BlockCenter - blockWidth / 2 + i * avatarSpacing);
+      const faceY1 = screenHeight * 0.38;
+      const faceY2 = screenHeight * 0.52;
+      for (let i = 0; i < 4; i++) {
+        p1FaceBGs[i*2].setPosition(p1FaceX[i], faceY1);
+        p1Options[i*2].setPosition(p1FaceX[i], faceY1 + faceOffsetY);
+        p1FaceBGs[i*2+1].setPosition(p1FaceX[i], faceY2);
+        p1Options[i*2+1].setPosition(p1FaceX[i], faceY2 + faceOffsetY);
+        p2FaceBGs[i*2].setPosition(p2FaceX[i], faceY1);
+        p2Options[i*2].setPosition(p2FaceX[i], faceY1 + faceOffsetY);
+        p2FaceBGs[i*2+1].setPosition(p2FaceX[i], faceY2);
+        p2Options[i*2+1].setPosition(p2FaceX[i], faceY2 + faceOffsetY);
+      }
+      // Optionally update player names if you store references
+    });
   }
   
   startFight() {

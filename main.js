@@ -109,7 +109,7 @@ const config = {
   height: GAME_HEIGHT,
   backgroundColor: '#222',
   parent: 'game-container',
-  scene: [RotatePromptScene, ScenarioSelectScene, PlayerSelectScene, KidsFightScene],
+  scene: [RotatePromptScene],
   physics: {
     default: 'arcade',
     arcade: {

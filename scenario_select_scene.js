@@ -38,16 +38,18 @@ class ScenarioSelectScene extends Phaser.Scene {
     // Match scaling logic to KidsFightScene (contain, never crop)
     this.rescalePreview();
 
-    // Scenario name
-    this.label = this.add.text(width/2, height/2 + 180, SCENARIOS[this.selectedScenario].name, {
-      fontSize: '28px', fill: '#fff', fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.2)'
-    }).setOrigin(0.5);
 
-    // Left/right arrows
-    this.leftBtn = this.add.text(width/2 - 160, height/2, '<', {
+
+    // Left/right arrows with scenario name in between
+    this.leftBtn = this.add.text(width/2 - 200, height/2, '<', {
       fontSize: '64px', fill: '#fff', fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.15)'
     }).setOrigin(0.5).setInteractive();
-    this.rightBtn = this.add.text(width/2 + 160, height/2, '>', {
+    
+    this.label = this.add.text(width/2, height/2, SCENARIOS[this.selectedScenario].name, {
+      fontSize: '28px', fill: '#fff', fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.2)'
+    }).setOrigin(0.5);
+    
+    this.rightBtn = this.add.text(width/2 + 200, height/2, '>', {
       fontSize: '64px', fill: '#fff', fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.15)'
     }).setOrigin(0.5).setInteractive();
 
