@@ -35,14 +35,21 @@ class RotatePromptScene extends Phaser.Scene {
       // Add the other scenes dynamically when in landscape mode
       if (!this.scenesAdded) {
         console.log('[RotatePromptScene] Adding game scenes');
-        this.scene.add('PlayerSelectScene', PlayerSelectScene, false);
-        this.scene.add('ScenarioSelectScene', ScenarioSelectScene, false);
-        this.scene.add('KidsFightScene', KidsFightScene, false);
+        // Check if scenes exist before adding them
+        if (!this.scene.get('PlayerSelectScene')) {
+          this.scene.add('PlayerSelectScene', PlayerSelectScene, false);
+        }
+        if (!this.scene.get('ScenarioSelectScene')) {
+          this.scene.add('ScenarioSelectScene', ScenarioSelectScene, false);
+        }
+        if (!this.scene.get('KidsFightScene')) {
+          this.scene.add('KidsFightScene', KidsFightScene, false);
+        }
         this.scenesAdded = true;
+        console.log('[RotatePromptScene] Starting PlayerSelectScene');
+        this.scene.stop();
+        this.scene.start('PlayerSelectScene');
       }
-      console.log('[RotatePromptScene] Starting PlayerSelectScene');
-      this.scene.stop();
-      this.scene.start('PlayerSelectScene');
     }
   }
 }

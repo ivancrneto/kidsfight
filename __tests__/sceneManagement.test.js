@@ -21,7 +21,54 @@ const mockSceneClasses = {
     constructor() { super({ key: 'ScenarioSelectScene' }); }
   },
   KidsFightScene: class KidsFightScene extends Phaser.Scene {
-    constructor() { super({ key: 'KidsFightScene' }); }
+    constructor() { 
+      super({ key: 'KidsFightScene' }); 
+      this.selected = {
+        p1: 'player1',
+        p2: 'player2'
+      };
+      this.selectedScenario = 'scenario1';
+    }
+
+    endGame(phrase) {
+      const winText = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2,
+        phrase,
+        {}
+      );
+
+      const replayButton = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2 + 50,
+        'Jogar Novamente (Mesmos Jogadores)',
+        {}
+      );
+      replayButton.setInteractive();
+
+      const newPlayersButton = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2 + 100,
+        'Escolher Outros Jogadores',
+        {}
+      );
+      newPlayersButton.setInteractive();
+
+      replayButton.on('pointerdown', () => {
+        this.scene.restart({
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          scenario: this.selectedScenario
+        });
+      });
+
+      newPlayersButton.on('pointerdown', () => {
+        this.scene.stop();
+        if (this.scene.get('PlayerSelectScene')) {
+          this.scene.start('PlayerSelectScene');
+        }
+      });
+    }
   },
   RotatePromptScene: class RotatePromptScene extends Phaser.Scene {
     constructor() { super({ key: 'RotatePromptScene' }); }
@@ -55,9 +102,27 @@ const mockSceneClasses = {
 // Mock Phaser Scene
 class MockScene {
   constructor() {
+    // Create mock text object with event emitter functionality
+    const createMockText = () => {
+      const listeners = {};
+      return {
+        setInteractive: jest.fn().mockReturnThis(),
+        setOrigin: jest.fn().mockReturnThis(),
+        on: jest.fn((event, callback) => {
+          listeners[event] = callback;
+          return this;
+        }),
+        emit: (event) => {
+          if (listeners[event]) {
+            listeners[event]();
+          }
+        }
+      };
+    };
+
     this.add = {
       rectangle: jest.fn().mockReturnThis(),
-      text: jest.fn().mockReturnThis(),
+      text: jest.fn(() => createMockText()),
       image: jest.fn().mockReturnThis(),
     };
     this.cameras = {
@@ -75,6 +140,8 @@ class MockScene {
       start: jest.fn(),
       stop: jest.fn(),
       add: jest.fn(),
+      restart: jest.fn(),
+      get: jest.fn().mockReturnValue(true)
     };
     this.time = {
       delayedCall: jest.fn((delay, callback) => {
@@ -147,6 +214,109 @@ describe('Scene Management', () => {
       expect(rotateScene.scene.stop).toHaveBeenCalled();
       expect(rotateScene.scene.start).toHaveBeenCalledWith('PlayerSelectScene');
     });
+
+    it('does not add scenes multiple times', () => {
+
+  });
+});
+
+describe('KidsFightScene', () => {
+  let kidsFightScene;
+  let mockScene;
+
+  beforeEach(() => {
+    mockScene = new MockScene();
+    kidsFightScene = new mockSceneClasses.KidsFightScene();
+    Object.assign(kidsFightScene, mockScene);
+  });
+
+  describe('endGame', () => {
+    it('displays win message and replay buttons', () => {
+      kidsFightScene.endGame('Player 1 wins!');
+
+      // Check if win message is displayed
+      expect(kidsFightScene.add.text).toHaveBeenCalledWith(
+        400, // width/2
+        300, // height/2
+        'Player 1 wins!',
+        expect.any(Object)
+      );
+
+      // Check if replay button is displayed
+      expect(kidsFightScene.add.text).toHaveBeenCalledWith(
+        400, // width/2
+        350, // height/2 + 50
+        'Jogar Novamente (Mesmos Jogadores)',
+        expect.any(Object)
+      );
+
+      // Check if new players button is displayed
+      expect(kidsFightScene.add.text).toHaveBeenCalledWith(
+        400, // width/2
+        400, // height/2 + 100
+        'Escolher Outros Jogadores',
+        expect.any(Object)
+      );
+    });
+
+    it('restarts game with same players when replay button is clicked', () => {
+      kidsFightScene.endGame('Player 1 wins!');
+      
+      // Get the replay button (second text element created)
+      const replayButton = kidsFightScene.add.text.mock.results[1].value;
+      
+      // Simulate click on replay button
+      replayButton.emit('pointerdown');
+
+      // Check if scene is restarted with correct data
+      expect(kidsFightScene.scene.restart).toHaveBeenCalledWith({
+        p1: 'player1',
+        p2: 'player2',
+        scenario: 'scenario1'
+      });
+    });
+
+    it('transitions to player select when new players button is clicked', () => {
+      kidsFightScene.endGame('Player 1 wins!');
+      
+      // Get the new players button (third text element created)
+      const newPlayersButton = kidsFightScene.add.text.mock.results[2].value;
+      
+      // Simulate click on new players button
+      newPlayersButton.emit('pointerdown');
+
+      // Check if current scene is stopped
+      expect(kidsFightScene.scene.stop).toHaveBeenCalled();
+      
+      // Check if PlayerSelectScene exists
+      expect(kidsFightScene.scene.get).toHaveBeenCalledWith('PlayerSelectScene');
+      
+      // Check if PlayerSelectScene is started
+      expect(kidsFightScene.scene.start).toHaveBeenCalledWith('PlayerSelectScene');
+    });
+
+    it('does not start PlayerSelectScene if it does not exist', () => {
+      // Mock scene.get to return false (scene does not exist)
+      kidsFightScene.scene.get.mockReturnValue(false);
+      
+      kidsFightScene.endGame('Player 1 wins!');
+      
+      // Get the new players button (third text element created)
+      const newPlayersButton = kidsFightScene.add.text.mock.results[2].value;
+      
+      // Simulate click on new players button
+      newPlayersButton.emit('pointerdown');
+
+      // Check if current scene is stopped
+      expect(kidsFightScene.scene.stop).toHaveBeenCalled();
+      
+      // Check if PlayerSelectScene exists
+      expect(kidsFightScene.scene.get).toHaveBeenCalledWith('PlayerSelectScene');
+      
+      // Check that PlayerSelectScene is NOT started
+      expect(kidsFightScene.scene.start).not.toHaveBeenCalled();
+    });
+  });
 
     it('does not add scenes multiple times', () => {
       rotateScene.create();

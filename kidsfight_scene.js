@@ -1182,10 +1182,11 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
   endGame(phrase) {
     if (this.gameOver) return;
     this.gameOver = true;
+
     // Centered winning phrase
     const winText = this.add.text(
       this.cameras.main.width / 2,
-      this.cameras.main.height / 2,
+      this.cameras.main.height / 2 - 50,
       phrase,
       {
         fontSize: Math.max(20, Math.min(36, Math.round(this.cameras.main.width * 0.055))) + 'px',
@@ -1202,9 +1203,65 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
           bottom: Math.round(this.cameras.main.width * 0.012)
         }
       }
-    )
-      .setOrigin(0.5)
-      .setDepth(10001);
+    ).setOrigin(0.5).setDepth(10001);
+
+    // Create replay buttons
+    const buttonStyle = {
+      fontSize: Math.max(16, Math.min(24, Math.round(this.cameras.main.width * 0.035))) + 'px',
+      color: '#fff',
+      fontFamily: 'monospace',
+      backgroundColor: '#4a4a4a',
+      padding: {
+        left: 20,
+        right: 20,
+        top: 10,
+        bottom: 10
+      }
+    };
+
+    // Button to replay with same players
+    const replayButton = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 50,
+      'Jogar Novamente (Mesmos Jogadores)',
+      buttonStyle
+    );
+    replayButton.setOrigin(0.5);
+    replayButton.setInteractive({ useHandCursor: true });
+    replayButton.on('pointerover', () => replayButton.setStyle({ backgroundColor: '#666666' }));
+    replayButton.on('pointerout', () => replayButton.setStyle({ backgroundColor: '#4a4a4a' }));
+    replayButton.on('pointerdown', () => {
+      // Reset the game with the same players
+      this.scene.restart({
+        p1: this.selected.p1,
+        p2: this.selected.p2,
+        scenario: this.selectedScenario
+      });
+    });
+
+
+    // Button to choose different players
+    const newPlayersButton = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 100,
+      'Escolher Outros Jogadores',
+      buttonStyle
+    );
+    newPlayersButton.setOrigin(0.5);
+    newPlayersButton.setInteractive({ useHandCursor: true });
+    newPlayersButton.on('pointerover', () => newPlayersButton.setStyle({ backgroundColor: '#666666' }));
+    newPlayersButton.on('pointerout', () => newPlayersButton.setStyle({ backgroundColor: '#4a4a4a' }));
+    newPlayersButton.on('pointerdown', () => {
+      // Clean up current scene and go back to player select scene
+      this.scene.stop();
+      // Only start PlayerSelectScene if it exists
+      if (this.scene.get('PlayerSelectScene')) {
+        this.scene.start('PlayerSelectScene');
+      }
+    });
+
+
+
     // Optionally, fade in the text
     winText.setAlpha(0);
     this.tweens.add({
@@ -1213,45 +1270,8 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
       duration: 400
     });
 
-    // --- Add 'Jogar Novamente' button ---
-    const btnY = this.cameras.main.height / 2 + 90;
-    const playAgainBtn = this.add.text(
-      this.cameras.main.width / 2,
-      btnY,
-      'Jogar Novamente',
-      {
-        fontSize: Math.max(18, Math.min(30, Math.round(this.cameras.main.width * 0.045))) + 'px',
-        color: '#fff',
-        backgroundColor: '#44aaff',
-        fontFamily: 'monospace',
-        padding: {
-          left: Math.round(this.cameras.main.width * 0.02),
-          right: Math.round(this.cameras.main.width * 0.02),
-          top: Math.round(this.cameras.main.width * 0.01),
-          bottom: Math.round(this.cameras.main.width * 0.01)
-        },
-        align: 'center',
-        stroke: '#000',
-        strokeThickness: 8,
-        borderRadius: 24
-      }
-    )
-      .setOrigin(0.5)
-      .setDepth(10002)
-      .setAlpha(0)
-      .setInteractive({ useHandCursor: true });
-    this.tweens.add({
-      targets: playAgainBtn,
-      alpha: 1,
-      duration: 400,
-      delay: 200
-    });
-    playAgainBtn.on('pointerdown', () => {
-      winText.destroy();
-      playAgainBtn.destroy();
-      // Go to player selection screen instead of restarting the current scene
-      this.scene.start('PlayerSelectScene');
-    });
+
+
     // Winner celebrates, loser lays down
     if (this.player1 && this.player2) {
       const p1Dead = this.playerHealth[0] <= 0;
