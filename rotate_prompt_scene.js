@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import GameModeScene from './game_mode_scene.js';
+import OnlineModeScene from './online_mode_scene.js';
 import PlayerSelectScene from './player_select_scene.js';
 import ScenarioSelectScene from './scenario_select_scene.js';
 import KidsFightScene from './kidsfight_scene.js';
@@ -36,6 +38,12 @@ class RotatePromptScene extends Phaser.Scene {
       if (!this.scenesAdded) {
         console.log('[RotatePromptScene] Adding game scenes');
         // Check if scenes exist before adding them
+        if (!this.scene.get('GameModeScene')) {
+          this.scene.add('GameModeScene', GameModeScene, false);
+        }
+        if (!this.scene.get('OnlineModeScene')) {
+          this.scene.add('OnlineModeScene', OnlineModeScene, false);
+        }
         if (!this.scene.get('PlayerSelectScene')) {
           this.scene.add('PlayerSelectScene', PlayerSelectScene, false);
         }
@@ -46,9 +54,9 @@ class RotatePromptScene extends Phaser.Scene {
           this.scene.add('KidsFightScene', KidsFightScene, false);
         }
         this.scenesAdded = true;
-        console.log('[RotatePromptScene] Starting PlayerSelectScene');
+        console.log('[RotatePromptScene] Starting GameModeScene');
         this.scene.stop();
-        this.scene.start('PlayerSelectScene');
+        this.scene.start('GameModeScene');
       }
     }
   }

@@ -17,6 +17,8 @@ import player6RawImg from './sprites-roni3.png';
 import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
 import RotatePromptScene from './rotate_prompt_scene.js';
+import GameModeScene from './game_mode_scene.js';
+import OnlineModeScene from './online_mode_scene.js';
 import PlayerSelectScene from './player_select_scene.js';
 import ScenarioSelectScene from './scenario_select_scene.js';
 import KidsFightScene from './kidsfight_scene.js';
@@ -109,7 +111,7 @@ const config = {
   height: GAME_HEIGHT,
   backgroundColor: '#222',
   parent: 'game-container',
-  scene: [RotatePromptScene],
+  scene: [RotatePromptScene, GameModeScene, OnlineModeScene],
   physics: {
     default: 'arcade',
     arcade: {

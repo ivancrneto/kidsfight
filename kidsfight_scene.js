@@ -22,6 +22,7 @@ import player5RawImg from './sprites-carol3.png';
 import player6RawImg from './sprites-roni3.png';
 import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
+import wsManager from './websocket_manager';
 
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 480;
@@ -30,6 +31,14 @@ const PLAYER_SPEED = 200;
 const JUMP_VELOCITY = -400;
 const GRAVITY = 900;
 const ROUND_TIME = 60;
+const ATTACK_COOLDOWN = 500; // 500ms cooldown between attacks
+const SPECIAL_COOLDOWN = 2000; // 2s cooldown between special attacks
+const LUNGE_COOLDOWN = 1000; // 1s cooldown between lunges
+const ATTACK_DAMAGE = 10;
+const SPECIAL_DAMAGE = 20;
+const LUNGE_DAMAGE = 15;
+const PLATFORM_Y = GAME_HEIGHT - 100;
+const PLATFORM_HEIGHT = 20;
 
 // Accept Phaser as a constructor parameter for testability
 class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Phaser.Scene : class {}) {
@@ -84,8 +93,46 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
   }
 
   init(data) {
-    this.selectedScenario = (data && data.scenario) ? data.scenario : 'scenario1';
-    this.selected = (data && data.p1 !== undefined && data.p2 !== undefined) ? { p1: data.p1, p2: data.p2 } : { p1: 0, p2: 1 };
+    console.log('[KidsFightScene] Init called with data:', data);
+    if (!data || !data.p1 || !data.p2) {
+      console.log('[KidsFightScene] Missing player data:', data);
+    }
+    // Convert numeric indices to character keys if needed
+    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    if (typeof data?.p1 === 'number') {
+      data.p1 = CHARACTER_KEYS[data.p1];
+    }
+    if (typeof data?.p2 === 'number') {
+      data.p2 = CHARACTER_KEYS[data.p2];
+    }
+    
+    this.selected = {
+      p1: data?.p1 || 'player1',
+      p2: data?.p2 || 'player2'
+    };
+    this.selectedScenario = data?.scenario || 'scenario1';
+    this.gameMode = data?.mode || 'local';
+    this.p1SpriteKey = this.selected.p1;
+    this.p2SpriteKey = this.selected.p2;
+    
+    // For online mode
+    if (this.gameMode === 'online') {
+      this.isHost = data.isHost;
+      
+      // Setup WebSocket handlers
+      if (wsManager.isConnected()) {
+        wsManager.ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.type === 'game_action') {
+            this.handleRemoteAction(data.action);
+          } else if (data.type === 'player_disconnected') {
+            this.handleDisconnection();
+          }
+        };
+      } else {
+        console.error('[KidsFightScene] WebSocket connection not available or not open');
+      }
+    }
   }
 
   preload() {
@@ -109,6 +156,11 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
 
   create() {
     window.scene = this;
+    
+    // For online mode, determine which player we control
+    if (this.gameMode === 'online') {
+      this.localPlayerIndex = this.isHost ? 0 : 1; // 0 for p1, 1 for p2
+    }
 
     // --- RESET ALL GAME STATE ON RESTART ---
     this.gameOver = false;
@@ -119,6 +171,68 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     this.lungeTimer = [0, 0];
     this.timeLeft = 60;
     this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
+    this.players = [];
+    
+    // Create platforms
+    this.platforms = this.physics.add.staticGroup();
+    
+    // Add main platform
+    const ground = this.add.rectangle(400, 450, 800, 60, 0x00ff00);
+    this.platforms.add(ground);
+    
+    // Create player sprites with the selected character sprites
+    console.log('[KidsFightScene] Creating players with sprites:', { p1: this.p1SpriteKey, p2: this.p2SpriteKey });
+    
+    // Make sure we have valid sprite keys
+    if (!this.p1SpriteKey || !this.p2SpriteKey) {
+      console.error('[KidsFightScene] Missing sprite keys:', { p1: this.p1SpriteKey, p2: this.p2SpriteKey });
+      this.p1SpriteKey = 'player1';
+      this.p2SpriteKey = 'player2';
+    }
+    
+    const player1 = this.physics.add.sprite(200, 300, this.p1SpriteKey);
+    const player2 = this.physics.add.sprite(600, 300, this.p2SpriteKey);
+    this.players = [player1, player2];
+    
+    // Initialize keyboard controls
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keyF = this.input.keyboard.addKey('F');
+    this.keyE = this.input.keyboard.addKey('E');
+    this.keyShift = this.input.keyboard.addKey('SHIFT');
+
+    // Setup physics for both players
+    this.players.forEach(player => {
+      player.setBounce(0.2);
+      player.setCollideWorldBounds(true);
+      this.physics.add.collider(player, this.platforms);
+    });
+    
+    // Add collision between players
+    this.physics.add.collider(player1, player2);
+
+    // Add game mode indicator
+    if (this.gameMode === 'online') {
+      const modeText = this.add.text(
+        this.cameras.main.width * 0.5,
+        30,
+        'Modo Online',
+        {
+          fontSize: '20px',
+          color: '#00ff00',
+          fontFamily: 'monospace'
+        }
+      ).setOrigin(0.5);
+
+      // Make it glow
+      modeText.setStroke('#004400', 4);
+      this.tweens.add({
+        targets: modeText,
+        alpha: 0.6,
+        duration: 1000,
+        yoyo: true,
+        repeat: -1
+      });
+    }
     // console.log('[DEBUG] create() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
     // --- CREATE CUSTOM SPRITESHEETS FIRST ---
     // Player 1 Spritesheet
@@ -413,18 +527,24 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
   // --- DEFENSIVE: Ensure valid selected and sprite keys ---
   console.log('[KidsFightScene] Selected data received:', this.selected);
 
-  // Default to Bento (0) for P1 and Davi R (1) for P2 if no selection data
-  const selectedSafe = (this.selected && typeof this.selected.p1 === 'number' && typeof this.selected.p2 === 'number')
-    ? this.selected
-    : { p1: 0, p2: 1 };
+  // Use character keys from data
+  const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+  let p1Key = this.selected?.p1 || 'player1';
+  let p2Key = this.selected?.p2 || 'player2';
+  
+  // Ensure character keys are strings and valid
+  if (typeof p1Key !== 'string' || !this.textures.exists(p1Key)) {
+    console.error('[KidsFightScene] Invalid p1Key:', p1Key);
+    p1Key = 'player1';
+    this.selected.p1 = 'player1';
+  }
+  if (typeof p2Key !== 'string' || !this.textures.exists(p2Key)) {
+    console.error('[KidsFightScene] Invalid p2Key:', p2Key);
+    p2Key = 'player2';
+    this.selected.p2 = 'player2';
+  }
 
-  console.log('[KidsFightScene] Using selections:', selectedSafe);
-
-  // Map selection indices to player sprite keys
-  // 0 = Bento (player1), 1 = Davi R (player2), 2 = José (player3), 3 = Davi S (player4), 4 = Carol (player5), 5 = Roni (player6), 6 = Jacqueline (player7), 7 = Ivan (player8)
-  // Use the existing playerSprites array defined earlier
-  const p1Key = playerSprites[selectedSafe.p1] || 'player1';
-  const p2Key = playerSprites[selectedSafe.p2] || 'player2';
+  console.log('[KidsFightScene] Using sprite keys:', { p1Key, p2Key });
 
   // Store the selected keys for later use in animations
   this.p1SpriteKey = p1Key;
@@ -766,6 +886,78 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     });
   }
 
+  handleRemoteAction(action) {
+    // Handle actions received from the other player
+    const playerIndex = this.isHost ? 1 : 0; // opposite of local player
+    
+    switch(action.type) {
+      case 'move':
+        if (action.direction === 'left') {
+          this.players[playerIndex].setVelocityX(-PLAYER_SPEED);
+          this.players[playerIndex].setFlipX(true);
+        } else if (action.direction === 'right') {
+          this.players[playerIndex].setVelocityX(PLAYER_SPEED);
+          this.players[playerIndex].setFlipX(false);
+        } else {
+          this.players[playerIndex].setVelocityX(0);
+        }
+        break;
+        
+      case 'jump':
+        if (this.players[playerIndex].body.touching.down) {
+          this.players[playerIndex].setVelocityY(JUMP_VELOCITY);
+        }
+        break;
+        
+      case 'attack':
+        if (time - this.lastAttackTime[playerIndex] >= 500) { // 500ms cooldown
+          this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'attack';
+          this.lastAttackTime[playerIndex] = time;
+          // Attack logic...
+        }
+        break;
+        
+      case 'special':
+        if (this.specialPips[playerIndex] >= 3) {
+          this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'special';
+          this.specialPips[playerIndex] = 0;
+          // Special attack logic...
+        }
+        break;
+    }
+  }
+
+  handleDisconnection() {
+    // Show disconnection message and return to menu
+    const text = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      'Jogador desconectado!\nVoltando ao menu...',
+      {
+        fontSize: '32px',
+        color: '#ff0000',
+        align: 'center',
+        fontFamily: 'monospace'
+      }
+    ).setOrigin(0.5);
+    
+    this.time.delayedCall(2000, () => {
+      if (this.ws) {
+        this.ws.close();
+      }
+      this.scene.start('GameModeScene');
+    });
+  }
+
+  sendGameAction(type, data = {}) {
+    if (this.gameMode === 'online' && wsManager.isConnected()) {
+      wsManager.send({
+        type: 'game_action',
+        action: { type, ...data }
+      });
+    }
+  }
+
   update(time, delta) {
     // Only show debug overlay in development mode
     const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || (typeof __DEV__ !== 'undefined' && __DEV__);
@@ -984,15 +1176,45 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         this.lungeTimer[1] -= delta;
       } else {
         p2.setVelocityX(0);
-        if (this.cursors.left.isDown) {
-          p2.setVelocityX(-PLAYER_SPEED);
-          p2Moving = true;
+        if (this.gameMode === 'local') {
+          if (this.cursors.left.isDown) {
+            p2.setVelocityX(-PLAYER_SPEED);
+            p2Moving = true;
+          }
+          if (this.cursors.right.isDown) {
+            p2.setVelocityX(PLAYER_SPEED);
+            p2Moving = true;
+          }
+          if (this.cursors.up.isDown && p2.onFloor()) p2.setVelocityY(JUMP_VELOCITY);
+        } else {
+          // Handle keyboard input for local player in online mode or player 1 in local mode
+          const controlIndex = this.gameMode === 'online' ? this.localPlayerIndex : 0;
+          if (this.cursors.left.isDown) {
+            this.players[controlIndex].setVelocityX(-PLAYER_SPEED);
+            this.players[controlIndex].setFlipX(true);
+            if (this.gameMode === 'online') {
+              this.sendGameAction('move', { direction: 'left' });
+            }
+          } else if (this.cursors.right.isDown) {
+            this.players[controlIndex].setVelocityX(PLAYER_SPEED);
+            this.players[controlIndex].setFlipX(false);
+            if (this.gameMode === 'online') {
+              this.sendGameAction('move', { direction: 'right' });
+            }
+          } else {
+            this.players[controlIndex].setVelocityX(0);
+            if (this.gameMode === 'online') {
+              this.sendGameAction('move', { direction: 'stop' });
+            }
+          }
+
+          if (this.cursors.up.isDown && this.players[controlIndex].body.touching.down) {
+            this.players[controlIndex].setVelocityY(JUMP_VELOCITY);
+            if (this.gameMode === 'online') {
+              this.sendGameAction('jump');
+            }
+          }
         }
-        if (this.cursors.right.isDown) {
-          p2.setVelocityX(PLAYER_SPEED);
-          p2Moving = true;
-        }
-        if (this.cursors.up.isDown && p2.onFloor()) p2.setVelocityY(JUMP_VELOCITY);
       }
       // Player 2 walk animation
       if (
@@ -1086,24 +1308,59 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
           if (this.player1State === 'attack' && !this.gameOver) {
             this.player1.play('p1_idle_' + this.p1SpriteKey, true);
             this.player1State = 'idle';
-            // console.log('[DEBUG] player1State set to:', this.player1State);
           }
         });
     }
 
-    // Player 1 special (B key or touch)
-    const specialConditionP1 = (
-      this.keys &&
-      this.keys.b && this.keys.b.isDown &&
-      this.player1State !== 'attack' &&
-      this.player1State !== 'special' &&
-      this.attackCount[0] >= 3
-    ) || (this._touchJustPressedP1S && this.player1State !== 'attack' && this.player1State !== 'special' && this.attackCount[0] >= 3);
-    if (specialConditionP1) {
+    // Handle keyboard input for attacks and special moves
+    const controlIndex = this.gameMode === 'online' ? this.localPlayerIndex : 0;
+    
+    if (this.cursors.space.isDown && time - this.lastAttackTime[controlIndex] >= 500) { // 500ms cooldown
+      this[controlIndex === 0 ? 'player1State' : 'player2State'] = 'attack';
+      this.lastAttackTime[controlIndex] = time;
+      
+      if (this.gameMode === 'online') {
+        this.sendGameAction('attack');
+      }
+    }
+
+    // Handle player 2 attacks in local mode only
+    if (this.gameMode === 'local' && this.keyF.isDown && time - this.lastAttackTime[1] >= 500) { // 500ms cooldown
+      this.player2State = 'attack';
+      this.lastAttackTime[1] = time;
+    }
+
+    // Handle special attacks
+    const specialCondition = (
+      (this.cursors.shift.isDown || this._touchJustPressedP1S) &&
+      (this.gameMode === 'online' ? 
+        this[controlIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' &&
+        this[controlIndex === 0 ? 'player1State' : 'player2State'] !== 'special' &&
+        this.attackCount[controlIndex] >= 3
+        :
+        this.player1State !== 'attack' &&
+        this.player1State !== 'special' &&
+        this.attackCount[0] >= 3
+      )
+    );
+
+    if (specialCondition) {
       this._touchJustPressedP1S = false;
-      const p1SpecialKey = 'p1_special_' + this.p1SpriteKey;
-      this.player1.play(p1SpecialKey, true);
-      this.player1State = 'special';
+      
+      if (this.gameMode === 'online') {
+        this[controlIndex === 0 ? 'player1State' : 'player2State'] = 'special';
+        this.attackCount[controlIndex] = 0;
+        this.specialPips[controlIndex] = 0;
+        this.showSpecialEffect(this.players[controlIndex].x, this.players[controlIndex].y);
+        this.sendGameAction('special');
+      } else {
+        const p1SpecialKey = 'p1_special_' + this.p1SpriteKey;
+        this.player1.play(p1SpecialKey, true);
+        this.player1State = 'special';
+        this.attackCount[0] = 0;
+        this.specialPips[0] = 0;
+        this.showSpecialEffect(this.players[0].x, this.players[0].y);
+      }
       tryAttack(this, 0, this.player1, this.player2, now, true);
       const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
       this.healthBar2.width = 200 * healthRatio;
@@ -1253,6 +1510,9 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     newPlayersButton.on('pointerout', () => newPlayersButton.setStyle({ backgroundColor: '#4a4a4a' }));
     newPlayersButton.on('pointerdown', () => {
       // Clean up current scene and go back to player select scene
+      if (this.ws) {
+        this.ws.close();
+      }
       this.scene.stop();
       // Only start PlayerSelectScene if it exists
       if (this.scene.get('PlayerSelectScene')) {
@@ -1260,7 +1520,7 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
       }
     });
 
-
+// ... (rest of the code remains the same)
 
     // Optionally, fade in the text
     winText.setAlpha(0);

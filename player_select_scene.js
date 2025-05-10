@@ -8,24 +8,54 @@ import player6RawImg from './sprites-roni3.png';
 import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
 import gameLogoImg from './android-chrome-192x192.png';
+import wsManager from './websocket_manager';
 
 class PlayerSelectScene extends Phaser.Scene {
   constructor() {
     super({ key: 'PlayerSelectScene' });
     console.log('PlayerSelectScene constructor called');
     // Character sprite keys for mapping
-    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
-    this.selected = { p1: 0, p2: 1 }; // Default selections using numeric indices
+    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    this.selected = { p1: 'player1', p2: 'player2' }; // Default selections using sprite keys
   }
   
   init(data) {
     // Reset selections when scene is restarted
     console.log('[PlayerSelectScene] Init called, resetting selections');
     // Character sprite keys for mapping
-    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
-    this.selected = { p1: 0, p2: 1 }; // Default selections using numeric indices
+    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    // Convert numeric indices to character keys if needed
+    const p1Selection = typeof data?.p1 === 'number' ? this.CHARACTER_KEYS[data.p1] : data?.p1 || 'player1';
+    const p2Selection = typeof data?.p2 === 'number' ? this.CHARACTER_KEYS[data.p2] : data?.p2 || 'player2';
+    this.selected = { p1: p1Selection, p2: p2Selection }; // Default selections using sprite keys
     this.selectedScenario = data && data.scenario ? data.scenario : 'scenario1';
     this.scenarioKey = this.selectedScenario; // Store scenario key for KidsFightScene
+    this.gameMode = data && data.mode ? data.mode : 'local'; // Store game mode
+    
+    // For online mode, store host status and setup WebSocket handlers
+    if (this.gameMode === 'online') {
+      this.isHost = data.isHost;
+      
+      // Setup WebSocket handlers for character selection
+      const ws = wsManager.ws;
+      if (ws) {
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.type === 'character_selected') {
+            // Update opponent's character
+            const playerKey = data.playerNum === 1 ? 'p1' : 'p2';
+            const characterKey = this.CHARACTER_KEYS[data.character];
+            this.selected[playerKey] = characterKey;
+            console.log('[PlayerSelectScene] Received character selection:', {
+              playerNum: data.playerNum,
+              characterIndex: data.character,
+              characterKey,
+              selected: this.selected
+            });
+          }
+        };
+      }
+    }
   }
   
   preload() {
@@ -44,10 +74,16 @@ class PlayerSelectScene extends Phaser.Scene {
   }
   
   create() {
-    // Add solid background
+    // Add solid background first
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
-    this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
+    const bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
+    
+    // Create the scene immediately since assets are already loaded in preload()
+    this.createScene();
+  }
+
+  createScene() {
 
     // Log screen dimensions for debugging
     const cam = this.cameras.main;
@@ -347,6 +383,7 @@ class PlayerSelectScene extends Phaser.Scene {
       option.on('pointerdown', () => {
         // The index in p1Options array directly maps to the character index (0-7)
         this.selected.p1 = i;
+        console.log('[PlayerSelectScene] P1 selected:', i, CHARACTER_KEYS[i]);
         this.p1Selector.setPosition(option.x, option.y - faceOffsetY);
         console.log('[PlayerSelectScene] Player 1 selected', this.selected);
       });
@@ -358,6 +395,7 @@ class PlayerSelectScene extends Phaser.Scene {
       option.on('pointerdown', () => {
         // The index in p2Options array directly maps to the character index (0-7)
         this.selected.p2 = i;
+        console.log('[PlayerSelectScene] P2 selected:', i, CHARACTER_KEYS[i]);
         this.p2Selector.setPosition(option.x, option.y - faceOffsetY);
         console.log('[PlayerSelectScene] Player 2 selected', this.selected);
       });
@@ -441,11 +479,66 @@ class PlayerSelectScene extends Phaser.Scene {
   }
   
   startFight() {
-    // Instead of starting KidsFightScene, go to ScenarioSelectScene again
-    this.scene.start('ScenarioSelectScene', {
-      p1: this.selected.p1,
-      p2: this.selected.p2
-    });
+    // In online mode, wait a bit for character sync
+    if (this.gameMode === 'online') {
+      // Send our character selection
+      // Get character index from the key (e.g., 'player1' -> 0)
+      const myChar = this.isHost ? this.selected.p1 : this.selected.p2;
+      const charIndex = this.CHARACTER_KEYS.indexOf(myChar);
+      const playerNum = this.isHost ? 1 : 2;
+      wsManager.send({
+        type: 'character_selected',
+        character: charIndex,
+        playerNum: playerNum
+      });
+      console.log('[PlayerSelectScene] Sending character selection:', {
+        charKey: myChar,
+        charIndex,
+        playerNum
+      });
+      
+      // Give a short delay for the other player's selection to arrive
+      setTimeout(() => {
+        console.log('[PlayerSelectScene] Starting fight with:', {
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          isHost: this.isHost
+        });
+        
+        // Start the KidsFightScene with character keys
+        const p1Index = this.CHARACTER_KEYS.indexOf(this.selected.p1);
+        const p2Index = this.CHARACTER_KEYS.indexOf(this.selected.p2);
+        this.scene.start('KidsFightScene', {
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          p1Index,
+          p2Index,
+          scenario: this.scenarioKey,
+          mode: this.gameMode,
+          isHost: this.isHost
+        });
+      }, 500); // 500ms delay for character sync
+    } else {
+      // Start immediately in local mode
+      console.log('[PlayerSelectScene] Starting fight with:', {
+        p1: this.selected.p1,
+        p2: this.selected.p2,
+        isHost: this.isHost
+      });
+      
+      // Start the KidsFightScene with character keys
+      const p1Index = this.CHARACTER_KEYS.indexOf(this.selected.p1);
+      const p2Index = this.CHARACTER_KEYS.indexOf(this.selected.p2);
+      this.scene.start('KidsFightScene', {
+        p1: this.selected.p1,
+        p2: this.selected.p2,
+        p1Index,
+        p2Index,
+        scenario: this.scenarioKey,
+        mode: this.gameMode,
+        isHost: this.isHost
+      });
+    }
   }
 }
 
