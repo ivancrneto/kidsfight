@@ -25,6 +25,20 @@ class WebSocketManager {
       this.ws.onclose = () => {
         console.log('[WebSocketManager] Connection closed');
       };
+      
+      // Add message logging
+      const originalOnMessage = this.ws.onmessage;
+      this.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('[WebSocketManager] Received message:', {
+          type: data.type,
+          isHost: this.isHost,
+          data: data
+        });
+        if (originalOnMessage) {
+          originalOnMessage(event);
+        }
+      };
     } else {
       console.log('[WebSocketManager] Reusing existing connection');
     }

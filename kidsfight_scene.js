@@ -118,20 +118,6 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     // For online mode
     if (this.gameMode === 'online') {
       this.isHost = data.isHost;
-      
-      // Setup WebSocket handlers
-      if (wsManager.isConnected()) {
-        wsManager.ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.type === 'game_action') {
-            this.handleRemoteAction(data.action);
-          } else if (data.type === 'player_disconnected') {
-            this.handleDisconnection();
-          }
-        };
-      } else {
-        console.error('[KidsFightScene] WebSocket connection not available or not open');
-      }
     }
   }
 
@@ -209,6 +195,18 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     
     // Add collision between players
     this.physics.add.collider(player1, player2);
+
+    // Setup WebSocket handlers for online mode
+    if (this.gameMode === 'online' && wsManager.isConnected()) {
+      wsManager.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'game_action') {
+          this.handleRemoteAction(data.action);
+        } else if (data.type === 'player_disconnected') {
+          this.handleDisconnection();
+        }
+      };
+    }
 
     // Add game mode indicator
     if (this.gameMode === 'online') {
@@ -910,9 +908,10 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         break;
         
       case 'attack':
-        if (time - this.lastAttackTime[playerIndex] >= 500) { // 500ms cooldown
+        const currentTime = this.time.now;
+        if (currentTime - this.lastAttackTime[playerIndex] >= 500) { // 500ms cooldown
           this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'attack';
-          this.lastAttackTime[playerIndex] = time;
+          this.lastAttackTime[playerIndex] = currentTime;
           // Attack logic...
         }
         break;

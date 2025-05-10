@@ -172,10 +172,15 @@ class OnlineModeScene extends Phaser.Scene {
 
   connectAsHost(gameCode) {
     try {
+      // Stop any existing scenes that might be running
+      this.scene.stop('KidsFightScene');
+      this.scene.stop('PlayerSelectScene');
+      
       wsManager.setHost(true);
       this.ws = wsManager.connect();
 
       this.ws.onopen = () => {
+        console.log('[OnlineModeScene] Sending create game request');
         // Send create game request
         this.ws.send(JSON.stringify({
           type: 'create_game',
@@ -185,7 +190,7 @@ class OnlineModeScene extends Phaser.Scene {
 
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        console.log('Received:', data);
+        console.log('[OnlineModeScene] Received:', data);
 
         switch (data.type) {
           case 'game_created':
@@ -194,9 +199,12 @@ class OnlineModeScene extends Phaser.Scene {
             break;
 
           case 'player_joined':
+            console.log('[OnlineModeScene] Player joined, going to player select:', data);
             this.statusText.setText('Jogador encontrado!\nEscolha seu personagem...');
-            // Start the game after a short delay
-            this.time.delayedCall(1000, () => {
+            // Start character selection
+            this.time.delayedCall(500, () => {
+              // Make sure we're not running any other scenes
+              this.scene.stop('KidsFightScene');
               this.scene.start('PlayerSelectScene', { 
                 mode: 'online',
                 isHost: true,
@@ -225,13 +233,18 @@ class OnlineModeScene extends Phaser.Scene {
 
   connectAsClient(gameCode) {
     try {
+      // Stop any existing scenes that might be running
+      this.scene.stop('KidsFightScene');
+      this.scene.stop('PlayerSelectScene');
+      
       wsManager.setHost(false);
       this.ws = wsManager.connect();
 
       this.ws.onopen = () => {
         console.log('[OnlineModeScene] Sending join game request for room:', gameCode);
         // Send join game request
-        wsManager.send({
+        console.log('DEBUG: About to call wsManager.send', wsManager, typeof wsManager.send);
+wsManager.send({
           type: 'join_game',
           roomCode: gameCode.toUpperCase(), // Ensure room code is uppercase
           character: 'player2' // Default character for now
@@ -240,13 +253,16 @@ class OnlineModeScene extends Phaser.Scene {
 
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        console.log('Received:', data);
+        console.log('[OnlineModeScene] Received:', data);
 
         switch (data.type) {
           case 'game_joined':
+            console.log('[OnlineModeScene] Game joined, going to player select:', data);
             this.statusText.setText('Conectado!\nEscolha seu personagem...');
-            // Start the character selection scene
-            this.time.delayedCall(1000, () => {
+            // Start character selection
+            this.time.delayedCall(500, () => {
+              // Make sure we're not running any other scenes
+              this.scene.stop('KidsFightScene');
               this.scene.start('PlayerSelectScene', { 
                 mode: 'online',
                 isHost: false,

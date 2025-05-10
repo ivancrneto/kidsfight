@@ -35,23 +35,35 @@ class PlayerSelectScene extends Phaser.Scene {
     // For online mode, store host status and setup WebSocket handlers
     if (this.gameMode === 'online') {
       this.isHost = data.isHost;
+      console.log('[PlayerSelectScene] Online mode initialized:', {
+        isHost: this.isHost,
+        roomCode: data.roomCode
+      });
       
       // Setup WebSocket handlers for character selection
       const ws = wsManager.ws;
       if (ws) {
         ws.onmessage = (event) => {
           const data = JSON.parse(event.data);
-          if (data.type === 'character_selected') {
-            // Update opponent's character
-            const playerKey = data.playerNum === 1 ? 'p1' : 'p2';
-            const characterKey = this.CHARACTER_KEYS[data.character];
-            this.selected[playerKey] = characterKey;
-            console.log('[PlayerSelectScene] Received character selection:', {
-              playerNum: data.playerNum,
-              characterIndex: data.character,
-              characterKey,
-              selected: this.selected
-            });
+          console.log('[PlayerSelectScene] Received websocket message:', data);
+          
+          switch(data.type) {
+            case 'character_selected':
+              // Update opponent's character
+              const playerKey = data.playerNum === 1 ? 'p1' : 'p2';
+              const characterKey = this.CHARACTER_KEYS[data.character];
+              this.selected[playerKey] = characterKey;
+              console.log('[PlayerSelectScene] Updated character selection:', {
+                playerNum: data.playerNum,
+                characterIndex: data.character,
+                characterKey,
+                selected: this.selected
+              });
+              break;
+              
+            case 'error':
+              console.error('[PlayerSelectScene] Error:', data.message);
+              break;
           }
         };
       }
@@ -379,26 +391,54 @@ class PlayerSelectScene extends Phaser.Scene {
     // Add click handlers
     for (let i = 0; i < p1Options.length; i++) {
       const option = p1Options[i];
-      option.setInteractive();
-      option.on('pointerdown', () => {
-        // The index in p1Options array directly maps to the character index (0-7)
-        this.selected.p1 = i;
-        console.log('[PlayerSelectScene] P1 selected:', i, CHARACTER_KEYS[i]);
-        this.p1Selector.setPosition(option.x, option.y - faceOffsetY);
-        console.log('[PlayerSelectScene] Player 1 selected', this.selected);
-      });
+      // In online mode, only host can select P1
+      if (this.gameMode !== 'online' || this.isHost) {
+        option.setInteractive();
+        option.on('pointerdown', () => {
+          // The index in p1Options array directly maps to the character index (0-7)
+          this.selected.p1 = CHARACTER_KEYS[i];
+          console.log('[PlayerSelectScene] P1 selected:', i, CHARACTER_KEYS[i]);
+          this.p1Selector.setPosition(option.x, option.y - faceOffsetY);
+          
+          if (this.gameMode === 'online') {
+            // Send selection to server
+            wsManager.send({
+              type: 'character_selected',
+              character: i,
+              playerNum: 1
+            });
+          }
+        });
+      } else {
+        console.log('DEBUG: Calling setAlpha on option', option);
+option.setAlpha(0.5); // Dim opponent's options
+      }
     }
     
     for (let i = 0; i < p2Options.length; i++) {
       const option = p2Options[i];
-      option.setInteractive();
-      option.on('pointerdown', () => {
-        // The index in p2Options array directly maps to the character index (0-7)
-        this.selected.p2 = i;
-        console.log('[PlayerSelectScene] P2 selected:', i, CHARACTER_KEYS[i]);
-        this.p2Selector.setPosition(option.x, option.y - faceOffsetY);
-        console.log('[PlayerSelectScene] Player 2 selected', this.selected);
-      });
+      // In online mode, only client can select P2
+      if (this.gameMode !== 'online' || !this.isHost) {
+        option.setInteractive();
+        option.on('pointerdown', () => {
+          // The index in p2Options array directly maps to the character index (0-7)
+          this.selected.p2 = CHARACTER_KEYS[i];
+          console.log('[PlayerSelectScene] P2 selected:', i, CHARACTER_KEYS[i]);
+          this.p2Selector.setPosition(option.x, option.y - faceOffsetY);
+          
+          if (this.gameMode === 'online') {
+            // Send selection to server
+            wsManager.send({
+              type: 'character_selected',
+              character: i,
+              playerNum: 2
+            });
+          }
+        });
+      } else {
+        console.log('DEBUG: Calling setAlpha on option', option);
+option.setAlpha(0.5); // Dim opponent's options
+      }
     }
     
     // Start button - always place near the bottom, centered, responsive width

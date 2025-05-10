@@ -6,5 +6,12 @@ module.exports = {
   moduleNameMapper: {
     '\\.(png|jpg|jpeg|gif|svg)$': '<rootDir>/__mocks__/fileMock.js',
     '\\.(css|less|scss)$': 'identity-obj-proxy',
+  },
+  setupFilesAfterEnv: ['<rootDir>/__tests__/setup.js'],
+  transformIgnorePatterns: [
+    '/node_modules/(?!(phaser|@babel/runtime)/)',
+  ],
+  testEnvironmentOptions: {
+    customExportConditions: ['node', 'node-addons']
   }
 };
