@@ -309,7 +309,62 @@ function applyGameCss() {
   }
 }
 
-// tryAttack logic (simplified for testability)
+/**
+ * Game utilities used across different files (ESM version)
+ */
+
+// Update scene layout based on screen size
+export function updateSceneLayout(scene) {
+  if (!scene || !scene.cameras || !scene.cameras.main) return false;
+  
+  const cam = scene.cameras.main;
+  
+  // Get current screen dimensions
+  const width = cam.width;
+  const height = cam.height;
+  
+  console.log('[GameUtils] Updating scene layout for dimensions:', width, 'x', height);
+  
+  // Set world and camera bounds to match screen size
+  if (scene.physics && scene.physics.world) {
+    scene.physics.world.setBounds(0, 0, width, height);
+  }
+  
+  cam.setBounds(0, 0, width, height);
+  
+  // Update touch controls if they exist
+  if (typeof scene.updateControlPositions === 'function') {
+    scene.updateControlPositions();
+  }
+  
+  return true;
+}
+
+// Apply game CSS to the page
+export function applyGameCss() {
+  if (typeof document === 'undefined') return false;
+  
+  // Add CSS to ensure the game canvas fills the viewport properly
+  const style = document.createElement('style');
+  style.textContent = `
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  `;
+  document.head.appendChild(style);
+  
+  return true;
+}
 function tryAttack(scene, playerIdx, attacker, defender, now, special) {
   // Robustly determine defenderIdx
   let defenderIdx = undefined;

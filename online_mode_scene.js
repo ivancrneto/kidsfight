@@ -119,7 +119,8 @@ class OnlineModeScene extends Phaser.Scene {
     // Button click handlers
     createButton.on('pointerdown', () => {
       // Generate a random 6-character game code
-      const gameCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      //const gameCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const gameCode = '111111';
       this.statusText.setText('Código do jogo: ' + gameCode + '\nAguardando outro jogador...');
       this.statusText.setColor('#00ff00');
       
@@ -187,6 +188,9 @@ class OnlineModeScene extends Phaser.Scene {
           character: 'player1' // Default character for now
         }));
       };
+
+            // Player 2 is the joiner (guest)
+            // This is already handled in KidsFightScene where isHost = false means localPlayerIndex = 1
 
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);

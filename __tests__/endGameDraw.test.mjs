@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-const { tryAttack } = require('../gameUtils.cjs');
+const gameUtils = require('../gameUtils.cjs');
 // __tests__/endGameDraw.test.js
 // Tests that endGame correctly sets frame 5 and does not rotate on draw
 

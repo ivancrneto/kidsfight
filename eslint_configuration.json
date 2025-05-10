@@ -1,0 +1,25 @@
+{
+  "esversion": 11,
+  "browser": true,
+  "node": true,
+  "strict": "global",
+  "globals": {
+    "Phaser": false,
+    "window": false,
+    "jest": false,
+    "describe": false,
+    "it": false,
+    "expect": false,
+    "beforeEach": false,
+    "afterEach": false
+  },
+  "undef": true,
+  "unused": true,
+  "curly": true,
+  "eqeqeq": true,
+  "nocomma": true,
+  "quotmark": "single",
+  "varstmt": true,
+  "module": true,
+  "asi": false
+}

@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-const { applyGameCss, updateSceneLayout, tryAttack } = require('../gameUtils.cjs');
+const { applyGameCss, updateSceneLayout } = require('../gameUtils.cjs');
 // __tests__/main.test.js
 // Basic unit tests for main.js constants and mockable logic
 

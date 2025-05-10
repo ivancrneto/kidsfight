@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "es6",
+    "moduleResolution": "node",
+    "checkJs": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": [
+    "*.js",
+    "**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

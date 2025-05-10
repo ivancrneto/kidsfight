@@ -1,8 +1,7 @@
 {
-  "extends": "@parcel/config-default",
+  "extends": ["@parcel/config-default"],
   "transformers": {
-    "*.png": ["@parcel/transformer-raw"],
-    "*.jpg": ["@parcel/transformer-raw"],
-    "*.gif": ["@parcel/transformer-raw"]
+    "*.{png,jpg,jpeg,gif,svg}": ["@parcel/transformer-raw"],
+    "manifest.json": ["@parcel/transformer-webmanifest"]
   }
 }

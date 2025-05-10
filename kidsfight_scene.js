@@ -585,6 +585,8 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
   if (this.sameCharacterSelected) {
     this.player2.setTint(0x9999ff); // Light blue tint
   }
+  
+
 
   // Enable collision with platform
   this.physics.add.collider(this.player2, platform);
@@ -884,6 +886,119 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     });
   }
 
+  update(time, delta) {
+    if (this.gameOver) return;
+
+    // Handle player 1 movement
+    if (this.player1 && this.player1.body) {
+      let p1IsMoving = false;
+
+      // Left/Right movement
+      if (this.keys.a.isDown) {
+        this.player1.body.velocity.x = -PLAYER_SPEED;
+        this.player1.setFlipX(true);
+        p1IsMoving = true;
+      } else if (this.keys.d.isDown) {
+        this.player1.body.velocity.x = PLAYER_SPEED;
+        this.player1.setFlipX(false);
+        p1IsMoving = true;
+      } else {
+        this.player1.body.velocity.x = 0;
+      }
+
+      // Jump
+      if (this.keys.w.isDown && this.player1.body.touching.down) {
+        this.player1.body.velocity.y = JUMP_VELOCITY;
+      }
+
+      // Handle animations
+      if (p1IsMoving && this.player1.body.touching.down) {
+        // Only play walk animation if not already playing it
+        if (!this.player1.anims.isPlaying || this.player1.anims.currentAnim.key !== `p1_walk_${this.p1SpriteKey}`) {
+          this.player1.play(`p1_walk_${this.p1SpriteKey}`);
+        }
+      } else if (this.player1.body.touching.down) {
+        // Only play idle animation if not already playing it
+        if (!this.player1.anims.isPlaying || this.player1.anims.currentAnim.key !== `p1_idle_${this.p1SpriteKey}`) {
+          this.player1.play(`p1_idle_${this.p1SpriteKey}`);
+        }
+      }
+
+      // Handle attacks in local mode or if player is host in online mode
+      if ((this.gameMode !== 'online' || this.isHost) && this.keys.f.isDown && time > this.lastAttackTime[0] + 500) {
+        this.player1.play(`p1_attack_${this.p1SpriteKey}`);
+        this.lastAttackTime[0] = time;
+        // Attack logic would go here...
+      }
+    }
+
+    // Handle player 2 movement (in local mode only or if client in online mode)
+    if (this.player2 && this.player2.body && (this.gameMode !== 'online' || !this.isHost)) {
+      let p2IsMoving = false;
+
+      // Left/Right movement
+      if (this.cursors.left.isDown) {
+        this.player2.body.velocity.x = -PLAYER_SPEED;
+        this.player2.setFlipX(true);
+        p2IsMoving = true;
+      } else if (this.cursors.right.isDown) {
+        this.player2.body.velocity.x = PLAYER_SPEED;
+        this.player2.setFlipX(false);
+        p2IsMoving = true;
+      } else {
+        this.player2.body.velocity.x = 0;
+      }
+
+      // Jump
+      if (this.cursors.up.isDown && this.player2.body.touching.down) {
+        this.player2.body.velocity.y = JUMP_VELOCITY;
+      }
+
+      // Handle animations
+      if (p2IsMoving && this.player2.body.touching.down) {
+        // Only play walk animation if not already playing it
+        if (!this.player2.anims.isPlaying || this.player2.anims.currentAnim.key !== `p2_walk_${this.p2SpriteKey}`) {
+          this.player2.play(`p2_walk_${this.p2SpriteKey}`);
+        }
+      } else if (this.player2.body.touching.down) {
+        // Only play idle animation if not already playing it
+        if (!this.player2.anims.isPlaying || this.player2.anims.currentAnim.key !== `p2_idle_${this.p2SpriteKey}`) {
+          this.player2.play(`p2_idle_${this.p2SpriteKey}`);
+        }
+      }
+
+      // Handle attacks in local mode or if player is client in online mode
+      if ((this.gameMode !== 'online' || !this.isHost) && this.cursors.space.isDown && time > this.lastAttackTime[1] + 500) {
+        this.player2.play(`p2_attack_${this.p2SpriteKey}`);
+        this.lastAttackTime[1] = time;
+        // Attack logic would go here...
+      }
+    }
+
+    // In online mode, send player position to other player
+    if (this.gameMode === 'online' && wsManager && wsManager.isConnected()) {
+      const playerToSync = this.isHost ? this.player1 : this.player2;
+      const playerIndex = this.isHost ? 0 : 1;
+
+      if (playerToSync && playerToSync.body) {
+        wsManager.send({
+          type: 'player_update',
+          x: playerToSync.x,
+          y: playerToSync.y,
+          velocityX: playerToSync.body.velocity.x,
+          velocityY: playerToSync.body.velocity.y,
+          health: this.playerHealth[playerIndex],
+          frame: playerToSync.frame.name,
+          flipX: playerToSync.flipX
+        });
+      }
+    }
+  }
+
+  updatePlayer2Animation(isMoving, delta) {
+    updateWalkingAnimation(this.player2, isMoving, delta);
+  }
+
   handleRemoteAction(action) {
     // Handle actions received from the other player
     const playerIndex = this.isHost ? 1 : 0; // opposite of local player
@@ -1175,44 +1290,39 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         this.lungeTimer[1] -= delta;
       } else {
         p2.setVelocityX(0);
-        if (this.gameMode === 'local') {
+        
+        // Handle player 2 movement in both local and online modes
+        if (this.gameMode === 'local' || (this.gameMode === 'online' && this.localPlayerIndex === 1)) {
+          // Local mode: player 2 controls with arrow keys
+          // Online mode: guest (player 2) controls with arrow keys
           if (this.cursors.left.isDown) {
             p2.setVelocityX(-PLAYER_SPEED);
+            this.player2.setFlipX(true);
             p2Moving = true;
-          }
-          if (this.cursors.right.isDown) {
-            p2.setVelocityX(PLAYER_SPEED);
-            p2Moving = true;
-          }
-          if (this.cursors.up.isDown && p2.onFloor()) p2.setVelocityY(JUMP_VELOCITY);
-        } else {
-          // Handle keyboard input for local player in online mode or player 1 in local mode
-          const controlIndex = this.gameMode === 'online' ? this.localPlayerIndex : 0;
-          if (this.cursors.left.isDown) {
-            this.players[controlIndex].setVelocityX(-PLAYER_SPEED);
-            this.players[controlIndex].setFlipX(true);
             if (this.gameMode === 'online') {
               this.sendGameAction('move', { direction: 'left' });
             }
           } else if (this.cursors.right.isDown) {
-            this.players[controlIndex].setVelocityX(PLAYER_SPEED);
-            this.players[controlIndex].setFlipX(false);
+            p2.setVelocityX(PLAYER_SPEED);
+            this.player2.setFlipX(false);
+            p2Moving = true;
             if (this.gameMode === 'online') {
               this.sendGameAction('move', { direction: 'right' });
             }
-          } else {
-            this.players[controlIndex].setVelocityX(0);
-            if (this.gameMode === 'online') {
-              this.sendGameAction('move', { direction: 'stop' });
-            }
+          } else if (this.gameMode === 'online') {
+            // Only send stop action in online mode
+            this.sendGameAction('move', { direction: 'stop' });
           }
-
-          if (this.cursors.up.isDown && this.players[controlIndex].body.touching.down) {
-            this.players[controlIndex].setVelocityY(JUMP_VELOCITY);
+          
+          if (this.cursors.up.isDown && p2.onFloor()) {
+            p2.setVelocityY(JUMP_VELOCITY);
             if (this.gameMode === 'online') {
               this.sendGameAction('jump');
             }
           }
+        } else if (this.gameMode === 'online' && this.localPlayerIndex === 0) {
+          // Online mode: host (player 1) doesn't control player 2
+          // Player 2 movement is controlled by remote actions
         }
       }
       // Player 2 walk animation

@@ -1,17 +1,19 @@
 module.exports = {
   presets: [
-    ['@babel/preset-env', {
-      targets: {
-        node: 'current',
-        browsers: ['last 2 versions']
+    [
+      '@babel/preset-env',
+      {
+        targets: {
+          node: 'current',
+          browsers: '> 0.25%, not dead'
+        },
+        modules: 'auto',
+        useBuiltIns: 'usage',
+        corejs: 3
       }
-    }]
+    ]
   ],
-  env: {
-    test: {
-      plugins: [
-        '@babel/plugin-transform-modules-commonjs'
-      ]
-    }
-  }
+  plugins: [
+    '@babel/plugin-transform-modules-commonjs'
+  ]
 };

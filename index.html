@@ -54,7 +54,9 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="gameUtils.js"></script>
+  <!-- Load gameUtils as a module instead -->
+  <script src="gameUtils.js" type="text/javascript"></script>
+  <!-- Ensure main.js is loaded as a module -->
   <script type="module" src="main.js"></script>
   <script>
     function checkLandscape() {

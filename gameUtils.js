@@ -1,4 +1,79 @@
+// Function to apply CSS to the game container
+function applyGameCss() {
+  const parent = document.getElementById('game-container');
+  if (!parent) return;
+  
+  parent.style.position = 'fixed';
+  parent.style.top = '0';
+  parent.style.left = '0';
+  parent.style.width = '100vw';
+  parent.style.height = '100vh';
+  parent.style.margin = '0';
+  parent.style.padding = '0';
+  parent.style.overflow = 'hidden';
+  parent.style.background = '#222';
+  
+  // Make sure all canvas elements are properly sized
+  const canvases = parent.querySelectorAll('canvas');
+  if (canvases.length) {
+    for (let canvas of canvases) {
+      canvas.style.display = 'block';
+      canvas.style.maxWidth = '100vw';
+      canvas.style.maxHeight = '100vh';
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      canvas.style.margin = '0 auto';
+    }
+  }
+}
 
+// Function to update scene layout
+function updateSceneLayout(scene) {
+  if (!scene || !scene.scale || !scene.isReady) return;
+  
+  const w = scene.scale.width;
+  const h = scene.scale.height;
+  
+  // Position players and platform based on new dimensions
+  if (scene.player1) {
+    scene.player1.setPosition(w * 0.3, h * 0.68);
+  }
+  
+  if (scene.player2) {
+    scene.player2.setPosition(w * 0.7, h * 0.68);
+  }
+  
+  if (scene.platform) {
+    scene.platform.setPosition(w/2, h * 0.8);
+    scene.platform.setSize(w, 20);
+  }
+  
+  // Update timer position
+  if (scene.timerText) {
+    scene.timerText.setPosition(w/2, 40);
+  }
+  
+  // Reposition background if it exists
+  if (scene.children && scene.children.list) {
+    for (let child of scene.children.list) {
+      if (child.texture && child.texture.key && 
+          (child.texture.key === 'scenario1' || child.texture.key === 'scenario2')) {
+        child.setPosition(w/2, h/2);
+        child.displayWidth = w;
+        child.displayHeight = h;
+      }
+    }
+  }
+}
+
+// Make functions available globally for non-module scripts
+window.applyGameCss = applyGameCss;
+window.updateSceneLayout = updateSceneLayout;
+
+// Export for module use
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { applyGameCss, updateSceneLayout };
+}
 // Pure game logic utilities for KidsFightScene
 
 // Layout update logic for scene objects
