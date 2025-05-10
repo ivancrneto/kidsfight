@@ -189,9 +189,6 @@ class OnlineModeScene extends Phaser.Scene {
         }));
       };
 
-            // Player 2 is the joiner (guest)
-            // This is already handled in KidsFightScene where isHost = false means localPlayerIndex = 1
-
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         console.log('[OnlineModeScene] Received:', data);

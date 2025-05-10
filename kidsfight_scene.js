@@ -1002,23 +1002,50 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
   handleRemoteAction(action) {
     // Handle actions received from the other player
     const playerIndex = this.isHost ? 1 : 0; // opposite of local player
+    const player = this.players[playerIndex];
+    const playerSprite = playerIndex === 0 ? this.player1 : this.player2;
+    const spriteKey = playerIndex === 0 ? this.p1SpriteKey : this.p2SpriteKey;
     
     switch(action.type) {
       case 'move':
         if (action.direction === 'left') {
-          this.players[playerIndex].setVelocityX(-PLAYER_SPEED);
-          this.players[playerIndex].setFlipX(true);
+          player.setVelocityX(-PLAYER_SPEED);
+          playerSprite.setFlipX(true);
+          
+          // Update animation to walking if player is in idle state
+          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'idle' && player.body.touching.down) {
+            const walkAnim = `p${playerIndex + 1}_walk_${spriteKey}`;
+            if (playerSprite.anims.currentAnim?.key !== walkAnim) {
+              playerSprite.play(walkAnim, true);
+            }
+          }
         } else if (action.direction === 'right') {
-          this.players[playerIndex].setVelocityX(PLAYER_SPEED);
-          this.players[playerIndex].setFlipX(false);
+          player.setVelocityX(PLAYER_SPEED);
+          playerSprite.setFlipX(false);
+          
+          // Update animation to walking if player is in idle state
+          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'idle' && player.body.touching.down) {
+            const walkAnim = `p${playerIndex + 1}_walk_${spriteKey}`;
+            if (playerSprite.anims.currentAnim?.key !== walkAnim) {
+              playerSprite.play(walkAnim, true);
+            }
+          }
         } else {
-          this.players[playerIndex].setVelocityX(0);
+          player.setVelocityX(0);
+          
+          // Return to idle animation if not already in idle
+          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'idle') {
+            const idleAnim = `p${playerIndex + 1}_idle_${spriteKey}`;
+            if (playerSprite.anims.currentAnim?.key !== idleAnim) {
+              playerSprite.play(idleAnim, true);
+            }
+          }
         }
         break;
         
       case 'jump':
-        if (this.players[playerIndex].body.touching.down) {
-          this.players[playerIndex].setVelocityY(JUMP_VELOCITY);
+        if (player.body.touching.down) {
+          player.setVelocityY(JUMP_VELOCITY);
         }
         break;
         
@@ -1027,7 +1054,18 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         if (currentTime - this.lastAttackTime[playerIndex] >= 500) { // 500ms cooldown
           this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'attack';
           this.lastAttackTime[playerIndex] = currentTime;
-          // Attack logic...
+          
+          // Play attack animation
+          const attackAnim = `p${playerIndex + 1}_attack_${spriteKey}`;
+          playerSprite.play(attackAnim, true);
+          
+          // Reset to idle after attack animation completes
+          playerSprite.once('animationcomplete', () => {
+            if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'attack') {
+              this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle';
+              playerSprite.play(`p${playerIndex + 1}_idle_${spriteKey}`, true);
+            }
+          });
         }
         break;
         
@@ -1035,7 +1073,35 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         if (this.specialPips[playerIndex] >= 3) {
           this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'special';
           this.specialPips[playerIndex] = 0;
-          // Special attack logic...
+          
+          // Play special attack animation
+          const specialAnim = `p${playerIndex + 1}_special_${spriteKey}`;
+          playerSprite.play(specialAnim, true);
+          
+          // Reset to idle after special animation completes
+          playerSprite.once('animationcomplete', () => {
+            if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'special') {
+              this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle';
+              playerSprite.play(`p${playerIndex + 1}_idle_${spriteKey}`, true);
+            }
+          });
+          
+          // Show special effect
+          this.showSpecialEffect(playerSprite.x, playerSprite.y);
+        }
+        break;
+        
+      case 'crouch':
+        if (this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'down') {
+          this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'down';
+          playerSprite.play(`p${playerIndex + 1}_down_${spriteKey}`, true);
+        }
+        break;
+        
+      case 'stand':
+        if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'down') {
+          this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle';
+          playerSprite.play(`p${playerIndex + 1}_idle_${spriteKey}`, true);
         }
         break;
     }
@@ -1353,13 +1419,22 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         if (this.player1State !== 'down') {
           this.player1.play('p1_down_' + this.p1SpriteKey, true);
           this.player1State = 'down';
+          
+          // Send crouch action in online mode if player 1 is controlled by local player
+          if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
+            this.sendGameAction('crouch');
+          }
         }
       } else {
         if (this.player1State !== 'idle') {
           // Only play idle if game is not over
           if (!this.gameOver) this.player1.play('p1_idle_' + this.p1SpriteKey, true);
           this.player1State = 'idle';
-// console.log('[DEBUG] player1State set to:', this.player1State);
+          
+          // Send stand action in online mode if player was previously crouching
+          if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
+            this.sendGameAction('stand');
+          }
         }
       }
     }
@@ -1372,6 +1447,11 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
           this.player2.play('p2_down_' + this.p2SpriteKey, true);
           this.player2.setFlipX(true);
           this.player2State = 'down';
+          
+          // Send crouch action in online mode if player 2 is controlled by local player
+          if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
+            this.sendGameAction('crouch');
+          }
         }
       } else {
         if (this.player2State !== 'idle') {
@@ -1379,6 +1459,11 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
           if (!this.gameOver) this.player2.play('p2_idle_' + this.p2SpriteKey, true);
           this.player2.setFlipX(true);
           this.player2State = 'idle';
+          
+          // Send stand action in online mode if player was previously crouching
+          if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
+            this.sendGameAction('stand');
+          }
         }
       }
     }
@@ -1405,6 +1490,12 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         // console.log('[DEBUG] Using attack animation key:', p1AttackKey);
         this.player1.play(p1AttackKey, true);
         this.player1State = 'attack';
+        
+        // Send attack action in online mode if player 1 is controlled by local player
+        if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
+          this.sendGameAction('attack');
+        }
+        
         // console.log('[DEBUG] player1State set to:', this.player1State);
         // Deal damage to player2 if in range
         console.log('[DEBUG-BEFORE] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
@@ -1458,6 +1549,9 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
       
       if (this.gameMode === 'online') {
         this[controlIndex === 0 ? 'player1State' : 'player2State'] = 'special';
+        
+        // Send special attack action to the other player
+        this.sendGameAction('special');
         this.attackCount[controlIndex] = 0;
         this.specialPips[controlIndex] = 0;
         this.showSpecialEffect(this.players[controlIndex].x, this.players[controlIndex].y);
@@ -1484,21 +1578,22 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
        });
     }
 
-    // Player 2 attack (; key or K key or touch)
+    // Player 2 attack (M key or touch)
     const attackConditionP2 = (
       this.keys &&
-      ((this.keys.semicolon && this.keys.semicolon.isDown) || (this.keys.k && this.keys.k.isDown)) &&
-      now > (this.lastAttackTime?.[1] || 0) + ATTACK_COOLDOWN &&
-      this.player2State !== 'attack' &&
-      this.player2State !== 'special'
-    ) || (this._touchJustPressedP2A && this.player2State !== 'attack' && this.player2State !== 'special');
+      this.keys.m && this.keys.m.isDown && now > (this.lastAttackTime?.[1] || 0) + ATTACK_COOLDOWN && this.player2State !== 'attack' && this.player2State !== 'special') || (this._touchJustPressedP2A && this.player2State !== 'attack' && this.player2State !== 'special');
     if (attackConditionP2) {
       // Always reset touch flag after attack (fixes mobile bug for Player 2)
       this._touchJustPressedP2A = false;
       const p2AttackKey = 'p2_attack_' + this.p2SpriteKey;
       this.player2.play(p2AttackKey, true);
       this.player2State = 'attack';
-      // console.log('[DEBUG] Player 2 attack');
+      
+      // Send attack action in online mode if player 2 is controlled by local player
+      if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
+        this.sendGameAction('attack');
+      }
+      
       tryAttack(this, 1, this.player2, this.player1, now, false);
       const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
       this.healthBar1.width = 200 * healthRatio1;
@@ -1523,6 +1618,11 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
       const p2SpecialKey = 'p2_special_' + this.p2SpriteKey;
       this.player2.play(p2SpecialKey, true);
       this.player2State = 'special';
+      
+      // Send special attack action in online mode if player 2 is controlled by local player
+      if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
+        this.sendGameAction('special');
+      }
       tryAttack(this, 1, this.player2, this.player1, now, true);
       const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
       this.healthBar1.width = 200 * healthRatio1;
