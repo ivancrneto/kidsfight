@@ -1006,39 +1006,50 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     const playerSprite = playerIndex === 0 ? this.player1 : this.player2;
     const spriteKey = playerIndex === 0 ? this.p1SpriteKey : this.p2SpriteKey;
     
+    console.log('[DEBUG] Received remote action:', action, 'for player', playerIndex);
+    
     switch(action.type) {
       case 'move':
         if (action.direction === 'left') {
           player.setVelocityX(-PLAYER_SPEED);
           playerSprite.setFlipX(true);
           
-          // Update animation to walking if player is in idle state
-          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'idle' && player.body.touching.down) {
+          // Always update animation to walking when moving left
+          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' && 
+              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'special' && 
+              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'down') {
+            
+            this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle'; // Set to idle state while walking
             const walkAnim = `p${playerIndex + 1}_walk_${spriteKey}`;
-            if (playerSprite.anims.currentAnim?.key !== walkAnim) {
-              playerSprite.play(walkAnim, true);
-            }
+            playerSprite.play(walkAnim, true);
+            console.log('[DEBUG] Playing walk animation for remote player', playerIndex, walkAnim);
           }
         } else if (action.direction === 'right') {
           player.setVelocityX(PLAYER_SPEED);
           playerSprite.setFlipX(false);
           
-          // Update animation to walking if player is in idle state
-          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'idle' && player.body.touching.down) {
+          // Always update animation to walking when moving right
+          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' && 
+              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'special' && 
+              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'down') {
+            
+            this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle'; // Set to idle state while walking
             const walkAnim = `p${playerIndex + 1}_walk_${spriteKey}`;
-            if (playerSprite.anims.currentAnim?.key !== walkAnim) {
-              playerSprite.play(walkAnim, true);
-            }
+            playerSprite.play(walkAnim, true);
+            console.log('[DEBUG] Playing walk animation for remote player', playerIndex, walkAnim);
           }
         } else {
           player.setVelocityX(0);
           
-          // Return to idle animation if not already in idle
-          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'idle') {
+          // Return to idle animation when stopped
+          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' && 
+              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'special' && 
+              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'down') {
+            
+            this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle';
             const idleAnim = `p${playerIndex + 1}_idle_${spriteKey}`;
-            if (playerSprite.anims.currentAnim?.key !== idleAnim) {
-              playerSprite.play(idleAnim, true);
-            }
+            playerSprite.play(idleAnim, true);
+            console.log('[DEBUG] Playing idle animation for remote player', playerIndex, idleAnim);
           }
         }
         break;
@@ -1131,10 +1142,13 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
 
   sendGameAction(type, data = {}) {
     if (this.gameMode === 'online' && wsManager.isConnected()) {
+      console.log('[DEBUG] Sending game action:', type, data);
       wsManager.send({
         type: 'game_action',
         action: { type, ...data }
       });
+    } else {
+      console.log('[DEBUG] Not sending game action - gameMode:', this.gameMode, 'wsManager connected:', wsManager.isConnected());
     }
   }
 

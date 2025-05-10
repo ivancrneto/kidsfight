@@ -1,5 +1,10 @@
 // Singleton WebSocket manager to maintain connection across scenes
 class WebSocketManager {
+  // Static instance property for the singleton pattern
+  static instance;
+  ws;
+  isHost;
+  
   constructor() {
     if (WebSocketManager.instance) {
       return WebSocketManager.instance;
@@ -26,17 +31,33 @@ class WebSocketManager {
         console.log('[WebSocketManager] Connection closed');
       };
       
-      // Add message logging
+      // Add message logging with enhanced debugging for game actions
       const originalOnMessage = this.ws.onmessage;
       this.ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log('[WebSocketManager] Received message:', {
-          type: data.type,
-          isHost: this.isHost,
-          data: data
-        });
-        if (originalOnMessage) {
-          originalOnMessage(event);
+        try {
+          const data = JSON.parse(event.data);
+          
+          // Enhanced logging for game actions
+          if (data.type === 'game_action') {
+            console.log('[WebSocketManager] Received game action:', {
+              actionType: data.action?.type,
+              direction: data.action?.direction,
+              isHost: this.isHost,
+              fullData: data
+            });
+          } else {
+            console.log('[WebSocketManager] Received message:', {
+              type: data.type,
+              isHost: this.isHost,
+              data: data
+            });
+          }
+          
+          if (originalOnMessage) {
+            originalOnMessage(event);
+          }
+        } catch (error) {
+          console.error('[WebSocketManager] Error processing message:', error, event.data);
         }
       };
     } else {
@@ -55,6 +76,19 @@ class WebSocketManager {
 
   send(message) {
     if (this.isConnected()) {
+      // Enhanced logging for game actions
+      if (typeof message === 'object' && message.type === 'game_action') {
+        console.log('[WebSocketManager] Sending game action:', {
+          actionType: message.action?.type,
+          direction: message.action?.direction,
+          isHost: this.isHost,
+          fullMessage: message
+        });
+      } else {
+        console.log('[WebSocketManager] Sending message:', message);
+      }
+      
+      // Send the message
       this.ws.send(typeof message === 'string' ? message : JSON.stringify(message));
     } else {
       console.error('[WebSocketManager] Cannot send message - not connected');
