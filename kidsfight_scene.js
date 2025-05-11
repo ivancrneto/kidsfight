@@ -186,26 +186,49 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
     this.keyE = this.input.keyboard.addKey('E');
     this.keyShift = this.input.keyboard.addKey('SHIFT');
 
-    // Setup physics for both players
-    this.players.forEach(player => {
-      player.setBounce(0.2);
-      player.setCollideWorldBounds(true);
-      this.physics.add.collider(player, this.platforms);
-    });
-    
-    // Add collision between players
-    this.physics.add.collider(player1, player2);
-
-    // Setup WebSocket handlers for online mode
-    if (this.gameMode === 'online' && wsManager.isConnected()) {
-      wsManager.ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'game_action') {
-          this.handleRemoteAction(data.action);
-        } else if (data.type === 'player_disconnected') {
-          this.handleDisconnection();
+    // Setup WebSocket for online mode
+    if (this.gameMode === 'online') {
+      this.wsManager = wsManager;
+      this.wsManager.isHost = this.isHost;
+      
+      // Add debug info text
+      this.debugInfoText = this.add.text(
+        10, 
+        this.cameras.main.height - 150, 
+        'WebSocket Debug Info:\nWaiting for actions...', 
+        {
+          fontSize: '14px',
+          color: '#ffffff',
+          backgroundColor: '#000000',
+          padding: { x: 5, y: 5 }
         }
-      };
+      ).setScrollFactor(0).setDepth(1000);
+      
+      // CRITICAL FIX: Set up WebSocket message handler
+      if (wsManager.ws) {
+        console.log('[CRITICAL] Setting up WebSocket message handler in KidsFightScene');
+        
+        // Store the original onmessage handler if it exists
+        const originalOnMessage = wsManager.ws.onmessage;
+        
+        wsManager.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('[CRITICAL] KidsFightScene received WebSocket message:', data);
+            
+            if (data.type === 'game_action') {
+              console.log('[CRITICAL] Received game action:', data.action);
+              this.handleRemoteAction(data.action);
+            } else if (data.type === 'player_disconnected') {
+              this.handleDisconnection();
+            }
+          } catch (error) {
+            console.error('[CRITICAL] Error handling WebSocket message:', error);
+          }
+        };
+      } else {
+        console.error('[CRITICAL] WebSocket not initialized in KidsFightScene');
+      }
     }
 
     // Add game mode indicator
@@ -229,6 +252,34 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         duration: 1000,
         yoyo: true,
         repeat: -1
+      });
+      
+      // Add test button to manually trigger a remote action
+      const testButton = this.add.text(
+        this.cameras.main.width * 0.5,
+        60,
+        '[ TEST SYNC ]',
+        {
+          fontSize: '16px',
+          color: '#ff0000',
+          backgroundColor: '#000000',
+          padding: { x: 10, y: 5 },
+          fontFamily: 'monospace'
+        }
+      ).setOrigin(0.5).setInteractive();
+      
+      testButton.on('pointerdown', () => {
+        console.log('[DEBUG] Test button clicked, sending test action');
+        // Force send a test action
+        if (wsManager.isConnected()) {
+          wsManager.send({
+            type: 'game_action',
+            action: { type: 'test_sync', timestamp: Date.now() }
+          });
+          console.log('[DEBUG] Test sync action sent');
+        } else {
+          console.error('[DEBUG] WebSocket not connected, cannot send test action');
+        }
       });
     }
     // console.log('[DEBUG] create() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
@@ -846,6 +897,59 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
       }
     )
       .setOrigin(0.5);
+      
+    // Add a very prominent test sync button for debugging
+    if (this.gameMode === 'online') {
+      const testSyncButton = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height - 100,
+        '[ TEST SYNC BUTTON ]',
+        {
+          fontSize: '24px',
+          color: '#ffffff',
+          backgroundColor: '#ff0000',
+          padding: { x: 20, y: 10 },
+          fontFamily: 'monospace'
+        }
+      ).setOrigin(0.5).setInteractive().setDepth(9999);
+      
+      testSyncButton.on('pointerdown', () => {
+        console.log('[DEBUG] Test sync button clicked!');
+        if (wsManager && wsManager.isConnected && wsManager.isConnected()) {
+          console.log('[DEBUG] WebSocket is connected, sending test sync action');
+          wsManager.send({
+            type: 'game_action',
+            action: { type: 'test_sync', timestamp: Date.now() }
+          });
+          
+          // Update debug info
+          if (this.debugInfoText) {
+            this.debugInfoText.setText(`Last Action: test_sync\nTimestamp: ${Date.now()}\nHost: ${this.isHost ? 'Yes' : 'No'}\nPlayer Index: ${this.localPlayerIndex}`);
+          }
+        } else {
+          console.error('[DEBUG] WebSocket is not connected!');
+          
+          // Update debug info
+          if (this.debugInfoText) {
+            this.debugInfoText.setText('WebSocket NOT CONNECTED!\nCheck console for errors');
+          }
+        }
+      });
+      
+      // Add on-screen debug information
+      this.debugInfoText = this.add.text(
+        10, 
+        this.cameras.main.height - 150,
+        `WebSocket: ${wsManager && wsManager.isConnected && wsManager.isConnected() ? 'Connected' : 'Disconnected'}\nHost: ${this.isHost ? 'Yes' : 'No'}\nPlayer Index: ${this.localPlayerIndex}\nNo actions yet`,
+        {
+          fontSize: '16px',
+          color: '#ffff00',
+          backgroundColor: '#000000',
+          padding: { x: 5, y: 5 },
+          fontFamily: 'monospace'
+        }
+      ).setDepth(9999);
+    }
     
     // Start countdown after a short delay
     this.time.delayedCall(1000, () => {
@@ -1000,120 +1104,357 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
   }
 
   handleRemoteAction(action) {
-    // Handle actions received from the other player
-    const playerIndex = this.isHost ? 1 : 0; // opposite of local player
-    const player = this.players[playerIndex];
-    const playerSprite = playerIndex === 0 ? this.player1 : this.player2;
-    const spriteKey = playerIndex === 0 ? this.p1SpriteKey : this.p2SpriteKey;
+    // CRITICAL FIX: Determine the correct player to update based on the player index in the action
+    // This ensures we're updating the correct player regardless of who is host or guest
+    const remotePlayerIndex = action.player === 0 ? 0 : 1;
+    const remoteSprite = remotePlayerIndex === 0 ? this.player1 : this.player2;
+    const spriteKey = remotePlayerIndex === 0 ? this.p1SpriteKey : this.p2SpriteKey;
     
-    console.log('[DEBUG] Received remote action:', action, 'for player', playerIndex);
+    // Skip if trying to update our own local player
+    if (remotePlayerIndex === this.localPlayerIndex) {
+      console.log(`[CRITICAL] Ignoring action for our own player ${remotePlayerIndex}`);
+      return;
+    }
+    
+    console.log(`[CRITICAL] Received remote action: ${action.type}, direction: ${action.direction || 'N/A'} for player ${remotePlayerIndex}`);
+    console.log(`[CRITICAL] Local player is ${this.localPlayerIndex}, isHost: ${this.isHost}`);
+    console.log(`[CRITICAL] Remote player sprite position: (${remoteSprite.x}, ${remoteSprite.y})`);
+    
+    // CRITICAL FIX: If position data is included, update the remote player's position directly
+    if (action.position) {
+      console.log(`[CRITICAL] Received position data: (${action.position.x}, ${action.position.y}), velocity: (${action.position.velocityX}, ${action.position.velocityY})`);
+      
+      // Update the remote player's position and velocity
+      remoteSprite.x = action.position.x;
+      remoteSprite.y = action.position.y;
+      remoteSprite.body.velocity.x = action.position.velocityX;
+      remoteSprite.body.velocity.y = action.position.velocityY;
+      
+      // Add a visual indicator for position update
+      const posMarker = this.add.circle(remoteSprite.x, remoteSprite.y, 15, 0x00ff00, 0.7);
+      this.time.delayedCall(300, () => posMarker.destroy());
+    } else {
+      // CRITICAL DEBUG: Force a visible marker at the remote player's position
+      const marker = this.add.circle(remoteSprite.x, remoteSprite.y, 20, 0xff0000, 0.5);
+      this.time.delayedCall(500, () => marker.destroy());
+    }
+    
+    // Update on-screen debug information
+    if (this.debugInfoText) {
+      this.debugInfoText.setText(
+        `Received: ${action.type}\n` +
+        `Direction: ${action.direction || 'N/A'}\n` +
+        `Timestamp: ${action.timestamp || Date.now()}\n` +
+        `Remote Player: ${remotePlayerIndex} (${remotePlayerIndex === 0 ? 'Host' : 'Guest'})\n` +
+        `Local Player: ${this.localPlayerIndex}\n` +
+        `Remote Position: (${Math.round(remoteSprite.x)}, ${Math.round(remoteSprite.y)})`
+      );
+    }
+    
+    // Add a visual indicator that an action was received
+    const actionText = this.add.text(
+      remoteSprite.x,
+      remoteSprite.y - 30,
+      `Action: ${action.type}${action.direction ? ' ' + action.direction : ''}`,
+      {
+        fontSize: '14px',
+        color: '#00ff00',
+        backgroundColor: '#000000',
+        padding: { x: 3, y: 2 }
+      }
+    ).setOrigin(0.5).setDepth(9999);
+    
+    // Remove the text after a short delay
+    this.time.delayedCall(800, () => {
+      actionText.destroy();
+    });
     
     switch(action.type) {
       case 'move':
+        console.log(`[CRITICAL DEBUG] Handling move action: ${action.direction} for player ${remotePlayerIndex}`);
+        
+        // CRITICAL FIX: Force update the remote player's animation based on direction
         if (action.direction === 'left') {
-          player.setVelocityX(-PLAYER_SPEED);
-          playerSprite.setFlipX(true);
+          // Set flip direction
+          remoteSprite.setFlipX(true);
           
-          // Always update animation to walking when moving left
-          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' && 
-              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'special' && 
-              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'down') {
-            
-            this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle'; // Set to idle state while walking
-            const walkAnim = `p${playerIndex + 1}_walk_${spriteKey}`;
-            playerSprite.play(walkAnim, true);
-            console.log('[DEBUG] Playing walk animation for remote player', playerIndex, walkAnim);
-          }
+          // Add visual indicator for debugging
+          const leftMarker = this.add.text(remoteSprite.x, remoteSprite.y - 50, '← MOVE LEFT', {
+            fontSize: '16px',
+            color: '#ff0000',
+            backgroundColor: '#000000',
+            padding: { x: 5, y: 2 }
+          }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+          
+          // Remove the text after a short delay
+          this.time.delayedCall(800, () => {
+            leftMarker.destroy();
+          });
+          
+          // CRITICAL FIX: Force the animation to play
+          const runAnim = `p${remotePlayerIndex+1}_walk_${spriteKey}`;
+          remoteSprite.anims.play(runAnim, true);
+          console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
         } else if (action.direction === 'right') {
-          player.setVelocityX(PLAYER_SPEED);
-          playerSprite.setFlipX(false);
+          // Set flip direction
+          remoteSprite.setFlipX(false);
           
-          // Always update animation to walking when moving right
-          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' && 
-              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'special' && 
-              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'down') {
-            
-            this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle'; // Set to idle state while walking
-            const walkAnim = `p${playerIndex + 1}_walk_${spriteKey}`;
-            playerSprite.play(walkAnim, true);
-            console.log('[DEBUG] Playing walk animation for remote player', playerIndex, walkAnim);
-          }
-        } else {
-          player.setVelocityX(0);
+          // Add visual indicator for debugging
+          const rightMarker = this.add.text(remoteSprite.x, remoteSprite.y - 50, 'MOVE RIGHT →', {
+            fontSize: '16px',
+            color: '#ff0000',
+            backgroundColor: '#000000',
+            padding: { x: 5, y: 2 }
+          }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
           
-          // Return to idle animation when stopped
-          if (this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' && 
-              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'special' && 
-              this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'down') {
-            
-            this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle';
-            const idleAnim = `p${playerIndex + 1}_idle_${spriteKey}`;
-            playerSprite.play(idleAnim, true);
-            console.log('[DEBUG] Playing idle animation for remote player', playerIndex, idleAnim);
-          }
+          // Remove the text after a short delay
+          this.time.delayedCall(800, () => {
+            rightMarker.destroy();
+          });
+          
+          // CRITICAL FIX: Force the animation to play
+          const runAnim = `p${remotePlayerIndex+1}_walk_${spriteKey}`;
+          remoteSprite.anims.play(runAnim, true);
+          console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
+        } else if (action.direction === 'stop') {
+          // Add visual indicator for debugging
+          const stopMarker = this.add.text(remoteSprite.x, remoteSprite.y - 50, 'STOP', {
+            fontSize: '16px',
+            color: '#ff0000',
+            backgroundColor: '#000000',
+            padding: { x: 5, y: 2 }
+          }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+          
+          // Remove the text after a short delay
+          this.time.delayedCall(800, () => {
+            stopMarker.destroy();
+          });
+          
+          // CRITICAL FIX: Force the idle animation to play
+          const idleAnim = `p${remotePlayerIndex+1}_idle_${spriteKey}`;
+          remoteSprite.anims.play(idleAnim, true);
+          console.log(`[CRITICAL] Playing idle animation ${idleAnim} for remote player ${remotePlayerIndex}`);
+        }
+        
+        // CRITICAL FIX: Force update the player's position in the debug display
+        console.log(`[CRITICAL] Player ${remotePlayerIndex} position: (${remoteSprite.x}, ${remoteSprite.y}), velocity: (${remoteSprite.body.velocity.x}, ${remoteSprite.body.velocity.y})`);
+        
+        // Update debug text with more detailed information
+        if (this.debugInfoText) {
+          this.debugInfoText.setText(
+            `Remote Player ${remotePlayerIndex} (${this.isHost ? 'Guest' : 'Host'})\n` +
+            `Action: Move ${action.direction}\n` +
+            `Position: (${Math.round(remoteSprite.x)}, ${Math.round(remoteSprite.y)})\n` +
+            `Velocity: (${Math.round(remoteSprite.body.velocity.x)}, ${Math.round(remoteSprite.body.velocity.y)})\n` +
+            `Animation: ${remoteSprite.anims.currentAnim?.key || 'none'}`
+          );
         }
         break;
         
       case 'jump':
-        if (player.body.touching.down) {
-          player.setVelocityY(JUMP_VELOCITY);
+        if (remoteSprite.body.touching.down) {
+          remoteSprite.setVelocityY(-500); // Use a constant jump velocity
+          
+          // Add visual indicator for debugging
+          const jumpMarker = this.add.text(remoteSprite.x, remoteSprite.y - 50, 'JUMP', {
+            fontSize: '16px',
+            color: '#ff0000',
+            backgroundColor: '#000000',
+            padding: { x: 5, y: 2 }
+          }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+          
+          // Remove the text after a short delay
+          this.time.delayedCall(800, () => {
+            jumpMarker.destroy();
+          });
+          
+          // Play jump animation - use walk animation since there's no specific jump animation
+          const jumpAnim = `p${remotePlayerIndex+1}_walk_${spriteKey}`;
+          remoteSprite.anims.play(jumpAnim, true);
         }
         break;
         
       case 'attack':
         const currentTime = this.time.now;
-        if (currentTime - this.lastAttackTime[playerIndex] >= 500) { // 500ms cooldown
-          this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'attack';
-          this.lastAttackTime[playerIndex] = currentTime;
+        
+        // Add visual indicator for debugging
+        const attackMarker = this.add.text(
+          remoteSprite.x,
+          remoteSprite.y - 50,
+          'ATTACK',
+          {
+            fontSize: '16px',
+            color: '#ff0000',
+            backgroundColor: '#000000',
+            padding: { x: 5, y: 2 }
+          }
+        ).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+        
+        // Remove the text after a short delay
+        this.time.delayedCall(800, () => {
+          attackMarker.destroy();
+        });
+        
+        // Play attack animation
+        const attackAnim = `p${remotePlayerIndex+1}_attack_${spriteKey}`;
+        remoteSprite.anims.play(attackAnim, true);
+        
+        // CRITICAL FIX: Apply damage to the local player when remote player attacks
+        // Determine which player is the defender (the local player)
+        const defenderIndex = this.localPlayerIndex;
+        const defender = defenderIndex === 0 ? this.player1 : this.player2;
+        
+        // Apply damage if players are close enough
+        const ATTACK_RANGE = 180;
+        if (Math.abs(remoteSprite.x - defender.x) <= ATTACK_RANGE) {
+          // Apply damage to the local player
+          this.playerHealth[defenderIndex] = Math.max(0, this.playerHealth[defenderIndex] - ATTACK_DAMAGE);
           
-          // Play attack animation
-          const attackAnim = `p${playerIndex + 1}_attack_${spriteKey}`;
-          playerSprite.play(attackAnim, true);
+          // Update the health bar
+          const healthBar = defenderIndex === 0 ? this.healthBar1 : this.healthBar2;
+          const healthRatio = Math.max(0, this.playerHealth[defenderIndex] / MAX_HEALTH);
+          if (healthBar) healthBar.width = 200 * healthRatio;
           
-          // Reset to idle after attack animation completes
-          playerSprite.once('animationcomplete', () => {
-            if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'attack') {
-              this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle';
-              playerSprite.play(`p${playerIndex + 1}_idle_${spriteKey}`, true);
-            }
-          });
+          // Visual feedback for taking damage
+          if (this.cameras && this.cameras.main) {
+            this.cameras.main.shake(100, 0.01);
+          }
+          
+          console.log(`[CRITICAL] Local player ${defenderIndex} took damage. Health: ${this.playerHealth[defenderIndex]}`);
         }
+        
+        // Reset to idle after attack animation completes
+        remoteSprite.once('animationcomplete', () => {
+          const idleAnim = `p${remotePlayerIndex+1}_idle_${spriteKey}`;
+          remoteSprite.anims.play(idleAnim, true);
+        });
         break;
         
       case 'special':
-        if (this.specialPips[playerIndex] >= 3) {
-          this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'special';
-          this.specialPips[playerIndex] = 0;
+        // Add visual indicator for debugging
+        const specialMarker = this.add.text(remoteSprite.x, remoteSprite.y - 50, 'SPECIAL', {
+          fontSize: '16px',
+          color: '#ff0000',
+          backgroundColor: '#000000',
+          padding: { x: 5, y: 2 }
+        }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+        
+        // Remove the text after a short delay
+        this.time.delayedCall(800, () => {
+          specialMarker.destroy();
+        });
+        
+        // Play special attack animation
+        const specialAnim = `p${remotePlayerIndex+1}_special_${spriteKey}`;
+        remoteSprite.anims.play(specialAnim, true);
+        
+        // CRITICAL FIX: Apply special attack damage to the local player
+        // Determine which player is the defender (the local player)
+        const specialDefenderIndex = this.localPlayerIndex;
+        const specialDefender = specialDefenderIndex === 0 ? this.player1 : this.player2;
+        
+        // Apply damage if players are close enough (special has slightly longer range)
+        const SPECIAL_RANGE = 200;
+        if (Math.abs(remoteSprite.x - specialDefender.x) <= SPECIAL_RANGE) {
+          // Apply damage to the local player (special does more damage)
+          this.playerHealth[specialDefenderIndex] = Math.max(0, this.playerHealth[specialDefenderIndex] - SPECIAL_DAMAGE);
           
-          // Play special attack animation
-          const specialAnim = `p${playerIndex + 1}_special_${spriteKey}`;
-          playerSprite.play(specialAnim, true);
+          // Update the health bar
+          const specialHealthBar = specialDefenderIndex === 0 ? this.healthBar1 : this.healthBar2;
+          const specialHealthRatio = Math.max(0, this.playerHealth[specialDefenderIndex] / MAX_HEALTH);
+          if (specialHealthBar) specialHealthBar.width = 200 * specialHealthRatio;
           
-          // Reset to idle after special animation completes
-          playerSprite.once('animationcomplete', () => {
-            if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'special') {
-              this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle';
-              playerSprite.play(`p${playerIndex + 1}_idle_${spriteKey}`, true);
-            }
-          });
+          // Visual feedback for taking damage (stronger for special)
+          if (this.cameras && this.cameras.main) {
+            this.cameras.main.shake(250, 0.03);
+          }
           
-          // Show special effect
-          this.showSpecialEffect(playerSprite.x, playerSprite.y);
+          console.log(`[CRITICAL] Local player ${specialDefenderIndex} took SPECIAL damage. Health: ${this.playerHealth[specialDefenderIndex]}`);
+        }
+        
+        // Reset to idle after special animation completes
+        remoteSprite.once('animationcomplete', () => {
+          const idleAnim = `p${remotePlayerIndex+1}_idle_${spriteKey}`;
+          remoteSprite.anims.play(idleAnim, true);
+        });
+        
+        // Show special effect if the method exists
+        if (typeof this.showSpecialEffect === 'function') {
+          this.showSpecialEffect(remoteSprite.x, remoteSprite.y);
         }
         break;
         
       case 'crouch':
-        if (this[playerIndex === 0 ? 'player1State' : 'player2State'] !== 'down') {
-          this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'down';
-          playerSprite.play(`p${playerIndex + 1}_down_${spriteKey}`, true);
-        }
+        // Add visual indicator for debugging
+        const crouchMarker = this.add.text(remoteSprite.x, remoteSprite.y - 50, 'CROUCH', {
+          fontSize: '16px',
+          color: '#ff0000',
+          backgroundColor: '#000000',
+          padding: { x: 5, y: 2 }
+        }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+        
+        // Remove the text after a short delay
+        this.time.delayedCall(800, () => {
+          crouchMarker.destroy();
+        });
+        
+        // Play crouch animation (using down animation which is what's available)
+        const crouchAnim = `p${remotePlayerIndex+1}_down_${spriteKey}`;
+        remoteSprite.anims.play(crouchAnim, true);
         break;
         
       case 'stand':
-        if (this[playerIndex === 0 ? 'player1State' : 'player2State'] === 'down') {
-          this[playerIndex === 0 ? 'player1State' : 'player2State'] = 'idle';
-          playerSprite.play(`p${playerIndex + 1}_idle_${spriteKey}`, true);
-        }
+        // Add visual indicator for debugging
+        const standMarker = this.add.text(remoteSprite.x, remoteSprite.y - 50, 'STAND', {
+          fontSize: '16px',
+          color: '#ff0000',
+          backgroundColor: '#000000',
+          padding: { x: 5, y: 2 }
+        }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+        
+        // Remove the text after a short delay
+        this.time.delayedCall(800, () => {
+          standMarker.destroy();
+        });
+        
+        // Play stand animation (idle)
+        const standAnim = `p${remotePlayerIndex+1}_idle_${spriteKey}`;
+        remoteSprite.anims.play(standAnim, true);
+        break;
+        
+      case 'test_sync':
+        // Special test action to verify synchronization
+        console.log('[DEBUG] Received test_sync action with timestamp:', action.timestamp);
+        
+        // Visual feedback - make the player jump and flash
+        remoteSprite.setVelocityY(-400); // Jump
+        
+        // Flash the player sprite
+        this.tweens.add({
+          targets: remoteSprite,
+          alpha: 0.2,
+          duration: 100,
+          yoyo: true,
+          repeat: 5
+        });
+        
+        // Show a text indicator
+        const syncText = this.add.text(
+          remoteSprite.x,
+          remoteSprite.y - 50,
+          'SYNC TEST!',
+          {
+            fontSize: '16px',
+            color: '#ffff00',
+            backgroundColor: '#000000',
+            padding: { x: 5, y: 2 }
+          }
+        ).setOrigin(0.5);
+        
+        // Remove the text after a delay
+        this.time.delayedCall(1000, () => {
+          syncText.destroy();
+        });
         break;
     }
   }
@@ -1141,14 +1482,43 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
   }
 
   sendGameAction(type, data = {}) {
-    if (this.gameMode === 'online' && wsManager.isConnected()) {
-      console.log('[DEBUG] Sending game action:', type, data);
-      wsManager.send({
-        type: 'game_action',
-        action: { type, ...data }
-      });
-    } else {
-      console.log('[DEBUG] Not sending game action - gameMode:', this.gameMode, 'wsManager connected:', wsManager.isConnected());
+    if (this.gameMode !== 'online' || !this.wsManager || !this.wsManager.ws) {
+      return;
+    }
+    
+    // Get the local player sprite to include position data
+    const localPlayer = this.localPlayerIndex === 0 ? this.player1 : this.player2;
+    
+    // Include current position data with every action
+    const action = {
+      type,
+      ...data,
+      timestamp: Date.now(),
+      player: this.localPlayerIndex,
+      position: {
+        x: localPlayer.x,
+        y: localPlayer.y,
+        velocityX: localPlayer.body.velocity.x,
+        velocityY: localPlayer.body.velocity.y
+      }
+    };
+    
+    console.log(`[CRITICAL] Sending game action: ${type}, direction: ${data.direction || 'N/A'}, player: ${this.localPlayerIndex}, position: (${localPlayer.x}, ${localPlayer.y})`);
+    this.wsManager.sendGameAction(action);
+    
+    // Add visual indicator for sent actions (debugging)
+    if (localPlayer) {
+      this.add.text(
+        localPlayer.x,
+        localPlayer.y - 70,
+        `SENT: ${type}${data.direction ? ' ' + data.direction : ''}`,
+        {
+          fontSize: '14px',
+          color: '#ff00ff',
+          backgroundColor: '#000000',
+          padding: { x: 3, y: 2 }
+        }
+      ).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
     }
   }
 
@@ -1333,15 +1703,39 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         this.lungeTimer[0] -= delta;
       } else {
         p1.setVelocityX(0);
-        if (this.keys.a.isDown) {
-          p1.setVelocityX(-PLAYER_SPEED);
-          p1Moving = true;
+        
+        // CRITICAL FIX: Only control player1 if in local mode or if we're the host in online mode
+        if (this.gameMode === 'local' || (this.gameMode === 'online' && this.localPlayerIndex === 0)) {
+          if (this.keys.a.isDown) {
+            p1.setVelocityX(-PLAYER_SPEED);
+            p1Moving = true;
+            
+            // Send movement action to other player if in online mode
+            if (this.gameMode === 'online') {
+              this.sendGameAction('move', { direction: 'left' });
+            }
+          } else if (this.keys.d.isDown) {
+            p1.setVelocityX(PLAYER_SPEED);
+            p1Moving = true;
+            
+            // Send movement action to other player if in online mode
+            if (this.gameMode === 'online') {
+              this.sendGameAction('move', { direction: 'right' });
+            }
+          } else if (this.gameMode === 'online') {
+            // Only send stop action in online mode
+            this.sendGameAction('move', { direction: 'stop' });
+          }
+          
+          if (this.keys.w.isDown && p1.onFloor()) {
+            p1.setVelocityY(JUMP_VELOCITY);
+            
+            // Send jump action to other player if in online mode
+            if (this.gameMode === 'online') {
+              this.sendGameAction('jump');
+            }
+          }
         }
-        if (this.keys.d.isDown) {
-          p1.setVelocityX(PLAYER_SPEED);
-          p1Moving = true;
-        }
-        if (this.keys.w.isDown && p1.onFloor()) p1.setVelocityY(JUMP_VELOCITY);
       }
       // Player 1 walk animation
       if (

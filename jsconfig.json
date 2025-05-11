@@ -4,11 +4,14 @@
     "module": "es6",
     "moduleResolution": "node",
     "checkJs": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
   "include": [
     "*.js",
-    "**/*.js"
+    "**/*.js",
+    "types.d.ts"
   ],
   "exclude": [
     "node_modules",
