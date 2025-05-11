@@ -394,12 +394,24 @@ function tryAttack(scene, playerIdx, attacker, defender, now, special) {
     console.error('[TRYATTACK] Could not determine defenderIdx!', defender, scene.player1, scene.player2);
     return;
   }
-  console.log('[TRYATTACK] defenderIdx:', defenderIdx, 'playerHealth before:', scene.playerHealth[defenderIdx]);
+  
+  // Initialize playerHealth if it doesn't exist
+  if (!scene.playerHealth) {
+    console.log('[TRYATTACK] Initializing playerHealth array');
+    scene.playerHealth = [100, 100]; // Default to 100 health for both players
+  }
+  
+  console.log('[TRYATTACK] defenderIdx:', defenderIdx, 'playerHealth before:', 
+    scene.playerHealth && scene.playerHealth[defenderIdx] !== undefined ? scene.playerHealth[defenderIdx] : 'undefined');
+  
   if (!attacker || !defender) return;
   const ATTACK_RANGE = 180;
   const ATTACK_COOLDOWN = 500;
+  
+  // Initialize attack tracking arrays if they don't exist
   if (!scene.lastAttackTime) scene.lastAttackTime = [0, 0];
   if (!scene.attackCount) scene.attackCount = [0, 0];
+  
   if (now - scene.lastAttackTime[playerIdx] < ATTACK_COOLDOWN) {
     // console.log('[DEBUG] tryAttack: Attack on cooldown for player', playerIdx);
     return;
@@ -408,10 +420,26 @@ function tryAttack(scene, playerIdx, attacker, defender, now, special) {
     // console.log('[DEBUG] tryAttack: Out of range. Attacker x:', attacker.x, 'Defender x:', defender.x);
     return;
   }
+  
+  // Update attack tracking
   scene.lastAttackTime[playerIdx] = now;
-  scene.attackCount[playerIdx]++;
-  scene.playerHealth[defenderIdx] = Math.max(0, (typeof scene.playerHealth[defenderIdx] === 'number' ? scene.playerHealth[defenderIdx] : 100) - (special ? 30 : 10));
-  console.log('[TRYATTACK] playerHealth after:', scene.playerHealth[defenderIdx]);
+  if (scene.attackCount && playerIdx !== undefined) {
+    scene.attackCount[playerIdx]++;
+  }
+  
+  // Safely update player health with additional checks
+  if (scene.playerHealth && defenderIdx !== undefined && defenderIdx >= 0 && defenderIdx < scene.playerHealth.length) {
+    const currentHealth = typeof scene.playerHealth[defenderIdx] === 'number' ? scene.playerHealth[defenderIdx] : 100;
+    const damage = special ? 30 : 10;
+    scene.playerHealth[defenderIdx] = Math.max(0, currentHealth - damage);
+    console.log('[TRYATTACK] playerHealth after:', scene.playerHealth[defenderIdx]);
+  } else {
+    console.error('[TRYATTACK] Could not update playerHealth - invalid state', {
+      playerHealthExists: !!scene.playerHealth,
+      defenderIdx,
+      playerIdx
+    });
+  }
   if (scene.cameras && scene.cameras.main && typeof scene.cameras.main.shake === 'function') {
     scene.cameras.main.shake(special ? 250 : 100, special ? 0.03 : 0.01);
   }

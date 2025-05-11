@@ -24,10 +24,16 @@ class PlayerSelectScene extends Phaser.Scene {
     console.log('[PlayerSelectScene] Init called, resetting selections');
     // Character sprite keys for mapping
     this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
-    // Convert numeric indices to character keys if needed
-    const p1Selection = typeof data?.p1 === 'number' ? this.CHARACTER_KEYS[data.p1] : data?.p1 || 'player1';
-    const p2Selection = typeof data?.p2 === 'number' ? this.CHARACTER_KEYS[data.p2] : data?.p2 || 'player2';
-    this.selected = { p1: p1Selection, p2: p2Selection }; // Default selections using sprite keys
+    
+    // For online mode, always set Bento (player1) as the initial player for both players
+    if (data && data.mode === 'online') {
+      this.selected = { p1: 'player1', p2: 'player1' }; // Bento for both players in online mode
+    } else {
+      // For local mode, use the provided selections or defaults
+      const p1Selection = typeof data?.p1 === 'number' ? this.CHARACTER_KEYS[data.p1] : data?.p1 || 'player1';
+      const p2Selection = typeof data?.p2 === 'number' ? this.CHARACTER_KEYS[data.p2] : data?.p2 || 'player2';
+      this.selected = { p1: p1Selection, p2: p2Selection };
+    }
     this.selectedScenario = data && data.scenario ? data.scenario : 'scenario1';
     this.scenarioKey = this.selectedScenario; // Store scenario key for KidsFightScene
     this.gameMode = data && data.mode ? data.mode : 'local'; // Store game mode
@@ -519,7 +525,7 @@ option.setAlpha(0.5); // Dim opponent's options
   }
   
   startFight() {
-    // In online mode, wait a bit for character sync
+    // In online mode, use the ready system
     if (this.gameMode === 'online') {
       // Send our character selection
       // Get character index from the key (e.g., 'player1' -> 0)
@@ -537,48 +543,133 @@ option.setAlpha(0.5); // Dim opponent's options
         playerNum
       });
       
-      // Give a short delay for the other player's selection to arrive
-      setTimeout(() => {
-        console.log('[PlayerSelectScene] Starting fight with:', {
-          p1: this.selected.p1,
-          p2: this.selected.p2,
-          isHost: this.isHost
-        });
+      // Show waiting message
+      this.waitingText = this.add.text(
+        this.cameras.main.width * 0.5,
+        this.cameras.main.height * 0.8,
+        'Waiting for both players to be ready...',
+        {
+          fontSize: '18px',
+          color: '#ffff00',
+          fontFamily: 'monospace',
+          backgroundColor: '#000000',
+          padding: { x: 10, y: 5 }
+        }
+      ).setOrigin(0.5).setDepth(100);
+      
+      // Send player ready message to server
+      wsManager.send({
+        type: 'player_ready',
+        character: charIndex
+      });
+      console.log('[PlayerSelectScene] Sending player ready message');
+      
+      // Set up handler for start_game message
+      const originalOnMessage = wsManager.ws.onmessage;
+      wsManager.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[PlayerSelectScene] Received message:', data);
+          
+          if (data.type === 'start_game') {
+            console.log('[PlayerSelectScene] Received start_game message, starting game');
+            // Add a visual indicator that we received the start_game message
+            const startGameText = this.add.text(
+              this.cameras.main.width * 0.5,
+              this.cameras.main.height * 0.7,
+              'START GAME RECEIVED! LAUNCHING...',
+              {
+                fontSize: '24px',
+                color: '#00ff00',
+                fontFamily: 'monospace',
+                backgroundColor: '#000000',
+                padding: { x: 10, y: 5 }
+              }
+            ).setOrigin(0.5).setDepth(100);
+            
+            // Launch the game after a short delay to ensure the message is visible
+            this.time.delayedCall(500, () => {
+              this.launchGame();
+            });
+          } else if (data.type === 'player_ready') {
+            console.log('[PlayerSelectScene] Other player is ready');
+            if (this.waitingText) {
+              this.waitingText.setText('Other player is ready! Starting game soon...');
+              this.waitingText.setColor('#00ff00');
+            }
+            
+            // Add a visual indicator that we received the player_ready message
+            const readyText = this.add.text(
+              this.cameras.main.width * 0.5,
+              this.cameras.main.height * 0.7,
+              `PLAYER ${data.player} IS READY!`,
+              {
+                fontSize: '20px',
+                color: '#ffff00',
+                fontFamily: 'monospace',
+                backgroundColor: '#000000',
+                padding: { x: 10, y: 5 }
+              }
+            ).setOrigin(0.5).setDepth(100);
+            
+            // Remove the text after a short delay
+            this.time.delayedCall(2000, () => {
+              readyText.destroy();
+            });
+          } else if (originalOnMessage) {
+            // Pass other messages to the original handler
+            originalOnMessage(event);
+          }
+        } catch (error) {
+          console.error('[PlayerSelectScene] Error processing message:', error);
+        }
+      };
+      
+      // Add a debug button to manually trigger the start game
+      if (this.gameMode === 'online') {
+        const debugButton = this.add.text(
+          this.cameras.main.width * 0.5,
+          this.cameras.main.height * 0.9,
+          'DEBUG: FORCE START GAME',
+          {
+            fontSize: '16px',
+            color: '#ff0000',
+            fontFamily: 'monospace',
+            backgroundColor: '#000000',
+            padding: { x: 10, y: 5 }
+          }
+        ).setOrigin(0.5).setDepth(100).setInteractive();
         
-        // Start the KidsFightScene with character keys
-        const p1Index = this.CHARACTER_KEYS.indexOf(this.selected.p1);
-        const p2Index = this.CHARACTER_KEYS.indexOf(this.selected.p2);
-        this.scene.start('KidsFightScene', {
-          p1: this.selected.p1,
-          p2: this.selected.p2,
-          p1Index,
-          p2Index,
-          scenario: this.scenarioKey,
-          mode: this.gameMode,
-          isHost: this.isHost
+        debugButton.on('pointerdown', () => {
+          console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
+          this.launchGame();
         });
-      }, 500); // 500ms delay for character sync
+      }
     } else {
       // Start immediately in local mode
-      console.log('[PlayerSelectScene] Starting fight with:', {
-        p1: this.selected.p1,
-        p2: this.selected.p2,
-        isHost: this.isHost
-      });
-      
-      // Start the KidsFightScene with character keys
-      const p1Index = this.CHARACTER_KEYS.indexOf(this.selected.p1);
-      const p2Index = this.CHARACTER_KEYS.indexOf(this.selected.p2);
-      this.scene.start('KidsFightScene', {
-        p1: this.selected.p1,
-        p2: this.selected.p2,
-        p1Index,
-        p2Index,
-        scenario: this.scenarioKey,
-        mode: this.gameMode,
-        isHost: this.isHost
-      });
+      this.launchGame();
     }
+  }
+  
+  launchGame() {
+    console.log('[PlayerSelectScene] Starting fight with:', {
+      p1: this.selected.p1,
+      p2: this.selected.p2,
+      isHost: this.isHost
+    });
+    
+    // Start the KidsFightScene with character keys
+    const p1Index = this.CHARACTER_KEYS.indexOf(this.selected.p1);
+    const p2Index = this.CHARACTER_KEYS.indexOf(this.selected.p2);
+    this.scene.start('KidsFightScene', {
+      p1: this.selected.p1,
+      p2: this.selected.p2,
+      p1Index,
+      p2Index,
+      scenario: this.scenarioKey,
+      mode: this.gameMode,
+      isHost: this.isHost
+    });
   }
 }
 

@@ -41,7 +41,7 @@ const PLATFORM_Y = GAME_HEIGHT - 100;
 const PLATFORM_HEIGHT = 20;
 
 // Accept Phaser as a constructor parameter for testability
-class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Phaser.Scene : class {}) {
+class KidsFightScene extends Phaser.Scene {
   // Helper method to get character name from sprite key
   getCharacterName(spriteKey) {
     switch(spriteKey) {
@@ -530,6 +530,26 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
       this.touchLabels.push(this.add.text(0, 0, 'S', {fontSize:'24px',color:'#222'}).setDepth(10000));
       // Immediately position all touch labels
       this.updateControlPositions();
+      
+      // In online mode, hide and disable the other player's controls
+      if (this.gameMode === 'online') {
+        console.log(`[TOUCH] Online mode detected, hiding controls for player ${this.localPlayerIndex === 0 ? '2' : '1'}`);
+        const otherPlayerControls = this.localPlayerIndex === 0 ? this.touchControls.p2 : this.touchControls.p1;
+        const otherPlayerLabelsStart = this.localPlayerIndex === 0 ? 6 : 0; // Player 2 labels start at index 6
+        
+        // Hide and disable the other player's controls
+        Object.values(otherPlayerControls).forEach(control => {
+          control.setVisible(false);
+          control.disableInteractive();
+        });
+        
+        // Hide the other player's labels
+        for (let i = otherPlayerLabelsStart; i < otherPlayerLabelsStart + 6; i++) {
+          if (this.touchLabels[i]) {
+            this.touchLabels[i].setVisible(false);
+          }
+        }
+      }
     }
 
 
@@ -1961,7 +1981,13 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         // Send special attack action to the other player
         this.sendGameAction('special');
         this.attackCount[controlIndex] = 0;
-        this.specialPips[controlIndex] = 0;
+        
+        // Use the correct specialPips arrays instead of a non-existent specialPips array
+        if (controlIndex === 0) {
+          this.specialPips1.forEach(pip => pip.setFillStyle(0x888888));
+        } else {
+          this.specialPips2.forEach(pip => pip.setFillStyle(0x888888));
+        }
         
         // Use the correct player reference instead of this.players array which doesn't exist
         const player = controlIndex === 0 ? this.player1 : this.player2;
@@ -1975,8 +2001,10 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         this.player1.play(p1SpecialKey, true);
         this.player1State = 'special';
         this.attackCount[0] = 0;
-        this.specialPips[0] = 0;
-        this.showSpecialEffect(this.players[0].x, this.players[0].y);
+        // Reset special pips for player 1
+        this.specialPips1.forEach(pip => pip.setFillStyle(0x888888));
+        // Fix reference to use this.player1 directly instead of this.players array
+        this.showSpecialEffect(this.player1.x, this.player1.y);
       }
       tryAttack(this, 0, this.player1, this.player2, now, true);
       const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
