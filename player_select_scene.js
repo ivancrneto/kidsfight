@@ -65,6 +65,25 @@ class PlayerSelectScene extends Phaser.Scene {
                 characterKey,
                 selected: this.selected
               });
+              
+              // Update the visual selection indicator
+              const characterIndex = parseInt(data.character);
+              const optionsArray = playerKey === 'p1' ? this.p1Options : this.p2Options;
+              const selector = playerKey === 'p1' ? this.p1Selector : this.p2Selector;
+              
+              if (optionsArray && selector && characterIndex >= 0 && characterIndex < optionsArray.length) {
+                const selectedOption = optionsArray[characterIndex];
+                console.log(`[PlayerSelectScene] Moving ${playerKey} selector to option:`, selectedOption);
+                selector.setPosition(selectedOption.x, selectedOption.y - this.faceOffsetY);
+              } else {
+                console.error(`[PlayerSelectScene] Could not update visual selection for ${playerKey}:`, {
+                  playerKey,
+                  characterIndex,
+                  hasOptionsArray: !!optionsArray,
+                  hasSelector: !!selector,
+                  optionsLength: optionsArray ? optionsArray.length : 0
+                });
+              }
               break;
               
             case 'scenario_selected':
@@ -349,42 +368,45 @@ class PlayerSelectScene extends Phaser.Scene {
     const faceOffsetY = 18; // move player images down inside the circles
     
     // Character sprite keys for mapping
-    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    
+    // Store faceOffsetY as a class property so it's accessible in the WebSocket handler
+    this.faceOffsetY = faceOffsetY;
     
     // Player 1 faces
     const p1FaceBGs = [];
-    const p1Options = [];
+    this.p1Options = [];
     // First row (indices 0-3)
     for (let i = 0; i < 4; i++) {
       p1FaceBGs.push(this.add.circle(p1FaceX[i], faceY1, faceRadius, 0x222222));
-      let s1 = this.add.sprite(p1FaceX[i], faceY1 + faceOffsetY, CHARACTER_KEYS[i], 0).setScale(0.18);
+      let s1 = this.add.sprite(p1FaceX[i], faceY1 + faceOffsetY, this.CHARACTER_KEYS[i], 0).setScale(0.18);
       s1.setCrop(0, cropY, frameW, cropH);
-      p1Options.push(s1);
+      this.p1Options.push(s1);
     }
     // Second row (indices 4-7)
     for (let i = 0; i < 4; i++) {
       p1FaceBGs.push(this.add.circle(p1FaceX[i], faceY2, faceRadius, 0x222222));
-      let s2 = this.add.sprite(p1FaceX[i], faceY2 + faceOffsetY, CHARACTER_KEYS[i+4], 0).setScale(0.18);
+      let s2 = this.add.sprite(p1FaceX[i], faceY2 + faceOffsetY, this.CHARACTER_KEYS[i+4], 0).setScale(0.18);
       s2.setCrop(0, cropY, frameW, cropH);
-      p1Options.push(s2);
+      this.p1Options.push(s2);
     }
 
     // Player 2 faces
     const p2FaceBGs = [];
-    const p2Options = [];
+    this.p2Options = [];
     // First row (indices 0-3)
     for (let i = 0; i < 4; i++) {
       p2FaceBGs.push(this.add.circle(p2FaceX[i], faceY1, faceRadius, 0x222222));
-      let s1 = this.add.sprite(p2FaceX[i], faceY1 + faceOffsetY, CHARACTER_KEYS[i], 0).setScale(0.18);
+      let s1 = this.add.sprite(p2FaceX[i], faceY1 + faceOffsetY, this.CHARACTER_KEYS[i], 0).setScale(0.18);
       s1.setCrop(0, cropY, frameW, cropH);
-      p2Options.push(s1);
+      this.p2Options.push(s1);
     }
     // Second row (indices 4-7)
     for (let i = 0; i < 4; i++) {
       p2FaceBGs.push(this.add.circle(p2FaceX[i], faceY2, faceRadius, 0x222222));
-      let s2 = this.add.sprite(p2FaceX[i], faceY2 + faceOffsetY, CHARACTER_KEYS[i+4], 0).setScale(0.18);
+      let s2 = this.add.sprite(p2FaceX[i], faceY2 + faceOffsetY, this.CHARACTER_KEYS[i+4], 0).setScale(0.18);
       s2.setCrop(0, cropY, frameW, cropH);
-      p2Options.push(s2);
+      this.p2Options.push(s2);
     }
     
     // Responsive player names
@@ -407,9 +429,9 @@ class PlayerSelectScene extends Phaser.Scene {
     }
 
     // Make options interactive
-    for (let i = 0; i < p1Options.length; i++) {
-      p1Options[i].setInteractive();
-      p2Options[i].setInteractive();
+    for (let i = 0; i < this.p1Options.length; i++) {
+      this.p1Options[i].setInteractive();
+      this.p2Options[i].setInteractive();
     }
     
     // Add selection indicators - store them as class properties so we can access them in other methods
@@ -418,16 +440,16 @@ class PlayerSelectScene extends Phaser.Scene {
     this.p2Selector = this.add.circle(p2FaceX[0], faceY1, faceRadius + 6, 0x0000ff, 0.18).setStrokeStyle(4, 0x0000ff);
     
     // Add click handlers
-    for (let i = 0; i < p1Options.length; i++) {
-      const option = p1Options[i];
+    for (let i = 0; i < this.p1Options.length; i++) {
+      const option = this.p1Options[i];
       // In online mode, only host can select P1
       if (this.gameMode !== 'online' || this.isHost) {
         option.setInteractive();
         option.on('pointerdown', () => {
           // The index in p1Options array directly maps to the character index (0-7)
-          this.selected.p1 = CHARACTER_KEYS[i];
-          console.log('[PlayerSelectScene] P1 selected:', i, CHARACTER_KEYS[i]);
-          this.p1Selector.setPosition(option.x, option.y - faceOffsetY);
+          this.selected.p1 = this.CHARACTER_KEYS[i];
+          console.log('[PlayerSelectScene] P1 selected:', i, this.CHARACTER_KEYS[i]);
+          this.p1Selector.setPosition(option.x, option.y - this.faceOffsetY);
           
           if (this.gameMode === 'online') {
             // Send selection to server
@@ -444,16 +466,16 @@ option.setAlpha(0.5); // Dim opponent's options
       }
     }
     
-    for (let i = 0; i < p2Options.length; i++) {
-      const option = p2Options[i];
+    for (let i = 0; i < this.p2Options.length; i++) {
+      const option = this.p2Options[i];
       // In online mode, only client can select P2
       if (this.gameMode !== 'online' || !this.isHost) {
         option.setInteractive();
         option.on('pointerdown', () => {
           // The index in p2Options array directly maps to the character index (0-7)
-          this.selected.p2 = CHARACTER_KEYS[i];
-          console.log('[PlayerSelectScene] P2 selected:', i, CHARACTER_KEYS[i]);
-          this.p2Selector.setPosition(option.x, option.y - faceOffsetY);
+          this.selected.p2 = this.CHARACTER_KEYS[i+4]; // Note: p2Options starts at index 4 in CHARACTER_KEYS
+          console.log('[PlayerSelectScene] P2 selected:', i, this.CHARACTER_KEYS[i+4]);
+          this.p2Selector.setPosition(option.x, option.y - this.faceOffsetY);
           
           if (this.gameMode === 'online') {
             // Send selection to server
