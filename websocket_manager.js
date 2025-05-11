@@ -45,7 +45,27 @@ class WebSocketManager {
               isHost: this.isHost,
               fullData: data
             });
-          } else {
+          } 
+          // Enhanced logging for replay requests
+          else if (data.type === 'replay_request') {
+            console.log('[WebSocketManager] Received replay request:', {
+              action: data.action,
+              isHost: this.isHost,
+              roomCode: data.roomCode,
+              timestamp: data.timestamp,
+              fullData: data
+            });
+          }
+          // Enhanced logging for replay responses
+          else if (data.type === 'replay_response') {
+            console.log('[WebSocketManager] Received replay response:', {
+              action: data.action,
+              accepted: data.accepted,
+              isHost: this.isHost,
+              fullData: data
+            });
+          } 
+          else {
             console.log('[WebSocketManager] Received message:', {
               type: data.type,
               isHost: this.isHost,
@@ -84,7 +104,27 @@ class WebSocketManager {
           isHost: this.isHost,
           fullMessage: message
         });
-      } else {
+      } 
+      // Enhanced logging for replay requests
+      else if (typeof message === 'object' && message.type === 'replay_request') {
+        console.log('[WebSocketManager] Sending replay request:', {
+          action: message.action,
+          isHost: this.isHost,
+          roomCode: message.roomCode,
+          timestamp: message.timestamp,
+          fullMessage: message
+        });
+      }
+      // Enhanced logging for replay responses
+      else if (typeof message === 'object' && message.type === 'replay_response') {
+        console.log('[WebSocketManager] Sending replay response:', {
+          action: message.action,
+          accepted: message.accepted,
+          isHost: this.isHost,
+          fullMessage: message
+        });
+      } 
+      else {
         console.log('[WebSocketManager] Sending message:', message);
       }
       
@@ -93,6 +133,22 @@ class WebSocketManager {
     } else {
       console.error('[WebSocketManager] Cannot send message - not connected');
     }
+  }
+  
+  sendGameAction(action) {
+    if (!this.isConnected()) {
+      console.error('[WebSocketManager] Cannot send game action - not connected');
+      return;
+    }
+    
+    console.log('[WebSocketManager] Sending game action:', action);
+    
+    const message = {
+      type: 'game_action',
+      action: action
+    };
+    
+    this.send(message);
   }
 
   close() {

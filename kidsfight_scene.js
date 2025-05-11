@@ -56,6 +56,244 @@ class KidsFightScene extends Phaser.Scene {
       default: return 'Jogador';
     }
   }
+  
+  // Handle incoming WebSocket messages
+  setupWebSocketHandlers() {
+    if (!this.wsManager || !this.wsManager.ws) {
+      console.error('[KidsFightScene] No WebSocket connection available');
+      return;
+    }
+    
+    console.log('[KidsFightScene] Setting up WebSocket handlers');
+    
+    // Store the original message handler if it exists
+    const originalOnMessage = this.wsManager.ws.onmessage;
+    
+    // Set up WebSocket message handler
+    this.wsManager.ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('[KidsFightScene] Received message:', data);
+        
+        // Handle different message types
+        if (data.type === 'game_action') {
+          this.handleRemoteAction(data.action);
+        } 
+        // Handle replay requests when game is over
+        else if (data.type === 'replay_request') {
+          console.log('[KidsFightScene] Received replay request:', data);
+          console.log('[KidsFightScene] Current game state:', {
+            gameOver: this.gameOver,
+            replayRequested: this.replayRequested,
+            restarting: this.restarting,
+            replayPopupShown: this.replayPopupShown,
+            roomCode: this.roomCode,
+            wsConnected: this.wsManager.isConnected()
+          });
+          
+          // Only show popup if game is over
+          if (this.gameOver) {
+            // If we're already waiting for a response and both players clicked the same button
+            if (this.replayRequested && data.action === 'replay_same_players') {
+              console.log('[KidsFightScene] Both players requested replay at the same time');
+              
+              // Auto-accept since we already clicked the same button
+              const responseData = {
+                type: 'replay_response',
+                accepted: true,
+                action: 'replay_same_players'
+              };
+              console.log('[KidsFightScene] Sending auto-accept response:', responseData);
+              this.wsManager.send(responseData);
+              
+              // Restart the game after a short delay
+              this.time.delayedCall(1000, () => {
+                if (!this.restarting) {
+                  this.restarting = true; // Prevent multiple restarts
+                  console.log('[KidsFightScene] Restarting game with same players...');
+                  this.scene.restart({
+                    p1: this.selected.p1,
+                    p2: this.selected.p2,
+                    scenario: this.selectedScenario,
+                    mode: 'online',
+                    isHost: this.isHost,
+                    roomCode: this.roomCode
+                  });
+                }
+              });
+            } else {
+              // Show the replay request popup
+              console.log('[KidsFightScene] Showing replay request popup for data:', data);
+              try {
+                this.showReplayRequestPopup(data);
+              } catch (error) {
+                console.error('[KidsFightScene] Error showing replay popup:', error);
+              }
+            }
+          } else {
+            console.log('[KidsFightScene] Ignoring replay request - game is not over yet');
+          }
+        }
+        // Handle replay responses
+        else if (data.type === 'replay_response' && this.replayRequested) {
+          console.log('[KidsFightScene] Received replay response:', data);
+          
+          // Find any waiting text that might be displayed
+          const waitingText = this.children.list.find(child => 
+            child.type === 'Text' && 
+            child.text && 
+            child.text.includes('Aguardando resposta')
+          );
+          
+          if (data.accepted) {
+            console.log('[KidsFightScene] Other player accepted replay request');
+            
+            // Update waiting text if it exists
+            if (waitingText) {
+              waitingText.setText('Outro jogador aceitou! Reiniciando...');
+              waitingText.setColor('#00ff00');
+            }
+            
+            // Restart the game after a short delay
+            this.time.delayedCall(1000, () => {
+              if (!this.restarting) {
+                this.restarting = true; // Prevent multiple restarts
+                try {
+                  this.scene.restart({
+                    p1: this.selected.p1,
+                    p2: this.selected.p2,
+                    scenario: this.selectedScenario,
+                    mode: 'online',
+                    isHost: this.isHost,
+                    roomCode: this.roomCode
+                  });
+                } catch (error) {
+                  console.error('[KidsFightScene] Error restarting scene:', error);
+                  // Fallback restart if the first attempt fails
+                  setTimeout(() => {
+                    this.scene.restart({
+                      p1: this.selected.p1,
+                      p2: this.selected.p2,
+                      scenario: this.selectedScenario,
+                      mode: 'online',
+                      isHost: this.isHost,
+                      roomCode: this.roomCode
+                    });
+                  }, 500);
+                }
+              }
+            });
+          } else {
+            console.log('[KidsFightScene] Other player declined replay request');
+            
+            // Update waiting text if it exists
+            if (waitingText) {
+              waitingText.setText('Outro jogador não aceitou ou houve um erro.');
+              waitingText.setColor('#ff0000');
+            }
+            
+            // Re-enable buttons after a short delay
+            this.time.delayedCall(2000, () => {
+              // Find and re-enable the replay and new players buttons
+              const replayButton = this.children.list.find(child => 
+                child.type === 'Text' && 
+                child.text && 
+                child.text.includes('Jogar Novamente')
+              );
+              
+              const newPlayersButton = this.children.list.find(child => 
+                child.type === 'Text' && 
+                child.text && 
+                child.text.includes('Escolher Outros Jogadores')
+              );
+              
+              if (replayButton) {
+                replayButton.setInteractive({ useHandCursor: true });
+                replayButton.setAlpha(1);
+              }
+              
+              if (newPlayersButton) {
+                newPlayersButton.setInteractive({ useHandCursor: true });
+                newPlayersButton.setAlpha(1);
+              }
+              
+              // Hide waiting text
+              if (waitingText) {
+                waitingText.setVisible(false);
+              }
+              
+              this.replayRequested = false;
+            });
+          }
+        }
+        // Pass to original handler if it exists
+        else if (originalOnMessage) {
+          originalOnMessage(event);
+        }
+      } catch (error) {
+        console.error('[KidsFightScene] Error handling WebSocket message:', error);
+        // Still call original handler in case of error
+        if (originalOnMessage) {
+          originalOnMessage(event);
+        }
+      }
+    };
+  }
+    
+  
+  
+  // Try to attack the opponent if in range
+  tryAttack(playerIndex, attacker, target, time, isSpecial = false) {
+    if (!attacker || !target || this.gameOver) return;
+    
+    // Record the attack time
+    this.lastAttackTime[playerIndex] = time;
+    
+    // Calculate distance between players
+    const distance = Math.abs(attacker.x - target.x);
+    const attackRange = isSpecial ? 150 : 100; // Special attacks have longer range
+    
+    // Check if target is within attack range
+    if (distance <= attackRange) {
+      // Determine damage amount
+      const damageAmount = isSpecial ? SPECIAL_DAMAGE : ATTACK_DAMAGE;
+      
+      // Apply damage to the correct health pool (opposite of attacker)
+      const targetIndex = playerIndex === 0 ? 1 : 0;
+      this.playerHealth[targetIndex] -= damageAmount;
+      
+      // Ensure health doesn't go below 0
+      if (this.playerHealth[targetIndex] < 0) {
+        this.playerHealth[targetIndex] = 0;
+      }
+      
+      // Check for game over
+      if (this.playerHealth[targetIndex] <= 0 && !this.gameOver) {
+        this.endGame(playerIndex);
+      }
+      
+      // Show hit effect
+      this.showHitEffect(target.x, target.y);
+      
+      // Increment attack counter for special moves
+      if (!isSpecial) {
+        this.attackCount[playerIndex]++;
+        
+        // Update special pips if needed
+        if (this.attackCount[playerIndex] <= 3) {
+          const pips = playerIndex === 0 ? this.specialPips1 : this.specialPips2;
+          if (pips && pips[this.attackCount[playerIndex] - 1]) {
+            pips[this.attackCount[playerIndex] - 1].setFillStyle(0xffff00);
+          }
+        }
+      }
+      
+      return true; // Hit successful
+    }
+    
+    return false; // No hit
+  }
+
   // --- EFFECTS: Special Effect Helper (Phaser 3.60+ workaround) ---
   showSpecialEffect(x, y, count = 30) {
     if (!this.specialEffect) return;
@@ -63,19 +301,43 @@ class KidsFightScene extends Phaser.Scene {
     this.specialEffect.setVisible(true);
     this.specialEffect.setAlpha(1);
     this.specialEffect.setScale(1);
-    this.specialEffect.lineStyle(8, 0x00eaff, 0.7);
-    this.specialEffect.strokeCircle(x, y, 20);
+    
+    // Create particles at position
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 3;
+      const size = 5 + Math.random() * 10;
+      const x2 = x + Math.cos(angle) * 10;
+      const y2 = y + Math.sin(angle) * 10;
+      
+      const particle = this.specialEffect.fillCircle(x2, y2, size, 0xffff00);
+    }
+    
+    // Fade out
     this.tweens.add({
       targets: this.specialEffect,
       alpha: 0,
-      scaleX: 2,
-      scaleY: 2,
-      duration: 350,
+      scale: 1.5,
+      duration: 500,
       onComplete: () => {
-        this.specialEffect.clear();
         this.specialEffect.setVisible(false);
-        this.specialEffect.setAlpha(1);
-        this.specialEffect.setScale(1);
+      }
+    });
+  }
+  
+  // --- EFFECTS: Hit Effect Helper ---
+  showHitEffect(x, y) {
+    // Create a temporary hit effect at the target position
+    const hitEffect = this.add.circle(x, y, 30, 0xff0000, 0.7);
+    
+    // Add a small animation to the hit effect
+    this.tweens.add({
+      targets: hitEffect,
+      alpha: 0,
+      scale: 1.5,
+      duration: 300,
+      onComplete: () => {
+        hitEffect.destroy();
       }
     });
   }
@@ -118,6 +380,7 @@ class KidsFightScene extends Phaser.Scene {
     // For online mode
     if (this.gameMode === 'online') {
       this.isHost = data.isHost;
+      this.roomCode = data.roomCode;
     }
   }
 
@@ -158,6 +421,17 @@ class KidsFightScene extends Phaser.Scene {
     this.timeLeft = 60;
     this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
     this.players = [];
+    
+    // Flags to prevent multiple restarts/redirects
+    this.restarting = false;
+    this.replayRequested = false;
+    this.replayPopupShown = false;
+    this.newPlayersRequested = false;
+    
+    // Setup WebSocket handlers for online mode
+    if (this.gameMode === 'online' && this.wsManager && this.wsManager.ws) {
+      this.setupWebSocketHandlers();
+    }
     
     // Create platforms
     this.platforms = this.physics.add.staticGroup();
@@ -827,8 +1101,8 @@ class KidsFightScene extends Phaser.Scene {
     // Reset loser y offset (in case of rematch)
     this.playerY = playerY; // Store globally for use in endGame
     // Store original Y for laying down math
-    this.player1._originalY = this.player1.y;
-    this.player2._originalY = this.player2.y;
+    this.player1.setData('originalY', this.player1.y);
+    this.player2.setData('originalY', this.player2.y);
 
     // Animation complete: return to idle after attack
     // (Replaced by manual timer for attack/special)
@@ -1011,6 +1285,29 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    // DEBUG: Add a keyboard shortcut to test the popup (press 'P')
+    if (this.input && this.input.keyboard && this.input.keyboard.checkDown(this.input.keyboard.addKey('P'), 500)) {
+      console.log('[KidsFightScene] DEBUG: Forcing popup to appear via keyboard shortcut');
+      // Create a fake request data object
+      const fakeRequestData = {
+        type: 'replay_request',
+        action: 'replay_same_players',
+        p1: this.selected?.p1 || 'player1',
+        p2: this.selected?.p2 || 'player2',
+        scenario: this.selectedScenario || 'default',
+        roomCode: this.roomCode || 'debug-room',
+        timestamp: Date.now()
+      };
+      // Force the gameOver state if it's not already set
+      if (!this.gameOver) {
+        console.log('[KidsFightScene] Setting gameOver to true for debugging');
+        this.gameOver = true;
+      }
+      // Force show the popup
+      this.showReplayRequestPopup(fakeRequestData);
+      return;
+    }
+    
     if (this.gameOver) return;
 
     // Handle player 1 movement
@@ -1927,7 +2224,7 @@ class KidsFightScene extends Phaser.Scene {
         // console.log('[DEBUG] player1State set to:', this.player1State);
         // Deal damage to player2 if in range
         console.log('[DEBUG-BEFORE] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
-        tryAttack(this, 0, this.player1, this.player2, now, false);
+        this.tryAttack(0, this.player1, this.player2, now, false);
         console.log('[DEBUG-AFTER] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
         const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
         this.healthBar2.width = 200 * healthRatio;
@@ -2006,7 +2303,7 @@ class KidsFightScene extends Phaser.Scene {
         // Fix reference to use this.player1 directly instead of this.players array
         this.showSpecialEffect(this.player1.x, this.player1.y);
       }
-      tryAttack(this, 0, this.player1, this.player2, now, true);
+      this.tryAttack(0, this.player1, this.player2, now, true);
       const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
       this.healthBar2.width = 200 * healthRatio;
       this.showSpecialEffect(this.player1.x, this.player1.y - 60);
@@ -2036,7 +2333,7 @@ class KidsFightScene extends Phaser.Scene {
         this.sendGameAction('attack');
       }
       
-      tryAttack(this, 1, this.player2, this.player1, now, false);
+      this.tryAttack(1, this.player2, this.player1, now, false);
       const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
       this.healthBar1.width = 200 * healthRatio1;
       this.time.delayedCall(400, () => {
@@ -2065,7 +2362,7 @@ class KidsFightScene extends Phaser.Scene {
       if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
         this.sendGameAction('special');
       }
-      tryAttack(this, 1, this.player2, this.player1, now, true);
+      this.tryAttack(1, this.player2, this.player1, now, true);
       const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
       this.healthBar1.width = 200 * healthRatio1;
       this.showSpecialEffect(this.player2.x, this.player2.y - 60);
@@ -2088,8 +2385,18 @@ class KidsFightScene extends Phaser.Scene {
 
   // --- GAME OVER HANDLER ---
   endGame(phrase) {
-    if (this.gameOver) return;
+    if (this.gameOver) {
+      console.log('[KidsFightScene] Game is already over, ignoring endGame call');
+      return;
+    }
+    
+    console.log('[KidsFightScene] Setting game over state with phrase:', phrase);
     this.gameOver = true;
+    
+    // Reset any flags that might interfere with replay functionality
+    this.replayPopupShown = false;
+    this.replayRequested = false;
+    this.restarting = false;
 
     // Centered winning phrase
     const winText = this.add.text(
@@ -2126,6 +2433,37 @@ class KidsFightScene extends Phaser.Scene {
         bottom: 10
       }
     };
+    
+    // DEBUG BUTTON - Add a debug button to force popup to appear
+    if (this.gameMode === 'online') {
+      const debugButton = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2 + 200,
+        '[DEBUG] Force Popup',
+        {
+          fontSize: '18px',
+          color: '#ff00ff',
+          backgroundColor: '#000000',
+          padding: { x: 10, y: 5 }
+        }
+      ).setOrigin(0.5).setDepth(10001).setInteractive({ useHandCursor: true });
+      
+      debugButton.on('pointerdown', () => {
+        console.log('[KidsFightScene] DEBUG: Forcing popup to appear');
+        // Create a fake request data object
+        const fakeRequestData = {
+          type: 'replay_request',
+          action: 'replay_same_players',
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          scenario: this.selectedScenario,
+          roomCode: this.roomCode,
+          timestamp: Date.now()
+        };
+        // Force show the popup
+        this.showReplayRequestPopup(fakeRequestData);
+      });
+    }
 
     // Button to replay with same players
     const replayButton = this.add.text(
@@ -2139,12 +2477,142 @@ class KidsFightScene extends Phaser.Scene {
     replayButton.on('pointerover', () => replayButton.setStyle({ backgroundColor: '#666666' }));
     replayButton.on('pointerout', () => replayButton.setStyle({ backgroundColor: '#4a4a4a' }));
     replayButton.on('pointerdown', () => {
-      // Reset the game with the same players
-      this.scene.restart({
-        p1: this.selected.p1,
-        p2: this.selected.p2,
-        scenario: this.selectedScenario
-      });
+      // Check if we're in online mode
+      if (this.gameMode === 'online' && this.wsManager && this.wsManager.isConnected()) {
+        // Prevent multiple clicks
+        if (this.replayRequested || this.restarting) {
+          console.log('[KidsFightScene] Replay already requested or in progress');
+          return;
+        }
+        
+        // Debug game state
+        console.log('[KidsFightScene] Game state when replay clicked:', {
+          gameOver: this.gameOver,
+          replayRequested: this.replayRequested,
+          restarting: this.restarting,
+          replayPopupShown: this.replayPopupShown,
+          roomCode: this.roomCode,
+          wsConnected: this.wsManager.isConnected()
+        });
+        
+        // Status text for online mode waiting
+        const waitingText = this.add.text(
+          this.cameras.main.width / 2,
+          this.cameras.main.height / 2 + 150,
+          'Aguardando resposta do outro jogador...',
+          {
+            fontSize: Math.max(14, Math.min(18, Math.round(this.cameras.main.width * 0.025))) + 'px',
+            color: '#ffff00',
+            backgroundColor: '#000000',
+            padding: { x: 10, y: 5 }
+          }
+        ).setOrigin(0.5).setDepth(10001);
+        
+        // Set a flag to track our request
+        this.replayRequested = true;
+        
+        // Send replay request to other player
+        console.log('[KidsFightScene] Sending replay_request for same players');
+        const requestData = {
+          type: 'replay_request',
+          action: 'replay_same_players',
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          scenario: this.selectedScenario,
+          roomCode: this.roomCode, // Make sure to include the room code
+          timestamp: Date.now() // Add timestamp to help identify unique requests
+        };
+        console.log('[KidsFightScene] Request data:', requestData);
+        this.wsManager.send(requestData);
+        
+        // Disable buttons while waiting
+        replayButton.disableInteractive();
+        replayButton.setAlpha(0.5);
+        newPlayersButton.disableInteractive();
+        newPlayersButton.setAlpha(0.5);
+        
+        // Set up a temporary handler specifically for replay responses
+        const originalOnMessage = this.wsManager.ws.onmessage;
+        this.wsManager.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('[KidsFightScene] Received message in temporary handler:', data);
+            
+            // Check if this is a replay request from the other player
+            if (data.type === 'replay_request') {
+              console.log('[KidsFightScene] Received replay request in temporary handler');
+              
+              // Reset the original handler to avoid recursion
+              this.wsManager.ws.onmessage = originalOnMessage;
+              
+              // Show the popup directly
+              this.showReplayRequestPopup(data);
+              return;
+            }
+            
+            // Handle replay responses
+            if (data.type === 'replay_response' && this.replayRequested) {
+              console.log('[KidsFightScene] Received replay response in temporary handler:', data);
+              
+              if (data.accepted) {
+                // Other player accepted, restart the game
+                waitingText.setText('Outro jogador aceitou! Reiniciando...');
+                waitingText.setColor('#00ff00');
+                
+                // Reset the game with the same players after a short delay
+                this.time.delayedCall(1000, () => {
+                  if (!this.restarting) {
+                    this.restarting = true; // Prevent multiple restarts
+                    console.log('[KidsFightScene] Restarting game with same players...');
+                    this.scene.restart({
+                      p1: this.selected.p1,
+                      p2: this.selected.p2,
+                      scenario: this.selectedScenario,
+                      mode: 'online',
+                      isHost: this.isHost,
+                      roomCode: this.roomCode
+                    });
+                  }
+                });
+              } else {
+                // Other player rejected or there was an error
+                waitingText.setText('Outro jogador não aceitou ou houve um erro.');
+                waitingText.setColor('#ff0000');
+                
+                // Re-enable buttons after a short delay
+                this.time.delayedCall(2000, () => {
+                  replayButton.setInteractive({ useHandCursor: true });
+                  replayButton.setAlpha(1);
+                  newPlayersButton.setInteractive({ useHandCursor: true });
+                  newPlayersButton.setAlpha(1);
+                  waitingText.setVisible(false);
+                  this.replayRequested = false;
+                });
+              }
+              
+              // Reset the original handler
+              this.wsManager.ws.onmessage = originalOnMessage;
+              return;
+            }
+            
+            // For any other message, pass to the original handler
+            if (originalOnMessage) {
+              originalOnMessage(event);
+            }
+          } catch (error) {
+            console.error('[KidsFightScene] Error in temporary handler:', error);
+            // Reset the original handler on error
+            this.wsManager.ws.onmessage = originalOnMessage;
+          }
+        };
+      } else {
+        // In local mode, just restart immediately
+        this.scene.restart({
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          scenario: this.selectedScenario
+        });
+      }
     });
 
 
@@ -2160,28 +2628,179 @@ class KidsFightScene extends Phaser.Scene {
     newPlayersButton.on('pointerover', () => newPlayersButton.setStyle({ backgroundColor: '#666666' }));
     newPlayersButton.on('pointerout', () => newPlayersButton.setStyle({ backgroundColor: '#4a4a4a' }));
     newPlayersButton.on('pointerdown', () => {
-      // Clean up current scene and go back to player select scene
-      if (this.ws) {
-        this.ws.close();
-      }
-      this.scene.stop();
-      // Only start PlayerSelectScene if it exists
-      if (this.scene.get('PlayerSelectScene')) {
-        this.scene.start('PlayerSelectScene');
+      // Check if we're in online mode
+      if (this.gameMode === 'online' && this.wsManager && this.wsManager.isConnected()) {
+        // Prevent multiple clicks
+        if (this.newPlayersRequested || this.redirecting) {
+          console.log('[KidsFightScene] New players already requested or redirect in progress');
+          return;
+        }
+        
+        // Status text for online mode waiting
+        const waitingText = this.add.text(
+          this.cameras.main.width / 2,
+          this.cameras.main.height / 2 + 150,
+          'Aguardando resposta do outro jogador...',
+          {
+            fontSize: Math.max(14, Math.min(18, Math.round(this.cameras.main.width * 0.025))) + 'px',
+            color: '#ffff00',
+            backgroundColor: '#000000',
+            padding: { x: 10, y: 5 }
+          }
+        ).setOrigin(0.5).setDepth(10001);
+        
+        // Set a flag to track our request
+        this.newPlayersRequested = true;
+        
+        // Send new players request to other player
+        console.log('[KidsFightScene] Sending replay_request for new players');
+        this.wsManager.send({
+          type: 'replay_request',
+          action: 'select_new_players',
+          timestamp: Date.now() // Add timestamp to help identify unique requests
+        });
+        
+        // Disable buttons while waiting
+        replayButton.disableInteractive();
+        replayButton.setAlpha(0.5);
+        newPlayersButton.disableInteractive();
+        newPlayersButton.setAlpha(0.5);
+        
+        // Set up handler for replay response that preserves the ability to show popups
+        const newPlayersOriginalOnMessage = this.wsManager.ws.onmessage;
+        this.wsManager.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('[KidsFightScene] Received message:', data);
+            
+            // Check if this is a replay request from the other player
+            if (data.type === 'replay_request') {
+              // If we're already waiting for a response, handle as both players clicking at the same time
+              if (this.newPlayersRequested && data.action === 'select_new_players') {
+                console.log('[KidsFightScene] Received new players request while waiting - both players clicked the same button!');
+                
+                // Auto-accept since we already clicked the same button
+                this.wsManager.send({
+                  type: 'replay_response',
+                  accepted: true,
+                  action: 'select_new_players'
+                });
+                
+                // Show message about both players choosing the same option
+                waitingText.setText('Ambos jogadores escolheram a mesma opção! Redirecionando...');
+                waitingText.setColor('#00ff00');
+                
+                // Redirect to player select after a short delay
+                this.time.delayedCall(1000, () => {
+                  if (!this.redirecting) {
+                    this.redirecting = true; // Prevent multiple redirects
+                    console.log('[KidsFightScene] Redirecting to player select...');
+                    try {
+                      // Clean up WebSocket connection
+                      if (this.wsManager && this.wsManager.ws) {
+                        // Keep the connection but reset the handler
+                        this.wsManager.ws.onmessage = newPlayersOriginalOnMessage;
+                      }
+                      
+                      // Stop current scene and start player select
+                      this.scene.stop();
+                      if (this.scene.get('PlayerSelectScene')) {
+                        this.scene.start('PlayerSelectScene', {
+                          mode: 'online',
+                          isHost: this.isHost,
+                          roomCode: this.roomCode
+                        });
+                      }
+                    } catch (error) {
+                      console.error('[KidsFightScene] Error redirecting to player select:', error);
+                    }
+                  }
+                });
+              } else {
+                // We're not waiting for a response, so show the popup
+                // Reset the original message handler first to avoid recursion
+                this.wsManager.ws.onmessage = newPlayersOriginalOnMessage;
+                // Show the replay request popup
+                this.showReplayRequestPopup(data);
+                return; // Exit early to avoid setting the handler again
+              }
+            } else if (data.type === 'replay_response') {
+              // Reset the original message handler
+              this.wsManager.ws.onmessage = newPlayersOriginalOnMessage;
+              
+              if (data.accepted && data.action === 'select_new_players') {
+                // Other player accepted, redirect to player select
+                waitingText.setText('Outro jogador aceitou! Redirecionando...');
+                waitingText.setColor('#00ff00');
+                
+                // Redirect to player select after a short delay
+                this.time.delayedCall(1000, () => {
+                  if (!this.redirecting) {
+                    this.redirecting = true; // Prevent multiple redirects
+                    console.log('[KidsFightScene] Redirecting to player select...');
+                    try {
+                      // Clean up WebSocket connection
+                      if (this.wsManager && this.wsManager.ws) {
+                        // Keep the connection but reset the handler
+                        this.wsManager.ws.onmessage = newPlayersOriginalOnMessage;
+                      }
+                      
+                      // Stop current scene and start player select
+                      this.scene.stop();
+                      if (this.scene.get('PlayerSelectScene')) {
+                        this.scene.start('PlayerSelectScene', {
+                          mode: 'online',
+                          isHost: this.isHost,
+                          roomCode: this.roomCode
+                        });
+                      }
+                    } catch (error) {
+                      console.error('[KidsFightScene] Error redirecting to player select:', error);
+                    }
+                  }
+                });
+              } else {
+                // Other player rejected or there was an error
+                waitingText.setText('Outro jogador não aceitou ou houve um erro.');
+                waitingText.setColor('#ff0000');
+                
+                // Re-enable buttons after a short delay
+                this.time.delayedCall(2000, () => {
+                  replayButton.setInteractive({ useHandCursor: true });
+                  replayButton.setAlpha(1);
+                  newPlayersButton.setInteractive({ useHandCursor: true });
+                  newPlayersButton.setAlpha(1);
+                  waitingText.setVisible(false);
+                  this.newPlayersRequested = false;
+                });
+              }
+            }
+          } catch (error) {
+            console.error('[KidsFightScene] Error processing message:', error);
+            // Reset the original message handler on error
+            this.wsManager.ws.onmessage = newPlayersOriginalOnMessage;
+          }
+        };
+      } else {
+        // In local mode, just redirect immediately
+        // Clean up current scene and go back to player select scene
+        this.scene.stop();
+        // Only start PlayerSelectScene if it exists
+        if (this.scene.get('PlayerSelectScene')) {
+          this.scene.start('PlayerSelectScene');
+        }
       }
     });
-
-// ... (rest of the code remains the same)
 
     // Optionally, fade in the text
-    winText.setAlpha(0);
-    this.tweens.add({
-      targets: winText,
-      alpha: 1,
-      duration: 400
-    });
-
-
+    if (this.winText) {
+      this.winText.setAlpha(0);
+      this.tweens.add({
+        targets: this.winText,
+        alpha: 1,
+        duration: 400
+      });
+    }
 
     // Winner celebrates, loser lays down
     if (this.player1 && this.player2) {
@@ -2230,6 +2849,220 @@ class KidsFightScene extends Phaser.Scene {
 
     // Do not remove input listeners; rely on this.gameOver = true to block input after game over.
     // This avoids breaking keyboard input after scene restart.
+  }
+
+
+  // Show a popup when receiving a replay request from the other player
+  showReplayRequestPopup(requestData) {
+    console.log('[KidsFightScene] showReplayRequestPopup called with data:', requestData);
+    
+    // CRITICAL FIX: Force the popup to show regardless of game state for testing
+    // We'll temporarily bypass the game state checks to ensure the popup appears
+    console.log('[KidsFightScene] Game state in showReplayRequestPopup:', {
+      gameOver: this.gameOver,
+      replayPopupShown: this.replayPopupShown,
+      replayRequested: this.replayRequested,
+      restarting: this.restarting
+    });
+    
+    // If we already have a popup shown, destroy it first to prevent stacking
+    if (this.replayPopupShown && this.replayPopupElements) {
+      console.log('[KidsFightScene] Destroying existing popup before showing new one');
+      this.destroyPopup(this.replayPopupElements);
+    }
+    
+    // Set flag to prevent duplicate popups
+    this.replayPopupShown = true;
+    
+    // Force the gameOver state if it's not already set
+    // This is a temporary fix to ensure the popup works
+    if (!this.gameOver) {
+      console.log('[KidsFightScene] Forcing gameOver state to true to show popup');
+      this.gameOver = true;
+    }
+    
+    console.log('[KidsFightScene] Showing replay request popup for:', requestData);
+    
+    // Create a semi-transparent background
+    const overlay = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      this.cameras.main.width,
+      this.cameras.main.height,
+      0x000000,
+      0.7
+    ).setDepth(10000);
+    
+    // Create popup container
+    const popupWidth = Math.min(500, this.cameras.main.width * 0.8);
+    const popupHeight = 250;
+    const popup = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      popupWidth,
+      popupHeight,
+      0x333333,
+      1
+    ).setStrokeStyle(4, 0xffffff).setDepth(10001);
+    
+    // Add title text
+    const titleText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 80,
+      'Solicitação de Revanche',
+      {
+        fontSize: '24px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        fontStyle: 'bold'
+      }
+    ).setOrigin(0.5).setDepth(10001);
+    
+    // Add message text
+    const actionText = requestData.action === 'replay_same_players' ? 
+      'jogar novamente com os mesmos personagens' : 
+      'selecionar novos personagens';
+    
+    const messageText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 30,
+      `O outro jogador quer ${actionText}.\nVocê aceita?`,
+      {
+        fontSize: '18px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        align: 'center'
+      }
+    ).setOrigin(0.5).setDepth(10001);
+    
+    // Create accept button
+    const acceptButton = this.add.rectangle(
+      this.cameras.main.width / 2 - 100,
+      this.cameras.main.height / 2 + 50,
+      150,
+      50,
+      0x00aa00,
+      1
+    ).setStrokeStyle(2, 0xffffff).setDepth(10001).setInteractive({ useHandCursor: true });
+    
+    const acceptText = this.add.text(
+      acceptButton.x,
+      acceptButton.y,
+      'Aceitar',
+      {
+        fontSize: '18px',
+        color: '#ffffff',
+        fontFamily: 'monospace'
+      }
+    ).setOrigin(0.5).setDepth(10001);
+    
+    // Create decline button
+    const declineButton = this.add.rectangle(
+      this.cameras.main.width / 2 + 100,
+      this.cameras.main.height / 2 + 50,
+      150,
+      50,
+      0xaa0000,
+      1
+    ).setStrokeStyle(2, 0xffffff).setDepth(10001).setInteractive({ useHandCursor: true });
+    
+    const declineText = this.add.text(
+      declineButton.x,
+      declineButton.y,
+      'Recusar',
+      {
+        fontSize: '18px',
+        color: '#ffffff',
+        fontFamily: 'monospace'
+      }
+    ).setOrigin(0.5).setDepth(10001);
+    
+    // Button hover effects
+    acceptButton.on('pointerover', () => {
+      acceptButton.setFillStyle(0x00cc00);
+    });
+    acceptButton.on('pointerout', () => {
+      acceptButton.setFillStyle(0x00aa00);
+    });
+    
+    declineButton.on('pointerover', () => {
+      declineButton.setFillStyle(0xcc0000);
+    });
+    declineButton.on('pointerout', () => {
+      declineButton.setFillStyle(0xaa0000);
+    });
+    
+    // Button click handlers
+    acceptButton.on('pointerdown', () => {
+      console.log('[KidsFightScene] Accepting replay request');
+      
+      // Send acceptance response
+      this.wsManager.send({
+        type: 'replay_response',
+        accepted: true,
+        action: requestData.action
+      });
+      
+      // Show acceptance message
+      messageText.setText('Aceitando solicitação...\nReiniciando jogo!');
+      messageText.setColor('#00ff00');
+      
+      // Disable buttons
+      acceptButton.disableInteractive();
+      declineButton.disableInteractive();
+      acceptButton.setAlpha(0.5);
+      declineButton.setAlpha(0.5);
+      
+      // Handle game restart based on request type
+      this.time.delayedCall(1000, () => {
+        if (requestData.action === 'replay_same_players') {
+          // Restart with same players
+          this.restarting = true;
+          this.scene.restart({
+            p1: this.selected.p1,
+            p2: this.selected.p2,
+            scenario: this.selectedScenario,
+            mode: 'online',
+            isHost: this.isHost,
+            roomCode: this.roomCode // Make sure to include the room code
+          });
+        } else if (requestData.action === 'select_new_players') {
+          // Return to player selection
+          this.redirecting = true;
+          this.scene.start('PlayerSelectScene', {
+            mode: 'online',
+            isHost: this.isHost,
+            roomCode: this.roomCode // Make sure to include the room code
+          });
+        }
+      });
+    });
+    
+    declineButton.on('pointerdown', () => {
+      console.log('[KidsFightScene] Declining replay request');
+      
+      // Send rejection response
+      this.wsManager.send({
+        type: 'replay_response',
+        accepted: false,
+        action: requestData.action
+      });
+      
+      // Close the popup
+      this.destroyPopup([overlay, popup, titleText, messageText, acceptButton, acceptText, declineButton, declineText]);
+    });
+    
+    // Store popup elements for later reference
+    this.replayPopupElements = [overlay, popup, titleText, messageText, acceptButton, acceptText, declineButton, declineText];
+  }
+  
+  // Helper to destroy popup elements
+  destroyPopup(elements) {
+    if (elements && elements.length) {
+      elements.forEach(element => {
+        if (element) element.destroy();
+      });
+    }
   }
 }
 
