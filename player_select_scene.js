@@ -67,6 +67,29 @@ class PlayerSelectScene extends Phaser.Scene {
               });
               break;
               
+            case 'scenario_selected':
+              // Update scenario selection (only client receives this from host)
+              if (!this.isHost && data.scenario) {
+                console.log('[PlayerSelectScene] Host selected scenario:', data.scenario);
+                this.scenarioKey = data.scenario;
+                
+                // If we have a scenario info text, update it
+                if (this.scenarioInfoText) {
+                  const scenarioName = this.getScenarioName(this.scenarioKey);
+                  this.scenarioInfoText.setText(`Cenário: ${scenarioName}`);
+                } else {
+                  // Create a scenario info text if it doesn't exist
+                  const { width, height } = this.cameras.main;
+                  this.scenarioInfoText = this.add.text(width/2, height * 0.75, `Cenário: ${this.getScenarioName(this.scenarioKey)}`, {
+                    fontSize: '18px',
+                    fill: '#ffffff',
+                    backgroundColor: '#333333',
+                    padding: { x: 10, y: 5 }
+                  }).setOrigin(0.5);
+                }
+              }
+              break;
+              
             case 'error':
               console.error('[PlayerSelectScene] Error:', data.message);
               break;
@@ -447,7 +470,7 @@ option.setAlpha(0.5); // Dim opponent's options
       }
     }
     
-    // Start button - always place near the bottom, centered, responsive width
+    // Start button and scenario button configuration
     const buttonW = Math.max(180, Math.min(0.9 * screenWidth, 320));
     const buttonH = 70;
     const margin = 24;
@@ -455,15 +478,22 @@ option.setAlpha(0.5); // Dim opponent's options
     
     // Calculate area available for avatars/options above the button
     const avatarBottomLimit = buttonY - buttonH / 2 - margin;
-    // Example: Adjust a top margin and grid height for avatars/options
-    // (Assume avatars/options are laid out using a Y offset or grid height variable)
-    // If you have a variable like gridTop or gridHeight, set it here:
-    // const gridTop = Math.max(40, avatarBottomLimit - desiredGridHeight);
-    // If you use fixed Y positions for avatars, clamp them:
-    // For each avatar/option: y = Math.min(originalY, avatarBottomLimit - avatarHeight/2)
-    // (You may need to adapt this depending on your actual layout code)
     
-    // Move the start button and text a bit to the left (e.g., 18px)
+    // Display scenario info text for online mode
+    if (this.gameMode === 'online' && this.isHost) {
+      console.log('[PlayerSelectScene] Creating scenario info text for host');
+      // We'll select the scenario after player selection
+      this.scenarioText = this.add.text(this.cameras.main.width * 0.5, this.cameras.main.height * 0.65, 
+        'Você escolherá o cenário após selecionar os personagens', {
+        fontSize: '18px',
+        fill: '#ffffff',
+        fontStyle: 'bold',
+        backgroundColor: '#000000',
+        padding: { x: 10, y: 5 }
+      }).setOrigin(0.5);
+    }
+    
+    // Move the start button and text a bit to the left
     const buttonX = cam.centerX - 18;
     const startBtn = this.add.rectangle(buttonX, buttonY, buttonW, buttonH, 0x00ff00)
       .setStrokeStyle(4, 0x000000); // Add black border for better visibility
@@ -527,127 +557,173 @@ option.setAlpha(0.5); // Dim opponent's options
   startFight() {
     // In online mode, use the ready system
     if (this.gameMode === 'online') {
-      // Send our character selection
-      // Get character index from the key (e.g., 'player1' -> 0)
-      const myChar = this.isHost ? this.selected.p1 : this.selected.p2;
-      const charIndex = this.CHARACTER_KEYS.indexOf(myChar);
-      const playerNum = this.isHost ? 1 : 2;
-      wsManager.send({
-        type: 'character_selected',
-        character: charIndex,
-        playerNum: playerNum
-      });
-      console.log('[PlayerSelectScene] Sending character selection:', {
-        charKey: myChar,
-        charIndex,
-        playerNum
-      });
+      // If host, first select scenario before proceeding
+      if (this.isHost) {
+        console.log('[PlayerSelectScene] Host selecting scenario before starting fight');
+        
+        // Launch scenario selection scene
+        this.scene.pause();
+        this.scene.launch('ScenarioSelectScene', {
+          p1: this.CHARACTER_KEYS.indexOf(this.selected.p1),
+          p2: this.CHARACTER_KEYS.indexOf(this.selected.p2),
+          fromPlayerSelect: true,
+          onlineMode: true
+        });
+        
+        // Listen for scenario selection
+        this.events.once('resume', (scene, data) => {
+          if (data && data.scenario) {
+            console.log('[PlayerSelectScene] Received scenario selection from ScenarioSelectScene:', data.scenario);
+            this.scenarioKey = data.scenario;
+            
+            // Send scenario selection to the other player
+            console.log('[PlayerSelectScene] Sending scenario_selected message to other player:', data.scenario);
+            wsManager.send({
+              type: 'scenario_selected',
+              scenario: data.scenario
+            });
+            
+            // Continue with the normal fight start process
+            this.continueStartFight();
+          }
+        });
+        
+        return; // Exit here, we'll continue after scenario selection
+      }
       
-      // Show waiting message
-      this.waitingText = this.add.text(
+      // For non-host or after scenario selection, continue with normal process
+      this.continueStartFight();
+    } else {
+      // Start immediately in local mode
+      this.launchGame();
+    }
+  }
+  
+  continueStartFight() {
+    // Send our character selection
+    // Get character index from the key (e.g., 'player1' -> 0)
+    const myChar = this.isHost ? this.selected.p1 : this.selected.p2;
+    const charIndex = this.CHARACTER_KEYS.indexOf(myChar);
+    const playerNum = this.isHost ? 1 : 2;
+    wsManager.send({
+      type: 'character_selected',
+      character: charIndex,
+      playerNum: playerNum
+    });
+    console.log('[PlayerSelectScene] Sending character selection:', {
+      charKey: myChar,
+      charIndex,
+      playerNum
+    });
+    
+    // Show waiting message
+    this.waitingText = this.add.text(
+      this.cameras.main.width * 0.5,
+      this.cameras.main.height * 0.8,
+      'Waiting for both players to be ready...',
+      {
+        fontSize: '18px',
+        color: '#ffff00',
+        fontFamily: 'monospace',
+        backgroundColor: '#000000',
+        padding: { x: 10, y: 5 }
+      }
+    ).setOrigin(0.5).setDepth(100);
+    
+    // Send player ready message to server
+    wsManager.send({
+      type: 'player_ready',
+      character: charIndex
+    });
+    console.log('[PlayerSelectScene] Sending player ready message');
+    
+    // Set up handler for start_game message
+    const originalOnMessage = wsManager.ws.onmessage;
+    wsManager.ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('[PlayerSelectScene] Received message:', data);
+        
+        if (data.type === 'start_game') {
+          console.log('[PlayerSelectScene] Received start_game message, starting game');
+          
+          // Update scenario if provided in the start_game message
+          if (data.scenario) {
+            console.log('[PlayerSelectScene] Using scenario from start_game message:', data.scenario);
+            this.scenarioKey = data.scenario;
+          }
+          
+          // Add a visual indicator that we received the start_game message
+          const startGameText = this.add.text(
+            this.cameras.main.width * 0.5,
+            this.cameras.main.height * 0.7,
+            'START GAME RECEIVED! LAUNCHING...',
+            {
+              fontSize: '24px',
+              color: '#00ff00',
+              fontFamily: 'monospace',
+              backgroundColor: '#000000',
+              padding: { x: 10, y: 5 }
+            }
+          ).setOrigin(0.5).setDepth(100);
+          
+          // Launch the game after a short delay to ensure the message is visible
+          this.time.delayedCall(500, () => {
+            this.launchGame();
+          });
+        } else if (data.type === 'player_ready') {
+          console.log('[PlayerSelectScene] Other player is ready');
+          if (this.waitingText) {
+            this.waitingText.setText('Other player is ready! Starting game soon...');
+            this.waitingText.setColor('#00ff00');
+          }
+          
+          // Add a visual indicator that we received the player_ready message
+          const readyText = this.add.text(
+            this.cameras.main.width * 0.5,
+            this.cameras.main.height * 0.7,
+            `PLAYER ${data.player} IS READY!`,
+            {
+              fontSize: '20px',
+              color: '#ffff00',
+              fontFamily: 'monospace',
+              backgroundColor: '#000000',
+              padding: { x: 10, y: 5 }
+            }
+          ).setOrigin(0.5).setDepth(100);
+          
+          // Remove the text after a short delay
+          this.time.delayedCall(2000, () => {
+            readyText.destroy();
+          });
+        } else if (originalOnMessage) {
+          // Pass other messages to the original handler
+          originalOnMessage(event);
+        }
+      } catch (error) {
+        console.error('[PlayerSelectScene] Error processing message:', error);
+      }
+    };
+    
+    // Add a debug button to manually trigger the start game
+    if (this.gameMode === 'online') {
+      const debugButton = this.add.text(
         this.cameras.main.width * 0.5,
-        this.cameras.main.height * 0.8,
-        'Waiting for both players to be ready...',
+        this.cameras.main.height * 0.9,
+        'DEBUG: FORCE START GAME',
         {
-          fontSize: '18px',
-          color: '#ffff00',
+          fontSize: '16px',
+          color: '#ff0000',
           fontFamily: 'monospace',
           backgroundColor: '#000000',
           padding: { x: 10, y: 5 }
         }
-      ).setOrigin(0.5).setDepth(100);
+      ).setOrigin(0.5).setDepth(100).setInteractive();
       
-      // Send player ready message to server
-      wsManager.send({
-        type: 'player_ready',
-        character: charIndex
+      debugButton.on('pointerdown', () => {
+        console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
+        this.launchGame();
       });
-      console.log('[PlayerSelectScene] Sending player ready message');
-      
-      // Set up handler for start_game message
-      const originalOnMessage = wsManager.ws.onmessage;
-      wsManager.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('[PlayerSelectScene] Received message:', data);
-          
-          if (data.type === 'start_game') {
-            console.log('[PlayerSelectScene] Received start_game message, starting game');
-            // Add a visual indicator that we received the start_game message
-            const startGameText = this.add.text(
-              this.cameras.main.width * 0.5,
-              this.cameras.main.height * 0.7,
-              'START GAME RECEIVED! LAUNCHING...',
-              {
-                fontSize: '24px',
-                color: '#00ff00',
-                fontFamily: 'monospace',
-                backgroundColor: '#000000',
-                padding: { x: 10, y: 5 }
-              }
-            ).setOrigin(0.5).setDepth(100);
-            
-            // Launch the game after a short delay to ensure the message is visible
-            this.time.delayedCall(500, () => {
-              this.launchGame();
-            });
-          } else if (data.type === 'player_ready') {
-            console.log('[PlayerSelectScene] Other player is ready');
-            if (this.waitingText) {
-              this.waitingText.setText('Other player is ready! Starting game soon...');
-              this.waitingText.setColor('#00ff00');
-            }
-            
-            // Add a visual indicator that we received the player_ready message
-            const readyText = this.add.text(
-              this.cameras.main.width * 0.5,
-              this.cameras.main.height * 0.7,
-              `PLAYER ${data.player} IS READY!`,
-              {
-                fontSize: '20px',
-                color: '#ffff00',
-                fontFamily: 'monospace',
-                backgroundColor: '#000000',
-                padding: { x: 10, y: 5 }
-              }
-            ).setOrigin(0.5).setDepth(100);
-            
-            // Remove the text after a short delay
-            this.time.delayedCall(2000, () => {
-              readyText.destroy();
-            });
-          } else if (originalOnMessage) {
-            // Pass other messages to the original handler
-            originalOnMessage(event);
-          }
-        } catch (error) {
-          console.error('[PlayerSelectScene] Error processing message:', error);
-        }
-      };
-      
-      // Add a debug button to manually trigger the start game
-      if (this.gameMode === 'online') {
-        const debugButton = this.add.text(
-          this.cameras.main.width * 0.5,
-          this.cameras.main.height * 0.9,
-          'DEBUG: FORCE START GAME',
-          {
-            fontSize: '16px',
-            color: '#ff0000',
-            fontFamily: 'monospace',
-            backgroundColor: '#000000',
-            padding: { x: 10, y: 5 }
-          }
-        ).setOrigin(0.5).setDepth(100).setInteractive();
-        
-        debugButton.on('pointerdown', () => {
-          console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
-          this.launchGame();
-        });
-      }
-    } else {
-      // Start immediately in local mode
-      this.launchGame();
     }
   }
   
@@ -670,6 +746,17 @@ option.setAlpha(0.5); // Dim opponent's options
       mode: this.gameMode,
       isHost: this.isHost
     });
+  }
+
+  // Helper method to get scenario name from scenario key
+  getScenarioName(scenarioKey) {
+    const names = {
+      'scenario1': 'Parque',
+      'scenario2': 'Praia',
+      'scenario3': 'Escola',
+      'scenario4': 'Quintal'
+    };
+    return names[scenarioKey] || scenarioKey;
   }
 }
 

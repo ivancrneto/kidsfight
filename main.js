@@ -155,7 +155,7 @@ const config = {
   height: GAME_HEIGHT,
   backgroundColor: '#222',
   parent: 'game-container',
-  scene: [RotatePromptScene, GameModeScene, OnlineModeScene],
+  scene: [RotatePromptScene, GameModeScene, OnlineModeScene, PlayerSelectScene, ScenarioSelectScene, KidsFightScene],
   physics: {
     default: 'arcade',
     arcade: {
@@ -197,16 +197,22 @@ window.onload = () => {
     config.height = window.innerHeight;
     config.scale.width = window.innerWidth;
     config.scale.height = window.innerHeight;
-    config.scene = [RotatePromptScene, ScenarioSelectScene, PlayerSelectScene, KidsFightScene];
+    // Keep the same scene order as in the initial configuration
+    config.scene = [RotatePromptScene, GameModeScene, OnlineModeScene, PlayerSelectScene, ScenarioSelectScene, KidsFightScene];
     console.log('[KidsFight] Game scenes:', config.scene.map(scene => scene.name || scene.prototype.constructor.name));
     console.log('[KidsFight] PlayerSelectScene included:', config.scene.some(scene => scene === PlayerSelectScene));
     game = new Phaser.Game(config);
     if (startScene === 'RotatePromptScene') {
       game.scene.start('RotatePromptScene');
+    } else if (startScene === 'GameModeScene') {
+      game.scene.start('GameModeScene', startData);
     } else if (startScene === 'ScenarioSelectScene') {
       game.scene.start('ScenarioSelectScene', startData);
-    } else {
+    } else if (startScene === 'PlayerSelectScene') {
       game.scene.start('PlayerSelectScene', startData);
+    } else {
+      // Default to GameModeScene if no specific scene is requested
+      game.scene.start('GameModeScene');
     }
     return game;
   }
@@ -251,12 +257,12 @@ window.onload = () => {
         }
         if (recreateTimeout) clearTimeout(recreateTimeout);
         recreateTimeout = setTimeout(() => {
-          game = createGame('ScenarioSelectScene');
+          game = createGame('GameModeScene');
         }, 120);
         lastWasPortrait = false;
       } else {
         if (!game) {
-          game = createGame('ScenarioSelectScene');
+          game = createGame('GameModeScene');
         } else {
           game.scene.stop('RotatePromptScene');
           if (!game.scene.isActive('PlayerSelectScene') && !game.scene.isActive('KidsFightScene')) {

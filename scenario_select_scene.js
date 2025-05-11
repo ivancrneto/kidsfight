@@ -27,9 +27,18 @@ class ScenarioSelectScene extends Phaser.Scene {
       fontSize: '32px', fill: '#fff', fontStyle: 'bold', fontFamily: 'monospace'
     }).setOrigin(0.5);
 
-    // If player choices are passed, store them
+    // Store data from the calling scene
     this.p1 = this.scene.settings.data && this.scene.settings.data.p1 !== undefined ? this.scene.settings.data.p1 : 0;
     this.p2 = this.scene.settings.data && this.scene.settings.data.p2 !== undefined ? this.scene.settings.data.p2 : 1;
+    this.fromPlayerSelect = this.scene.settings.data && this.scene.settings.data.fromPlayerSelect;
+    this.onlineMode = this.scene.settings.data && this.scene.settings.data.onlineMode;
+    
+    console.log('[ScenarioSelectScene] Created with data:', {
+      p1: this.p1,
+      p2: this.p2,
+      fromPlayerSelect: this.fromPlayerSelect,
+      onlineMode: this.onlineMode
+    });
 
     // Show scenario preview
     this.preview = this.add.image(width/2, height/2, SCENARIOS[this.selectedScenario].key)
@@ -56,16 +65,55 @@ class ScenarioSelectScene extends Phaser.Scene {
     this.leftBtn.on('pointerdown', () => this.changeScenario(-1));
     this.rightBtn.on('pointerdown', () => this.changeScenario(1));
 
-    // Confirm button
+    // Create a more visible confirm button with a background rectangle
+    const confirmBtnBg = this.add.rectangle(width/2, height - 100, 250, 70, 0x44aaff)
+      .setStrokeStyle(4, 0x000000)
+      .setInteractive({ useHandCursor: true });
+    
     this.confirmBtn = this.add.text(width/2, height - 100, 'CONFIRMAR', {
-      fontSize: '32px', fill: '#fff', fontFamily: 'monospace', backgroundColor: '#44aaff', padding: {left:32,right:32,top:12,bottom:12}, borderRadius: 18
-    }).setOrigin(0.5).setInteractive();
-    this.confirmBtn.on('pointerdown', () => {
-      this.scene.start('KidsFightScene', {
-        p1: this.p1,
-        p2: this.p2,
-        scenario: SCENARIOS[this.selectedScenario].key
-      });
+      fontSize: '32px', 
+      fill: '#fff', 
+      fontFamily: 'monospace',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    
+    // Add hover effects
+    confirmBtnBg.on('pointerover', () => {
+      confirmBtnBg.setFillStyle(0x55bbff); // Lighter blue on hover
+    });
+    
+    confirmBtnBg.on('pointerout', () => {
+      confirmBtnBg.setFillStyle(0x44aaff); // Back to original color
+    });
+    
+    // Handle click
+    confirmBtnBg.on('pointerdown', () => {
+      confirmBtnBg.setFillStyle(0x3377dd); // Darker blue when clicked
+      
+      // If coming from PlayerSelectScene in online mode, return to it with the selected scenario
+      if (this.fromPlayerSelect) {
+        const selectedScenarioKey = SCENARIOS[this.selectedScenario].key;
+        console.log('[ScenarioSelectScene] Returning to PlayerSelectScene with scenario:', selectedScenarioKey);
+        
+        // Create the data to return to PlayerSelectScene
+        const returnData = {
+          scenario: selectedScenarioKey,
+          type: 'scenario_selected'
+        };
+        
+        console.log('[ScenarioSelectScene] Resuming PlayerSelectScene with data:', returnData);
+        
+        // Resume the PlayerSelectScene with the scenario data
+        this.scene.resume('PlayerSelectScene', returnData);
+        this.scene.stop();
+      } else {
+        // Normal flow - start the game directly
+        this.scene.start('KidsFightScene', {
+          p1: this.p1,
+          p2: this.p2,
+          scenario: SCENARIOS[this.selectedScenario].key
+        });
+      }
     });
 
     // Keyboard navigation
