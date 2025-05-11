@@ -1962,8 +1962,14 @@ class KidsFightScene extends (typeof Phaser !== 'undefined' && Phaser.Scene ? Ph
         this.sendGameAction('special');
         this.attackCount[controlIndex] = 0;
         this.specialPips[controlIndex] = 0;
-        this.showSpecialEffect(this.players[controlIndex].x, this.players[controlIndex].y);
-        this.sendGameAction('special');
+        
+        // Use the correct player reference instead of this.players array which doesn't exist
+        const player = controlIndex === 0 ? this.player1 : this.player2;
+        if (player) {
+          this.showSpecialEffect(player.x, player.y);
+        }
+        // Only send the action once to avoid duplicate messages
+        // Removed duplicate sendGameAction call
       } else {
         const p1SpecialKey = 'p1_special_' + this.p1SpriteKey;
         this.player1.play(p1SpecialKey, true);
