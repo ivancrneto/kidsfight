@@ -1,4 +1,6 @@
 // Singleton WebSocket manager to maintain connection across scenes
+import { DEV } from './globals.js';
+
 class WebSocketManager {
   // Static instance property for the singleton pattern
   static instance;
@@ -16,11 +18,15 @@ class WebSocketManager {
 
   connect() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.log('[WebSocketManager] Creating new connection');
-      this.ws = new WebSocket('ws://localhost:8081');
+      if (DEV) console.log('[WebSocketManager] Creating new connection');
+      // Use localhost in development, production server in production
+      const wsUrl = DEV
+        ? 'ws://localhost:8081'
+        : 'wss://kidsfight.netlify.app';
+      this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        console.log('[WebSocketManager] Connection opened');
+        if (DEV) console.log('[WebSocketManager] Connection opened');
       };
       
       this.ws.onerror = (error) => {
@@ -28,7 +34,7 @@ class WebSocketManager {
       };
       
       this.ws.onclose = () => {
-        console.log('[WebSocketManager] Connection closed');
+        if (DEV) console.log('[WebSocketManager] Connection closed');
       };
       
       // Add message logging with enhanced debugging for game actions
@@ -39,7 +45,7 @@ class WebSocketManager {
           
           // Enhanced logging for game actions
           if (data.type === 'game_action') {
-            console.log('[WebSocketManager] Received game action:', {
+            if (DEV) console.log('[WebSocketManager] Received game action:', {
               actionType: data.action?.type,
               direction: data.action?.direction,
               isHost: this.isHost,
@@ -48,7 +54,7 @@ class WebSocketManager {
           } 
           // Enhanced logging for replay requests
           else if (data.type === 'replay_request') {
-            console.log('[WebSocketManager] Received replay request:', {
+            if (DEV) console.log('[WebSocketManager] Received replay request:', {
               action: data.action,
               isHost: this.isHost,
               roomCode: data.roomCode,
@@ -58,7 +64,7 @@ class WebSocketManager {
           }
           // Enhanced logging for replay responses
           else if (data.type === 'replay_response') {
-            console.log('[WebSocketManager] Received replay response:', {
+            if (DEV) console.log('[WebSocketManager] Received replay response:', {
               action: data.action,
               accepted: data.accepted,
               isHost: this.isHost,
@@ -66,7 +72,7 @@ class WebSocketManager {
             });
           } 
           else {
-            console.log('[WebSocketManager] Received message:', {
+            if (DEV) console.log('[WebSocketManager] Received message:', {
               type: data.type,
               isHost: this.isHost,
               data: data
@@ -81,7 +87,7 @@ class WebSocketManager {
         }
       };
     } else {
-      console.log('[WebSocketManager] Reusing existing connection');
+      if (DEV) console.log('[WebSocketManager] Reusing existing connection');
     }
     return this.ws;
   }
@@ -98,7 +104,7 @@ class WebSocketManager {
     if (this.isConnected()) {
       // Enhanced logging for game actions
       if (typeof message === 'object' && message.type === 'game_action') {
-        console.log('[WebSocketManager] Sending game action:', {
+        if (DEV) console.log('[WebSocketManager] Sending game action:', {
           actionType: message.action?.type,
           direction: message.action?.direction,
           isHost: this.isHost,
@@ -107,7 +113,7 @@ class WebSocketManager {
       } 
       // Enhanced logging for replay requests
       else if (typeof message === 'object' && message.type === 'replay_request') {
-        console.log('[WebSocketManager] Sending replay request:', {
+        if (DEV) console.log('[WebSocketManager] Sending replay request:', {
           action: message.action,
           isHost: this.isHost,
           roomCode: message.roomCode,
@@ -117,7 +123,7 @@ class WebSocketManager {
       }
       // Enhanced logging for replay responses
       else if (typeof message === 'object' && message.type === 'replay_response') {
-        console.log('[WebSocketManager] Sending replay response:', {
+        if (DEV) console.log('[WebSocketManager] Sending replay response:', {
           action: message.action,
           accepted: message.accepted,
           isHost: this.isHost,
@@ -125,7 +131,7 @@ class WebSocketManager {
         });
       } 
       else {
-        console.log('[WebSocketManager] Sending message:', message);
+        if (DEV) console.log('[WebSocketManager] Sending message:', message);
       }
       
       // Send the message
@@ -141,7 +147,7 @@ class WebSocketManager {
       return;
     }
     
-    console.log('[WebSocketManager] Sending game action:', action);
+    if (DEV) console.log('[WebSocketManager] Sending game action:', action);
     
     const message = {
       type: 'game_action',
