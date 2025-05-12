@@ -39,8 +39,7 @@ const SPECIAL_DAMAGE = 20; // Special attack damage
 
 // Define development environment detection once at the file level
 // This handles both Node.js environments and browser environments
-const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || 
-           (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' && window.localStorage.getItem('debug_mode') === 'true');
+const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development');
 const LUNGE_COOLDOWN = 1000; // 1s cooldown between lunges
 const LUNGE_DAMAGE = 15;
 const PLATFORM_Y = GAME_HEIGHT - 100;
@@ -394,7 +393,7 @@ class KidsFightScene extends Phaser.Scene {
       console.log('[KidsFightScene] Missing player data:', data);
     }
     // Convert numeric indices to character keys if needed
-    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8', 'player9'];
     if (typeof data?.p1 === 'number') {
       data.p1 = CHARACTER_KEYS[data.p1];
     }
@@ -1482,17 +1481,17 @@ class KidsFightScene extends Phaser.Scene {
     
     // Skip if trying to update our own local player
     if (remotePlayerIndex === this.localPlayerIndex) {
-      console.log(`[CRITICAL] Ignoring action for our own player ${remotePlayerIndex}`);
+      if (DEV) console.log(`[CRITICAL] Ignoring action for our own player ${remotePlayerIndex}`);
       return;
     }
     
-    console.log(`[CRITICAL] Received remote action: ${action.type}, direction: ${action.direction || 'N/A'} for player ${remotePlayerIndex}`);
-    console.log(`[CRITICAL] Local player is ${this.localPlayerIndex}, isHost: ${this.isHost}`);
-    console.log(`[CRITICAL] Remote player sprite position: (${remoteSprite.x}, ${remoteSprite.y})`);
+    if (DEV) console.log(`[CRITICAL] Received remote action: ${action.type}, direction: ${action.direction || 'N/A'} for player ${remotePlayerIndex}`);
+    if (DEV) console.log(`[CRITICAL] Local player is ${this.localPlayerIndex}, isHost: ${this.isHost}`);
+    if (DEV) console.log(`[CRITICAL] Remote player sprite position: (${remoteSprite.x}, ${remoteSprite.y})`);
     
     // CRITICAL FIX: If position data is included, update the remote player's position directly
     if (action.position) {
-      console.log(`[CRITICAL] Received position data: (${action.position.x}, ${action.position.y}), velocity: (${action.position.velocityX}, ${action.position.velocityY})`);
+      if (DEV) console.log(`[CRITICAL] Received position data: (${action.position.x}, ${action.position.y}), velocity: (${action.position.velocityX}, ${action.position.velocityY})`);
       
       // Update the remote player's position and velocity
       remoteSprite.x = action.position.x;
@@ -1518,7 +1517,7 @@ class KidsFightScene extends Phaser.Scene {
     }
 
     // Update on-screen debug information
-    if (this.debugInfoText) {
+    if (DEV && this.debugInfoText) {
 
   this.debugInfoText.setText(
     `Received: ${action.type}\n` +
@@ -1535,7 +1534,7 @@ if (DEV) {
   const actionText = this.add.text(
     remoteSprite.x,
     remoteSprite.y - 30,
-    `Action: ${action.type}${action.direction ? ' ' + action.direction : ''}`,
+    'SHOULD NEVER SEE THIS IN PROD ' + new Date().toISOString(),
     {
       fontSize: '14px',
       color: '#00ff00',
@@ -1544,7 +1543,10 @@ if (DEV) {
     }
   ).setOrigin(0.5).setDepth(999);
 
-  // Remove the text after a short delay
+  // Make the text persist for 10 seconds for easier inspection
+  this.time.delayedCall(10000, () => {
+    if (actionText.scene) actionText.destroy();
+  }, this);
   this.time.delayedCall(800, () => {
     actionText.destroy();
   });
@@ -1577,7 +1579,7 @@ switch(action.type) {
       // CRITICAL FIX: Force the animation to play
       const runAnim = `p${remotePlayerIndex+1}_walk_${spriteKey}`;
       remoteSprite.anims.play(runAnim, true);
-      console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
+      if (DEV) console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
     } else if (action.direction === 'right') {
       // Set flip direction
       remoteSprite.setFlipX(false);
@@ -1600,7 +1602,7 @@ switch(action.type) {
       // CRITICAL FIX: Force the animation to play
       const runAnim = `p${remotePlayerIndex+1}_walk_${spriteKey}`;
       remoteSprite.anims.play(runAnim, true);
-      console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
+      if (DEV) console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
     } else if (action.direction === 'stop') {
       // Add visual indicator for debugging (only in DEV mode)
       if (DEV) {
@@ -1620,11 +1622,11 @@ switch(action.type) {
       // CRITICAL FIX: Force the idle animation to play
       const idleAnim = `p${remotePlayerIndex+1}_idle_${spriteKey}`;
       remoteSprite.anims.play(idleAnim, true);
-      console.log(`[CRITICAL] Playing idle animation ${idleAnim} for remote player ${remotePlayerIndex}`);
+      if (DEV) console.log(`[CRITICAL] Playing idle animation ${idleAnim} for remote player ${remotePlayerIndex}`);
     }
 
     // CRITICAL FIX: Force update the player's position in the debug display
-    console.log(`[CRITICAL] Player ${remotePlayerIndex} position: (${remoteSprite.x}, ${remoteSprite.y}), velocity: (${remoteSprite.body.velocity.x}, ${remoteSprite.body.velocity.y})`);
+    if (DEV) console.log(`[CRITICAL] Player ${remotePlayerIndex} position: (${remoteSprite.x}, ${remoteSprite.y}), velocity: (${remoteSprite.body.velocity.x}, ${remoteSprite.body.velocity.y})`);
 
     // Update debug text with more detailed information
     if (this.debugInfoText) {
@@ -1642,23 +1644,25 @@ switch(action.type) {
       );
     }
     
-    // Add a visual indicator that an action was received
-    const actionText = this.add.text(
-      remoteSprite.x,
-      remoteSprite.y - 30,
-      `Action: ${action.type}${action.direction ? ' ' + action.direction : ''}`,
-      {
-        fontSize: '14px',
-        color: '#00ff00',
-        backgroundColor: '#000000',
-        padding: { x: 3, y: 2 }
-      }
-    ).setOrigin(0.5).setDepth(999);
-    
-    // Remove the text after a short delay
-    this.time.delayedCall(800, () => {
-      actionText.destroy();
-    });
+    // Add a visual indicator that an action was received (DEV ONLY)
+    if (DEV) {
+      const actionText = this.add.text(
+        remoteSprite.x,
+        remoteSprite.y - 30,
+        `Action: ${action.type}${action.direction ? ' ' + action.direction : ''}`,
+        {
+          fontSize: '14px',
+          color: '#00ff00',
+          backgroundColor: '#000000',
+          padding: { x: 3, y: 2 }
+        }
+      ).setOrigin(0.5).setDepth(999);
+      
+      // Remove the text after a short delay
+      this.time.delayedCall(800, () => {
+        actionText.destroy();
+      });
+    }
     
     switch(action.type) {
       case 'move':
@@ -1687,7 +1691,7 @@ switch(action.type) {
           // CRITICAL FIX: Force the animation to play
           const runAnim = `p${remotePlayerIndex+1}_walk_${spriteKey}`;
           remoteSprite.anims.play(runAnim, true);
-          console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
+          if (DEV) console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
         } else if (action.direction === 'right') {
           // Set flip direction
           remoteSprite.setFlipX(false);
@@ -1710,7 +1714,7 @@ switch(action.type) {
           // CRITICAL FIX: Force the animation to play
           const runAnim = `p${remotePlayerIndex+1}_walk_${spriteKey}`;
           remoteSprite.anims.play(runAnim, true);
-          console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
+          if (DEV) console.log(`[CRITICAL] Playing walk animation ${runAnim} for remote player ${remotePlayerIndex}`);
         } else if (action.direction === 'stop') {
           // Add visual indicator for debugging (only in DEV mode)
           if (DEV) {
@@ -1730,14 +1734,14 @@ switch(action.type) {
           // CRITICAL FIX: Force the idle animation to play
           const idleAnim = `p${remotePlayerIndex+1}_idle_${spriteKey}`;
           remoteSprite.anims.play(idleAnim, true);
-          console.log(`[CRITICAL] Playing idle animation ${idleAnim} for remote player ${remotePlayerIndex}`);
+          if (DEV) console.log(`[CRITICAL] Playing idle animation ${idleAnim} for remote player ${remotePlayerIndex}`);
         }
         
         // CRITICAL FIX: Force update the player's position in the debug display
-        console.log(`[CRITICAL] Player ${remotePlayerIndex} position: (${remoteSprite.x}, ${remoteSprite.y}), velocity: (${remoteSprite.body.velocity.x}, ${remoteSprite.body.velocity.y})`);
+        if (DEV) console.log(`[CRITICAL] Player ${remotePlayerIndex} position: (${remoteSprite.x}, ${remoteSprite.y}), velocity: (${remoteSprite.body.velocity.x}, ${remoteSprite.body.velocity.y})`);
         
-        // Update debug text with more detailed information
-        if (this.debugInfoText) {
+        // Update debug text with more detailed information (DEV ONLY)
+        if (DEV && this.debugInfoText) {
           this.debugInfoText.setText(
             `Remote Player ${remotePlayerIndex} (${this.isHost ? 'Guest' : 'Host'})\n` +
             `Action: Move ${action.direction}\n` +
@@ -1822,7 +1826,7 @@ switch(action.type) {
             this.cameras.main.shake(100, 0.01);
           }
           
-          console.log(`[CRITICAL] Local player ${targetIndex} took damage. Health: ${this.playerHealth[targetIndex]}`);
+          if (DEV) console.log(`[CRITICAL] Local player ${targetIndex} took damage. Health: ${this.playerHealth[targetIndex]}`);
         }
         
         // Reset to idle after attack animation completes
@@ -1879,7 +1883,7 @@ switch(action.type) {
             this.showSpecialEffect(midX, midY);
           }
           
-          console.log(`[CRITICAL] Local player ${targetIndex} took SPECIAL damage. Health: ${this.playerHealth[targetIndex]}`);
+          if (DEV) console.log(`[CRITICAL] Local player ${targetIndex} took SPECIAL damage. Health: ${this.playerHealth[targetIndex]}`);
         }
         
         // Reset to idle after special animation completes
@@ -2018,7 +2022,7 @@ handleDisconnection() {
       }
     };
     
-    console.log(`[CRITICAL] Sending game action: ${type}, direction: ${data.direction || 'N/A'}, player: ${this.localPlayerIndex}, position: (${localPlayer.x}, ${localPlayer.y})`);
+    if (DEV) console.log(`[CRITICAL] Sending game action: ${type}, direction: ${data.direction || 'N/A'}, player: ${this.localPlayerIndex}, position: (${localPlayer.x}, ${localPlayer.y})`);
     this.wsManager.sendGameAction(action);
     
     // Add visual indicator for sent actions (debugging) - only in DEV mode
