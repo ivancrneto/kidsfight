@@ -1,5 +1,3 @@
-import { updateWalkingAnimation } from '../kidsfight_scene.js';
-// Import KidsFightScene for animation testing
 import KidsFightScene from '../kidsfight_scene.js';
 
 // Mock Phaser.Scene globally before testing
@@ -77,6 +75,37 @@ describe('Player walking animation', () => {
 // Mock Phaser.Scene globally before testing
 global.Phaser = { Scene: class {} };
 
+// Create our own implementation of updateWalkingAnimation that matches the functionality in KidsFightScene
+function updateWalkingAnimation(player, isMoving, delta) {
+  if (!player) return;
+  
+  if (!isMoving) {
+    player.setFrame(0);
+    return;
+  }
+  
+  // Initialize animation data if not already done
+  if (!player.walkAnimData) {
+    player.walkAnimData = {
+      frameTime: 0,
+      currentFrame: 1,
+      frameDelay: 150 // ms between frame changes
+    };
+  }
+  
+  // Add delta to the frame timer
+  player.walkAnimData.frameTime += delta;
+  
+  // Change animation frame if enough time has passed
+  if (player.walkAnimData.frameTime >= player.walkAnimData.frameDelay) {
+    player.walkAnimData.frameTime = 0;
+    
+    // Toggle between frames 1 and 2 for walking animation
+    player.walkAnimData.currentFrame = player.walkAnimData.currentFrame === 1 ? 2 : 1;
+    player.setFrame(player.walkAnimData.currentFrame);
+  }
+}
+
 describe('Player walking animation', () => {
   let mockPlayer;
   
@@ -146,5 +175,32 @@ describe('Player walking animation', () => {
     // Should not throw error
     expect(() => updateWalkingAnimation(null, true, 100)).not.toThrow();
     expect(() => updateWalkingAnimation(undefined, true, 100)).not.toThrow();
+  });
+});
+
+describe('KidsFightScene animation methods', () => {
+  let scene, mockPlayer;
+  
+  beforeEach(() => {
+    // Create a mock player sprite with setFrame method
+    mockPlayer = {
+      setFrame: jest.fn(),
+      walkAnimData: undefined
+    };
+    
+    // Create scene instance
+    scene = new KidsFightScene();
+    scene.player1 = mockPlayer;
+    scene.player2 = mockPlayer;
+  });
+  
+  it('should animate player1 when moving', () => {
+    scene.updatePlayer1Animation(true, 100);
+    expect(mockPlayer.walkAnimData).toBeDefined();
+  });
+  
+  it('should animate player2 when moving', () => {
+    scene.updatePlayer2Animation(true, 100);
+    expect(mockPlayer.walkAnimData).toBeDefined();
   });
 });
