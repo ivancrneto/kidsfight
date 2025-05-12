@@ -26,7 +26,8 @@ import wsManager from './websocket_manager';
 
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 480;
-const MAX_HEALTH = 100;
+const MAX_HEALTH = 100; // Each health bar represents this amount of health
+const TOTAL_HEALTH = MAX_HEALTH; // Just one health bar
 const PLAYER_SPEED = 200;
 const JUMP_VELOCITY = -400;
 const GRAVITY = 900;
@@ -42,6 +43,13 @@ const PLATFORM_HEIGHT = 20;
 
 // Accept Phaser as a constructor parameter for testability
 class KidsFightScene extends Phaser.Scene {
+  // Helper method to stretch background image to fill the camera area
+  stretchBackground(bg) {
+    if (!bg) return;
+    const cam = this.cameras.main;
+    stretchBackgroundToFill(bg, cam.width, cam.height);
+  }
+
   // Helper method to get character name from sprite key
   getCharacterName(spriteKey) {
     switch(spriteKey) {
@@ -53,6 +61,7 @@ class KidsFightScene extends Phaser.Scene {
       case 'player6': return 'Roni';
       case 'player7': return 'Jacqueline';
       case 'player8': return 'Ivan';
+      case 'player9': return 'D.Isa';
       default: return 'Jogador';
     }
   }
@@ -267,6 +276,9 @@ class KidsFightScene extends Phaser.Scene {
         this.playerHealth[targetIndex] = 0;
       }
       
+      // Update health bars
+      this.updateHealthBars(targetIndex);
+      
       // Check for game over
       if (this.playerHealth[targetIndex] <= 0 && !this.gameOver) {
         this.endGame(playerIndex);
@@ -292,6 +304,24 @@ class KidsFightScene extends Phaser.Scene {
     }
     
     return false; // No hit
+  }
+
+  // Update the health bar for a player
+  updateHealthBars(playerIndex) {
+    const currentHealth = this.playerHealth[playerIndex];
+    const barWidth = 200; // Must match what's set in create()
+    
+    // Calculate ratio for display
+    const healthRatio = Math.max(0, currentHealth / MAX_HEALTH);
+    
+    // Update the appropriate health bar
+    if (playerIndex === 0) {
+      // Player 1 health bar
+      this.healthBar1.width = barWidth * healthRatio;
+    } else {
+      // Player 2 health bar
+      this.healthBar2.width = barWidth * healthRatio;
+    }
   }
 
   // --- EFFECTS: Special Effect Helper (Phaser 3.60+ workaround) ---
@@ -349,7 +379,6 @@ class KidsFightScene extends Phaser.Scene {
     this.lungeTimer = [0, 0]; // Initialize lunge timers for both players
     this.timeLeft = 60;
     this.player1State = 'idle';
-// console.log('[DEBUG] player1State set to:', this.player1State); // 'idle', 'down', 'attack', 'special'
     this.player2State = 'idle';
     // // console.log('[constructor] timeLeft:', this.timeLeft, 'ROUND_TIME:', typeof ROUND_TIME !== 'undefined' ? ROUND_TIME : 'undefined');
   }
@@ -419,7 +448,8 @@ class KidsFightScene extends Phaser.Scene {
     this.attackCount = [0, 0];
     this.lungeTimer = [0, 0];
     this.timeLeft = 60;
-    this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
+    // Set up player health (doubled with two bars)
+    this.playerHealth = [TOTAL_HEALTH, TOTAL_HEALTH];
     this.players = [];
     
     // Flags to prevent multiple restarts/redirects
@@ -508,7 +538,7 @@ class KidsFightScene extends Phaser.Scene {
     // Add game mode indicator
     if (this.gameMode === 'online') {
       const modeText = this.add.text(
-        this.cameras.main.width * 0.5,
+        this.cameras.main.width / 2,
         30,
         'Modo Online',
         {
@@ -530,7 +560,7 @@ class KidsFightScene extends Phaser.Scene {
       
       // Add test button to manually trigger a remote action
       const testButton = this.add.text(
-        this.cameras.main.width * 0.5,
+        this.cameras.main.width / 2,
         60,
         '[ TEST SYNC ]',
         {
@@ -1135,16 +1165,20 @@ class KidsFightScene extends Phaser.Scene {
     }
 
     // Health bars
-    this.healthBar1Border = this.add.rectangle(200, 30, 204, 24, 0xffffff).setOrigin(0.5);
-    this.healthBar2Border = this.add.rectangle(600, 30, 204, 24, 0xffffff).setOrigin(0.5);
+    const barHeight = 20;
+    const barWidth = 200;
+    
+    // Create health bar borders
+    this.healthBar1Border = this.add.rectangle(200, 30, 204, 24, 0x000000);
+    this.healthBar2Border = this.add.rectangle(600, 30, 204, 24, 0x000000);
     this.healthBar1Border.setStrokeStyle(2, 0x000000);
     this.healthBar2Border.setStrokeStyle(2, 0x000000);
-    this.healthBar1 = this.add.rectangle(200, 30, 200, 20, 0xff4444);
-    this.healthBar2 = this.add.rectangle(600, 30, 200, 20, 0x44aaff);
+    
+    // Single health bars for each player
+    this.healthBar1 = this.add.rectangle(200, 30, barWidth, barHeight, 0xff4444);
+    this.healthBar2 = this.add.rectangle(600, 30, barWidth, barHeight, 0x44aaff);
     this.healthBar1.setOrigin(0.5);
     this.healthBar2.setOrigin(0.5);
-    this.children.bringToTop(this.healthBar1);
-    this.children.bringToTop(this.healthBar2);
 
     // --- SPECIAL HIT CIRCLES (PIPS) ---
     // Player 1 special pips (left, above health bar)
@@ -1221,12 +1255,7 @@ class KidsFightScene extends Phaser.Scene {
             this.debugInfoText.setText(`Last Action: test_sync\nTimestamp: ${Date.now()}\nHost: ${this.isHost ? 'Yes' : 'No'}\nPlayer Index: ${this.localPlayerIndex}`);
           }
         } else {
-          console.error('[DEBUG] WebSocket is not connected!');
-          
-          // Update debug info
-          if (this.debugInfoText) {
-            this.debugInfoText.setText('WebSocket NOT CONNECTED!\nCheck console for errors');
-          }
+          console.error('[DEBUG] WebSocket not connected, cannot send test action');
         }
       });
       
@@ -1479,7 +1508,7 @@ class KidsFightScene extends Phaser.Scene {
         backgroundColor: '#000000',
         padding: { x: 3, y: 2 }
       }
-    ).setOrigin(0.5).setDepth(9999);
+    ).setOrigin(0.5).setDepth(999);
     
     // Remove the text after a short delay
     this.time.delayedCall(800, () => {
@@ -1501,7 +1530,7 @@ class KidsFightScene extends Phaser.Scene {
             color: '#ff0000',
             backgroundColor: '#000000',
             padding: { x: 5, y: 2 }
-          }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+          }).setOrigin(0.5).setDepth(999);
           
           // Remove the text after a short delay
           this.time.delayedCall(800, () => {
@@ -1522,7 +1551,7 @@ class KidsFightScene extends Phaser.Scene {
             color: '#ff0000',
             backgroundColor: '#000000',
             padding: { x: 5, y: 2 }
-          }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+          }).setOrigin(0.5).setDepth(999);
           
           // Remove the text after a short delay
           this.time.delayedCall(800, () => {
@@ -1540,7 +1569,7 @@ class KidsFightScene extends Phaser.Scene {
             color: '#ff0000',
             backgroundColor: '#000000',
             padding: { x: 5, y: 2 }
-          }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+          }).setOrigin(0.5).setDepth(999);
           
           // Remove the text after a short delay
           this.time.delayedCall(800, () => {
@@ -1578,7 +1607,7 @@ class KidsFightScene extends Phaser.Scene {
             color: '#ff0000',
             backgroundColor: '#000000',
             padding: { x: 5, y: 2 }
-          }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+          }).setOrigin(0.5).setDepth(999);
           
           // Remove the text after a short delay
           this.time.delayedCall(800, () => {
@@ -1605,7 +1634,7 @@ class KidsFightScene extends Phaser.Scene {
             backgroundColor: '#000000',
             padding: { x: 5, y: 2 }
           }
-        ).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+        ).setOrigin(0.5).setDepth(999);
         
         // Remove the text after a short delay
         this.time.delayedCall(800, () => {
@@ -1627,10 +1656,8 @@ class KidsFightScene extends Phaser.Scene {
           // Apply damage to the local player
           this.playerHealth[defenderIndex] = Math.max(0, this.playerHealth[defenderIndex] - ATTACK_DAMAGE);
           
-          // Update the health bar
-          const healthBar = defenderIndex === 0 ? this.healthBar1 : this.healthBar2;
-          const healthRatio = Math.max(0, this.playerHealth[defenderIndex] / MAX_HEALTH);
-          if (healthBar) healthBar.width = 200 * healthRatio;
+          // Update the health bars
+          this.updateHealthBars(defenderIndex);
           
           // Visual feedback for taking damage
           if (this.cameras && this.cameras.main) {
@@ -1654,7 +1681,7 @@ class KidsFightScene extends Phaser.Scene {
           color: '#ff0000',
           backgroundColor: '#000000',
           padding: { x: 5, y: 2 }
-        }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+        }).setOrigin(0.5).setDepth(999);
         
         // Remove the text after a short delay
         this.time.delayedCall(800, () => {
@@ -1676,10 +1703,8 @@ class KidsFightScene extends Phaser.Scene {
           // Apply damage to the local player (special does more damage)
           this.playerHealth[specialDefenderIndex] = Math.max(0, this.playerHealth[specialDefenderIndex] - SPECIAL_DAMAGE);
           
-          // Update the health bar
-          const specialHealthBar = specialDefenderIndex === 0 ? this.healthBar1 : this.healthBar2;
-          const specialHealthRatio = Math.max(0, this.playerHealth[specialDefenderIndex] / MAX_HEALTH);
-          if (specialHealthBar) specialHealthBar.width = 200 * specialHealthRatio;
+          // Update the health bars
+          this.updateHealthBars(specialDefenderIndex);
           
           // Visual feedback for taking damage (stronger for special)
           if (this.cameras && this.cameras.main) {
@@ -1708,7 +1733,7 @@ class KidsFightScene extends Phaser.Scene {
           color: '#ff0000',
           backgroundColor: '#000000',
           padding: { x: 5, y: 2 }
-        }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+        }).setOrigin(0.5).setDepth(999);
         
         // Remove the text after a short delay
         this.time.delayedCall(800, () => {
@@ -1727,7 +1752,7 @@ class KidsFightScene extends Phaser.Scene {
           color: '#ff0000',
           backgroundColor: '#000000',
           padding: { x: 5, y: 2 }
-        }).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+        }).setOrigin(0.5).setDepth(999);
         
         // Remove the text after a short delay
         this.time.delayedCall(800, () => {
@@ -1835,7 +1860,7 @@ class KidsFightScene extends Phaser.Scene {
           backgroundColor: '#000000',
           padding: { x: 3, y: 2 }
         }
-      ).setOrigin(0.5).setDepth(9999).setAlpha(0.8);
+      ).setOrigin(0.5).setDepth(999);
     }
   }
 
@@ -1882,6 +1907,7 @@ class KidsFightScene extends Phaser.Scene {
     }
 
     if (this.gameOver) return;
+
     // --- SPECIAL PIPS UPDATE LOGIC ---
     // Helper: update special pips and indicators for a player
     const updateSpecialPips = (playerIdx) => {
@@ -2226,8 +2252,7 @@ class KidsFightScene extends Phaser.Scene {
         console.log('[DEBUG-BEFORE] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
         this.tryAttack(0, this.player1, this.player2, now, false);
         console.log('[DEBUG-AFTER] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
-        const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
-        this.healthBar2.width = 200 * healthRatio;
+        this.updateHealthBars(1);
         // Manually switch to idle after 400ms
         this.time.delayedCall(400, () => {
           if (this.player1State === 'attack' && !this.gameOver) {
@@ -2304,8 +2329,7 @@ class KidsFightScene extends Phaser.Scene {
         this.showSpecialEffect(this.player1.x, this.player1.y);
       }
       this.tryAttack(0, this.player1, this.player2, now, true);
-      const healthRatio = Math.max(0, this.playerHealth[1] / MAX_HEALTH);
-      this.healthBar2.width = 200 * healthRatio;
+      this.updateHealthBars(1);
       this.showSpecialEffect(this.player1.x, this.player1.y - 60);
       this.time.delayedCall(700, () => {
           if (this.player1State === 'special' && !this.gameOver) {
@@ -2334,8 +2358,7 @@ class KidsFightScene extends Phaser.Scene {
       }
       
       this.tryAttack(1, this.player2, this.player1, now, false);
-      const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
-      this.healthBar1.width = 200 * healthRatio1;
+      this.updateHealthBars(0);
       this.time.delayedCall(400, () => {
          if (this.player2State === 'attack' && !this.gameOver) {
            this.player2.play('p2_idle_' + this.p2SpriteKey, true);
@@ -2363,8 +2386,7 @@ class KidsFightScene extends Phaser.Scene {
         this.sendGameAction('special');
       }
       this.tryAttack(1, this.player2, this.player1, now, true);
-      const healthRatio1 = Math.max(0, this.playerHealth[0] / MAX_HEALTH);
-      this.healthBar1.width = 200 * healthRatio1;
+      this.updateHealthBars(0);
       this.showSpecialEffect(this.player2.x, this.player2.y - 60);
       this.time.delayedCall(700, () => {
         if (this.player2State === 'special' && !this.gameOver) {

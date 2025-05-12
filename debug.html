@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KidsFight Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        button {
+            background-color: #ff00ff;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background-color: #cc00cc;
+        }
+        .debug-panel {
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-panel">
+        <h1>KidsFight Debug Panel</h1>
+        <p>Use these buttons to test game functionality directly.</p>
+    </div>
+
+    <button id="forcePopup">FORCE POPUP</button>
+    <button id="clearCache">CLEAR CACHE</button>
+
+    <script>
+        document.getElementById('forcePopup').addEventListener('click', function() {
+            // Try to get the game scene and call the popup function directly
+            try {
+                const gameIframe = window.open('http://localhost:63790', '_blank');
+                
+                // Wait for the iframe to load
+                setTimeout(() => {
+                    try {
+                        // Try to access the game scene
+                        if (gameIframe && gameIframe.scene && gameIframe.scene.scenes) {
+                            const kidsFightScene = gameIframe.scene.scenes.find(scene => scene.constructor.name === 'KidsFightScene');
+                            
+                            if (kidsFightScene) {
+                                // Create a fake request data object
+                                const fakeRequestData = {
+                                    type: 'replay_request',
+                                    action: 'replay_same_players',
+                                    p1: 'player1',
+                                    p2: 'player2',
+                                    scenario: 'default',
+                                    roomCode: 'debug-room',
+                                    timestamp: Date.now()
+                                };
+                                
+                                // Force show the popup
+                                kidsFightScene.showReplayRequestPopup(fakeRequestData);
+                                console.log('Popup forced!');
+                            } else {
+                                console.error('KidsFightScene not found');
+                            }
+                        } else {
+                            console.error('Game scene not accessible');
+                        }
+                    } catch (error) {
+                        console.error('Error accessing game:', error);
+                    }
+                }, 2000);
+            } catch (error) {
+                console.error('Error opening game:', error);
+            }
+        });
+
+        document.getElementById('clearCache').addEventListener('click', function() {
+            if (window.caches) {
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                    alert('Cache cleared! Please refresh the game page.');
+                });
+            } else {
+                alert('Cache API not supported in this browser.');
+            }
+        });
+    </script>
+</body>
+</html>

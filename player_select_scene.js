@@ -7,6 +7,7 @@ import player5RawImg from './sprites-carol3.png';
 import player6RawImg from './sprites-roni3.png';
 import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
+import player9RawImg from './sprites-d_isa.png';
 import gameLogoImg from './android-chrome-192x192.png';
 import wsManager from './websocket_manager';
 
@@ -15,7 +16,7 @@ class PlayerSelectScene extends Phaser.Scene {
     super({ key: 'PlayerSelectScene' });
     console.log('PlayerSelectScene constructor called');
     // Character sprite keys for mapping
-    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8', 'player9'];
     this.selected = { p1: 'player1', p2: 'player2' }; // Default selections using sprite keys
   }
   
@@ -23,7 +24,7 @@ class PlayerSelectScene extends Phaser.Scene {
     // Reset selections when scene is restarted
     console.log('[PlayerSelectScene] Init called, resetting selections');
     // Character sprite keys for mapping
-    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8', 'player9'];
     
     // For online mode, always set Bento (player1) as the initial player for both players
     if (data && data.mode === 'online') {
@@ -129,6 +130,7 @@ class PlayerSelectScene extends Phaser.Scene {
     this.load.image('player6_raw', player6RawImg);
     this.load.image('player7_raw', player7RawImg);
     this.load.image('player8_raw', player8RawImg);
+    this.load.image('player9_raw', player9RawImg);
     this.load.image('game_logo', gameLogoImg);
     console.log('[PlayerSelectScene] Assets queued for loading');
   }
@@ -345,22 +347,51 @@ class PlayerSelectScene extends Phaser.Scene {
       }
     }
     
+    // Player 9 (D.Isa) Spritesheet
+    if (!this.textures.exists('player9')) {
+      console.log('[PlayerSelectScene] Creating player9 spritesheet');
+      const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400]; // You can adjust this if D.Isa's frames differ
+      const frameHeight = 512; // Adjust if D.Isa's frame height is different
+      const player9Texture = this.textures.get('player9_raw').getSourceImage();
+      this.textures.addSpriteSheet('player9', player9Texture, {
+        frameWidth: 400,
+        frameHeight: frameHeight,
+        startFrame: 0,
+        endFrame: frameWidths.length - 1
+      });
+      // Manually add frames for variable widths
+      const tex = this.textures.get('player9');
+      tex.frames = { __BASE: tex.frames['__BASE'] };
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
+      }
+    }
+    
+    // DEBUG: Log CHARACTER_KEYS
+    console.log('[DEBUG] CHARACTER_KEYS:', this.CHARACTER_KEYS);
+
+    // DEBUG: Check if D.Isa sprite is loaded
+    if (this.textures.exists('player9')) {
+      console.log('[DEBUG] D.Isa sprite is loaded');
+    } else {
+      console.warn('[DEBUG] D.Isa sprite is NOT loaded');
+    }
+
     // Create player face-only sprites for selection - crop to top half of first frame
     const faceRadius = 32; // Circle button radius
-    const cols = 4;
-    // X positions: 4 columns, offset blocks with 8% shift
+    // Dynamically calculate grid layout based on number of characters
+    const totalChars = this.CHARACTER_KEYS.length;
+    const cols = 4; // Keep 4 columns for mobile-friendliness
+    const rows = Math.ceil(totalChars / cols);
     const avatarSpacing = screenWidth * 0.08;
     const blockWidth = avatarSpacing * (cols - 1);
     const centerX = screenWidth / 2;
     const middleGap = screenWidth * 0.12;
-    // Offset: Player 1 block 8% left, Player 2 block 8% right
     const p1BlockCenter = centerX - middleGap - screenWidth * 0.08;
     const p2BlockCenter = centerX + middleGap + screenWidth * 0.08;
-    const p1FaceX = Array.from({length: 4}, (_, i) => p1BlockCenter - blockWidth / 2 + i * avatarSpacing);
-    const p2FaceX = Array.from({length: 4}, (_, i) => p2BlockCenter - blockWidth / 2 + i * avatarSpacing);
-    // Y positions: two rows, responsive
-    const faceY1 = screenHeight * 0.38;
-    const faceY2 = screenHeight * 0.52;
+    const faceY = (row) => screenHeight * (0.38 + 0.14 * row); // space rows vertically
     const frameW = 250; // adjust if needed
     const frameH = 350; // adjust if needed (should match your spritesheet frame height)
     const cropH = frameH / 1.3;
@@ -368,49 +399,41 @@ class PlayerSelectScene extends Phaser.Scene {
     const faceOffsetY = 18; // move player images down inside the circles
     
     // Character sprite keys for mapping
-    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8', 'player9'];
     
     // Store faceOffsetY as a class property so it's accessible in the WebSocket handler
     this.faceOffsetY = faceOffsetY;
     
-    // Player 1 faces
+    // Player 1 faces (dynamic grid)
     const p1FaceBGs = [];
     this.p1Options = [];
-    // First row (indices 0-3)
-    for (let i = 0; i < 4; i++) {
-      p1FaceBGs.push(this.add.circle(p1FaceX[i], faceY1, faceRadius, 0x222222));
-      let s1 = this.add.sprite(p1FaceX[i], faceY1 + faceOffsetY, this.CHARACTER_KEYS[i], 0).setScale(0.18);
-      s1.setCrop(0, cropY, frameW, cropH);
-      this.p1Options.push(s1);
-    }
-    // Second row (indices 4-7)
-    for (let i = 0; i < 4; i++) {
-      p1FaceBGs.push(this.add.circle(p1FaceX[i], faceY2, faceRadius, 0x222222));
-      let s2 = this.add.sprite(p1FaceX[i], faceY2 + faceOffsetY, this.CHARACTER_KEYS[i+4], 0).setScale(0.18);
-      s2.setCrop(0, cropY, frameW, cropH);
-      this.p1Options.push(s2);
+    for (let i = 0; i < totalChars; i++) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const x = p1BlockCenter - blockWidth / 2 + col * avatarSpacing;
+      const y = faceY(row);
+      p1FaceBGs.push(this.add.circle(x, y, faceRadius, 0x222222));
+      let s = this.add.sprite(x, y + faceOffsetY, this.CHARACTER_KEYS[i], 0).setScale(0.18);
+      s.setCrop(0, cropY, frameW, cropH);
+      this.p1Options.push(s);
     }
 
-    // Player 2 faces
+    // Player 2 faces (dynamic grid)
     const p2FaceBGs = [];
     this.p2Options = [];
-    // First row (indices 0-3)
-    for (let i = 0; i < 4; i++) {
-      p2FaceBGs.push(this.add.circle(p2FaceX[i], faceY1, faceRadius, 0x222222));
-      let s1 = this.add.sprite(p2FaceX[i], faceY1 + faceOffsetY, this.CHARACTER_KEYS[i], 0).setScale(0.18);
-      s1.setCrop(0, cropY, frameW, cropH);
-      this.p2Options.push(s1);
-    }
-    // Second row (indices 4-7)
-    for (let i = 0; i < 4; i++) {
-      p2FaceBGs.push(this.add.circle(p2FaceX[i], faceY2, faceRadius, 0x222222));
-      let s2 = this.add.sprite(p2FaceX[i], faceY2 + faceOffsetY, this.CHARACTER_KEYS[i+4], 0).setScale(0.18);
-      s2.setCrop(0, cropY, frameW, cropH);
-      this.p2Options.push(s2);
+    for (let i = 0; i < totalChars; i++) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const x = p2BlockCenter - blockWidth / 2 + col * avatarSpacing;
+      const y = faceY(row);
+      p2FaceBGs.push(this.add.circle(x, y, faceRadius, 0x222222));
+      let s = this.add.sprite(x, y + faceOffsetY, this.CHARACTER_KEYS[i], 0).setScale(0.18);
+      s.setCrop(0, cropY, frameW, cropH);
+      this.p2Options.push(s);
     }
     
-    // Responsive player names
-    const playerNames = ['Bento', 'Davi R', 'José', 'Davi S', 'Carol', 'Roni', 'Jacque', 'Ivan'];
+    // Responsive player names (dynamic grid)
+    const playerNames = ['Bento', 'Davi R', 'José', 'Davi S', 'Carol', 'Roni', 'Jacque', 'Ivan', 'D.Isa'];
     const nameStyle = {
       fontSize: Math.round(Math.max(12, Math.min(18, screenWidth * 0.025))) + 'px',
       fill: '#ffffff',
@@ -419,13 +442,14 @@ class PlayerSelectScene extends Phaser.Scene {
       backgroundColor: 'rgba(0,0,0,0.35)'
     };
     const nameYOffset = 22;
-    for (let i = 0; i < 4; i++) {
-      this.add.text(p1FaceX[i], faceY1 + nameYOffset, playerNames[i], nameStyle).setOrigin(0.5).setAlpha(0.8);
-      this.add.text(p1FaceX[i], faceY2 + nameYOffset, playerNames[i+4], nameStyle).setOrigin(0.5).setAlpha(0.8);
-    }
-    for (let i = 0; i < 4; i++) {
-      this.add.text(p2FaceX[i], faceY1 + nameYOffset, playerNames[i], nameStyle).setOrigin(0.5).setAlpha(0.8);
-      this.add.text(p2FaceX[i], faceY2 + nameYOffset, playerNames[i+4], nameStyle).setOrigin(0.5).setAlpha(0.8);
+    for (let i = 0; i < totalChars; i++) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const p1x = p1BlockCenter - blockWidth / 2 + col * avatarSpacing;
+      const p2x = p2BlockCenter - blockWidth / 2 + col * avatarSpacing;
+      const y = faceY(row) + nameYOffset;
+      this.add.text(p1x, y, playerNames[i], nameStyle).setOrigin(0.5).setAlpha(0.8);
+      this.add.text(p2x, y, playerNames[i], nameStyle).setOrigin(0.5).setAlpha(0.8);
     }
 
     // Make options interactive
@@ -436,8 +460,12 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Add selection indicators - store them as class properties so we can access them in other methods
     // Smaller selection indicators to match smaller sprites
-    this.p1Selector = this.add.circle(p1FaceX[0], faceY1, faceRadius + 6, 0xffff00, 0.18).setStrokeStyle(4, 0xffff00);
-    this.p2Selector = this.add.circle(p2FaceX[0], faceY1, faceRadius + 6, 0x0000ff, 0.18).setStrokeStyle(4, 0x0000ff);
+    // Place selectors at the first character's position
+    const p1x0 = p1BlockCenter - blockWidth / 2 + 0 * avatarSpacing;
+    const p2x0 = p2BlockCenter - blockWidth / 2 + 0 * avatarSpacing;
+    const faceY0 = faceY(0);
+    this.p1Selector = this.add.circle(p1x0, faceY0, faceRadius + 6, 0xffff00, 0.18).setStrokeStyle(4, 0xffff00);
+    this.p2Selector = this.add.circle(p2x0, faceY0, faceRadius + 6, 0x0000ff, 0.18).setStrokeStyle(4, 0x0000ff);
     
     // Add click handlers
     for (let i = 0; i < this.p1Options.length; i++) {

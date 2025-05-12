@@ -1,3 +1,12 @@
+// This file serves as both a setup file and contains a dummy test to satisfy Jest
+
+describe('Setup', () => {
+  // Empty dummy test to satisfy Jest requirement
+  test('should pass', () => {
+    expect(true).toBe(true);
+  });
+});
+
 // Mock Phaser globally
 global.Phaser = require('../__mocks__/phaser').default;
 // Mock Phaser globally for all tests
