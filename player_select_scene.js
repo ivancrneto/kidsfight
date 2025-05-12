@@ -369,14 +369,20 @@ class PlayerSelectScene extends Phaser.Scene {
       }
     }
     
-    // DEBUG: Log CHARACTER_KEYS
-    console.log('[DEBUG] CHARACTER_KEYS:', this.CHARACTER_KEYS);
-
-    // DEBUG: Check if D.Isa sprite is loaded
-    if (this.textures.exists('player9')) {
-      console.log('[DEBUG] D.Isa sprite is loaded');
-    } else {
-      console.warn('[DEBUG] D.Isa sprite is NOT loaded');
+    // Add environment check for development mode
+    const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || (typeof __DEV__ !== 'undefined' && __DEV__);
+    
+    // Only show debug messages in development environment
+    if (DEV) {
+      // DEBUG: Log CHARACTER_KEYS
+      console.log('[DEBUG] CHARACTER_KEYS:', this.CHARACTER_KEYS);
+      
+      // DEBUG: Check if D.Isa sprite is loaded
+      if (this.textures.exists('player9')) {
+        console.log('[DEBUG] D.Isa sprite is loaded');
+      } else {
+        console.warn('[DEBUG] D.Isa sprite is NOT loaded');
+      }
     }
 
     // Create player face-only sprites for selection - crop to top half of first frame
@@ -489,7 +495,7 @@ class PlayerSelectScene extends Phaser.Scene {
           }
         });
       } else {
-        console.log('DEBUG: Calling setAlpha on option', option);
+        if (DEV) console.log('DEBUG: Calling setAlpha on option', option);
 option.setAlpha(0.5); // Dim opponent's options
       }
     }
@@ -515,7 +521,7 @@ option.setAlpha(0.5); // Dim opponent's options
           }
         });
       } else {
-        console.log('DEBUG: Calling setAlpha on option', option);
+        if (DEV) console.log('DEBUG: Calling setAlpha on option', option);
 option.setAlpha(0.5); // Dim opponent's options
       }
     }
@@ -556,8 +562,8 @@ option.setAlpha(0.5); // Dim opponent's options
     // Make start button interactive
     startBtn.setInteractive();
     startBtn.on('pointerdown', () => {
-      // Log the selection for debugging
-      console.log('[PlayerSelectScene] Starting fight with selections:', this.selected);
+      // Log the selection for debugging (only in dev)
+      if (DEV) console.log('[PlayerSelectScene] Starting fight with selections:', this.selected);
       
       // Create a new object with the exact format expected by KidsFightScene
       // KidsFightScene expects { p1: number, p2: number }
@@ -666,6 +672,26 @@ option.setAlpha(0.5); // Dim opponent's options
       playerNum
     });
     
+    // Add a debug button in online mode for testing and development
+    if (this.gameMode === 'online') {
+      const debugButton = this.add.text(
+        this.cameras.main.width * 0.5,
+        this.cameras.main.height * 0.9,
+        'DEBUG: FORCE START GAME',
+        {
+          fontSize: '16px',
+          color: '#ff00ff',
+          backgroundColor: '#333333',
+          padding: { x: 8, y: 4 }
+        }
+      ).setOrigin(0.5).setDepth(100).setInteractive();
+      
+      debugButton.on('pointerdown', () => {
+        console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
+        this.launchGame();
+      });
+    }
+    
     // Show waiting message
     this.waitingText = this.add.text(
       this.cameras.main.width * 0.5,
@@ -755,8 +781,10 @@ option.setAlpha(0.5); // Dim opponent's options
       }
     };
     
-    // Add a debug button to manually trigger the start game
-    if (this.gameMode === 'online') {
+    // Add a debug button to manually trigger the start game (only in development environment)
+    const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || (typeof __DEV__ !== 'undefined' && __DEV__);
+    
+    if (this.gameMode === 'online' && DEV) {
       const debugButton = this.add.text(
         this.cameras.main.width * 0.5,
         this.cameras.main.height * 0.9,
