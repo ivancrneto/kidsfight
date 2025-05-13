@@ -34,6 +34,7 @@ describe('KidsFightScene attack and special animation durations', () => {
     scene.player1State = 'idle';
     scene.player2State = 'idle';
     scene.time = { delayedCall: jest.fn((delay, cb) => setTimeout(cb, delay)) };
+
     scene.tryAttack = jest.fn();
     scene.keys = {
       a: { isDown: false },
@@ -124,6 +125,8 @@ describe('KidsFightScene attack and special animation durations', () => {
   });
 
   it('should set isAttacking[0] true for 900ms on special, then false', () => {
+    // Set lastAttackTime so cooldown is satisfied
+    scene.lastAttackTime[0] = 1000 - 2001;
     callUpdateAttack(0, true, 1000);
     expect(scene.isAttacking[0]).toBe(true);
     jest.advanceTimersByTime(899);
@@ -133,6 +136,9 @@ describe('KidsFightScene attack and special animation durations', () => {
   });
 
   it('should set isAttacking[1] true for 900ms on special, then false', () => {
+    // Set lastAttackTime so cooldown is satisfied
+    scene.lastAttackTime[1] = 1000 - 2001;
+    // Use helper to ensure all state and keys are set
     callUpdateAttack(1, true, 1000);
     expect(scene.isAttacking[1]).toBe(true);
     jest.advanceTimersByTime(899);
@@ -156,6 +162,8 @@ describe('KidsFightScene attack and special animation durations', () => {
     scene.player1State = 'idle';
     scene.player1.anims.isPlaying = false;
     scene.player1.anims.currentAnim.key = '';
+    // Second attack
+    scene.lastAttackTime[0] = 1300 - 501;
     callUpdateAttack(0, false, 1300);
     expect(scene.tryAttack).toHaveBeenCalledTimes(2);
   });
