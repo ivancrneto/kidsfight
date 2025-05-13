@@ -274,6 +274,7 @@ class KidsFightScene extends Phaser.Scene {
       // Apply damage to the correct health pool (opposite of attacker)
       const targetIndex = playerIndex === 0 ? 1 : 0;
       this.playerHealth[targetIndex] -= damageAmount;
+      if (DEV) console.log('[DEBUG-HEALTH-ASSIGNMENT] playerHealth set to', this.playerHealth, 'after attack');
       
       // Ensure health doesn't go below 0
       if (this.playerHealth[targetIndex] < 0) {
@@ -384,6 +385,8 @@ class KidsFightScene extends Phaser.Scene {
     this.timeLeft = 60;
     this.player1State = 'idle';
     this.player2State = 'idle';
+    this.isAttacking = [false, false];
+    
     // // console.log('[constructor] timeLeft:', this.timeLeft, 'ROUND_TIME:', typeof ROUND_TIME !== 'undefined' ? ROUND_TIME : 'undefined');
   }
 
@@ -450,8 +453,9 @@ class KidsFightScene extends Phaser.Scene {
     this.attackCount = [0, 0];
     this.lungeTimer = [0, 0];
     this.timeLeft = 60;
-    // Set up player health (doubled with two bars)
+    // Always reset player health to full at the start of the game
     this.playerHealth = [TOTAL_HEALTH, TOTAL_HEALTH];
+    if (DEV) console.log('[DEBUG-HEALTH-RESET] playerHealth set to', this.playerHealth, 'in create()');
     this.players = [];
     
     // Flags to prevent multiple restarts/redirects
@@ -534,6 +538,17 @@ class KidsFightScene extends Phaser.Scene {
               this.handleRemoteAction(data.action);
             } else if (data.type === 'player_disconnected') {
               this.handleDisconnection();
+            } else if (data.type === 'start_game') {
+              if (Array.isArray(data.health) && data.health.length === 2) {
+                this.playerHealth = [...data.health];
+                if (DEV) console.log('[DEBUG-HEALTH-SERVER] playerHealth set from server data:', this.playerHealth);
+                console.log('[KidsFightScene] Initialized playerHealth from server:', this.playerHealth);
+              } else {
+                // fallback to default if not provided
+                this.playerHealth = [100, 100];
+                if (DEV) console.log('[DEBUG-HEALTH-FALLBACK] playerHealth set to [100, 100] (fallback)');
+                console.warn('[KidsFightScene] No health provided by server, using defaults');
+              }
             }
           } catch (error) {
             console.error('[CRITICAL] Error handling WebSocket message:', error);
@@ -821,10 +836,22 @@ class KidsFightScene extends Phaser.Scene {
       this.touchFlags = { p1: {left:false,right:false,jump:false,down:false,attack:false,special:false}, p2: {left:false,right:false,jump:false,down:false,attack:false,special:false} };
       // Setup touch events for all buttons
       const setupBtn = (btn, flagObj, flag) => {
-        btn.on('pointerdown', (e)=>{flagObj[flag]=true; if (e && e.stopPropagation) e.stopPropagation(); if (DEV) console.log('[TOUCH] pointerdown', flag);});
-        btn.on('pointerup', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); if (DEV) console.log('[TOUCH] pointerup', flag);});
-        btn.on('pointerout', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); if (DEV) console.log('[TOUCH] pointerout', flag);});
-        btn.on('pointerupoutside', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); if (DEV) console.log('[TOUCH] pointerupoutside', flag);});
+        btn.on('pointerdown', (e)=>{flagObj[flag]=true; if (e && e.stopPropagation) e.stopPropagation(); if (DEV) console.log('[TOUCH] pointerdown', flag);
+        // Visual indicator: briefly flash the button
+        btn.setAlpha(0.4);
+        if (this.time && typeof this.time.delayedCall === 'function') {
+          this.time.delayedCall(120, () => btn.setAlpha(1), null, this);
+        }
+      });
+        btn.on('pointerup', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); if (DEV) console.log('[TOUCH] pointerup', flag);
+        btn.setAlpha(1);
+      });
+        btn.on('pointerout', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); if (DEV) console.log('[TOUCH] pointerout', flag);
+        btn.setAlpha(1);
+      });
+        btn.on('pointerupoutside', (e)=>{flagObj[flag]=false; if (e && e.stopPropagation) e.stopPropagation(); if (DEV) console.log('[TOUCH] pointerupoutside', flag);
+        btn.setAlpha(1);
+      });
       };
       Object.entries(this.touchControls.p1).forEach(([k,btn])=>setupBtn(btn, this.touchFlags.p1, k));
       Object.entries(this.touchControls.p2).forEach(([k,btn])=>setupBtn(btn, this.touchFlags.p2, k));
@@ -943,7 +970,7 @@ class KidsFightScene extends Phaser.Scene {
   const p1X = GAME_WIDTH * 0.25;
   const p2X = GAME_WIDTH * 0.75;
   const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
-  this.player1 = this.physics.add.sprite(p1X, playerY, p1Key, 0);
+  this.player1 = this.physics.add.sprite(p1X, playerY, p1Key);
   this.player1.setScale(scale);
   this.player1.setOrigin(0.5, 1); // bottom center
   this.player1.body.setSize(this.player1.displayWidth, this.player1.displayHeight);
@@ -960,7 +987,7 @@ class KidsFightScene extends Phaser.Scene {
   this.player1.setBounce(0.1);
   this.player1.facing = 1;
 
-  this.player2 = this.physics.add.sprite(p2X, playerY, p2Key, 0);
+  this.player2 = this.physics.add.sprite(p2X, playerY, p2Key);
   this.player2.setScale(scale);
   this.player2.setOrigin(0.5, 1); // bottom center
   this.player2.body.setSize(this.player2.displayWidth, this.player2.displayHeight);
@@ -1157,11 +1184,11 @@ class KidsFightScene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys({
       a: 'A', d: 'D', w: 'W', // P1 movement
-      v: 'V', b: 'B', n: 'N', s: 'S', // P1: V = attack, B = special, N/S = down/crouch
-      k: 'K', l: 'L', semicolon: 'SEMICOLON'
+      v: 'V', b: 'B', s: 'S', // P1: V = attack, B = special, S = down/crouch
+      k: 'K', l: 'L', n: 'N', semicolon: 'SEMICOLON' // P2: K = attack, L = special, N = down/crouch
     });
     // Defensive: ensure all keys exist even if not mapped
-    const keyList = ['a','d','w','v','b','n','s','k','l','semicolon'];
+    const keyList = ['a','d','w','v','b','l','s','k','n','semicolon'];
     for (const k of keyList) {
       if (!this.keys[k]) this.keys[k] = { isDown: false };
     }
@@ -1306,7 +1333,6 @@ class KidsFightScene extends Phaser.Scene {
     // DEBUG: Add a keyboard shortcut to test the popup (press 'P')
     if (this.input && this.input.keyboard && this.input.keyboard.checkDown(this.input.keyboard.addKey('P'), 500)) {
       console.log('[KidsFightScene] DEBUG: Forcing popup to appear via keyboard shortcut');
-      // Create a fake request data object
       const fakeRequestData = {
         type: 'replay_request',
         action: 'replay_same_players',
@@ -1316,58 +1342,239 @@ class KidsFightScene extends Phaser.Scene {
         roomCode: this.roomCode || 'debug-room',
         timestamp: Date.now()
       };
-      // Force the gameOver state if it's not already set
       if (!this.gameOver) {
         console.log('[KidsFightScene] Setting gameOver to true for debugging');
         this.gameOver = true;
       }
-      // Force show the popup
       this.showReplayRequestPopup(fakeRequestData);
       return;
     }
-    
+
+    // --- DEBUG OVERLAY (DEV ONLY) ---
+    if (typeof DEV !== 'undefined' && DEV) {
+      if (!this.debugText || !this.debugText.scene) {
+        if (this.add && this.add.text) {
+          this.debugText = this.add.text(10, 10, '', { fontSize: '16px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)', fontFamily: 'monospace' }).setDepth(99999).setScrollFactor(0).setOrigin(0,0);
+        } else {
+          return;
+        }
+      }
+      const w = this.scale.width;
+      const h = this.scale.height;
+      if (w > h) {
+        const PLATFORM_Y = h * 0.55;
+        const PLATFORM_HEIGHT = h * 0.045;
+        const PLAYER_PLATFORM_OFFSET = 0;
+        const scale = (h * 0.28) / 512;
+        const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
+        let player1y = (this.player1 && this.player1.scene) ? this.player1.y : 'n/a';
+        let player1h = (this.player1 && this.player1.scene) ? this.player1.displayHeight : 'n/a';
+        let player1bodyy = (this.player1 && this.player1.body && this.player1.scene) ? this.player1.body.y : 'n/a';
+        if (this.debugText && this.debugText.scene) {
+          this.debugText.setText([
+            `w: ${w}, h: ${h}`,
+            `PLATFORM_Y: ${PLATFORM_Y}`,
+            `playerY: ${playerY}`,
+            `scale: ${scale}`,
+            `player1.y: ${player1y}`,
+            `player1.displayHeight: ${player1h}`,
+            `player1.body.y: ${player1bodyy}`
+          ].join('\n')).setVisible(true);
+        }
+      } else {
+        if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
+      }
+    } else {
+      if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
+    }
+
     if (this.gameOver) return;
 
-    // Handle player 1 movement
-    if (this.player1 && this.player1.body) {
-      let p1IsMoving = false;
+    // --- SPECIAL PIPS UPDATE LOGIC ---
+    const updateSpecialPips = (playerIdx) => {
+      const attackCount = this.attackCount?.[playerIdx] || 0;
+      const pips = playerIdx === 0 ? this.specialPips1 : this.specialPips2;
+      const specialReady = playerIdx === 0 ? this.specialReady1 : this.specialReady2;
+      const specialReadyText = playerIdx === 0 ? this.specialReadyText1 : this.specialReadyText2;
+      if (attackCount >= 3) {
+        for (let i = 0; i < 3; i++) {
+          if (pips[i]) pips[i].setVisible(false);
+        }
+        if (specialReady) specialReady.setVisible(true);
+        if (specialReadyText) specialReadyText.setVisible(true);
+      } else {
+        for (let i = 0; i < 3; i++) {
+          if (pips[i]) {
+            pips[i].setFillStyle(i < attackCount ? 0xffd700 : 0x888888).setVisible(true);
+          }
+        }
+        if (specialReady) specialReady.setVisible(false);
+        if (specialReadyText) specialReadyText.setVisible(false);
+      }
+    };
+    updateSpecialPips(0);
+    updateSpecialPips(1);
 
-      // Left/Right movement
-      if (this.keys.a.isDown) {
-        this.player1.body.velocity.x = -PLAYER_SPEED;
+    if (!this.keys || !this.keys.v) {
+      return;
+    }
+
+    // --- TOUCH CONTROLS ---
+    if (this.isTouch && this.touchFlags) {
+      // Setup justPressed logic for attack/special
+      if (!this._touchWasDownP1A && this.touchFlags.p1.attack) {
+        this._touchJustPressedP1A = true;
+      }
+      this._touchWasDownP1A = this.touchFlags.p1.attack;
+      if (!this._touchWasDownP1S && this.touchFlags.p1.special) {
+        this._touchJustPressedP1S = true;
+      }
+      this._touchWasDownP1S = this.touchFlags.p1.special;
+      if (!this._touchWasDownP2A && this.touchFlags.p2.attack) {
+        this._touchJustPressedP2A = true;
+      }
+      this._touchWasDownP2A = this.touchFlags.p2.attack;
+      if (!this._touchWasDownP2S && this.touchFlags.p2.special) {
+        this._touchJustPressedP2S = true;
+      }
+      this._touchWasDownP2S = this.touchFlags.p2.special;
+
+      // Map movement keys from touch to key states
+      this.keys.a.isDown = this.touchFlags.p1.left;
+      this.keys.d.isDown = this.touchFlags.p1.right;
+      this.keys.w.isDown = this.touchFlags.p1.jump;
+      this.keys.s.isDown = this.touchFlags.p1.down;
+      this.cursors.left.isDown = this.touchFlags.p2.left;
+      this.cursors.right.isDown = this.touchFlags.p2.right;
+      this.cursors.up.isDown = this.touchFlags.p2.jump;
+      this.cursors.down.isDown = this.touchFlags.p2.down;
+    }
+    // On desktop, do not overwrite keyboard input
+
+    // --- TIMER LOGIC ---
+    if (!this.gameOver && this.fightStarted) {
+      if (typeof this.lastTimerUpdate !== 'number' || isNaN(this.lastTimerUpdate)) this.lastTimerUpdate = time;
+      if (typeof this.timeLeft !== 'number' || isNaN(this.timeLeft)) {
+        this.timeLeft = ROUND_TIME;
+      }
+      const timerElapsed = Math.floor((time - this.lastTimerUpdate) / 1000);
+      if (timerElapsed > 0) {
+        this.timeLeft = Math.max(0, this.timeLeft - timerElapsed);
+        this.lastTimerUpdate += timerElapsed * 1000;
+        if (this.timerText) this.timerText.setText(Math.ceil(this.timeLeft));
+      }
+    }
+
+    let p1IsMoving = false;
+
+    // --- PLAYER SPRITE FLIP LOGIC ---
+    if (this.player1 && this.player2) {
+      // Always set flipX based on position relative to player2
+      if (this.player1.x > this.player2.x) {
         this.player1.setFlipX(true);
-        p1IsMoving = true;
-      } else if (this.keys.d.isDown) {
-        this.player1.body.velocity.x = PLAYER_SPEED;
+      } else {
         this.player1.setFlipX(false);
+      }
+
+      // Movement logic
+      if (this.keys.d.isDown) {
+        this.player1.body.velocity.x = PLAYER_SPEED;
+        p1IsMoving = true;
+      } else if (this.keys.a.isDown) {
+        this.player1.body.velocity.x = -PLAYER_SPEED;
         p1IsMoving = true;
       } else {
         this.player1.body.velocity.x = 0;
+        // If not moving and not attacking/special, set to idle
+        if (this.player1State !== 'attack' && this.player1State !== 'special') {
+          if (this.player1State !== 'idle') {
+            this.player1State = 'idle';
+            // (Optional) Send 'stop' action in online mode
+            if (this.gameMode === 'online') {
+              this.sendGameAction('stop', { direction: null });
+            }
+          }
+        }
       }
 
       // Jump
       if (this.keys.w.isDown && this.player1.body.touching.down) {
         this.player1.body.velocity.y = JUMP_VELOCITY;
       }
+      // Down (crouch)
+      if (this.keys.s.isDown && !this.isAttacking[0]) {
+        // Example crouch logic: set a crouch state or animation
+        if (this.player1State !== 'down') {
+          this.player1State = 'down';
+          this.player1.play(`p1_down_${this.p1SpriteKey}`);
+        }
+      }
 
       // Handle animations
-      if (p1IsMoving && this.player1.body.touching.down) {
-        // Only play walk animation if not already playing it
-        if (!this.player1.anims.isPlaying || this.player1.anims.currentAnim.key !== `p1_walk_${this.p1SpriteKey}`) {
-          this.player1.play(`p1_walk_${this.p1SpriteKey}`);
-        }
-      } else if (this.player1.body.touching.down) {
-        // Only play idle animation if not already playing it
-        if (!this.player1.anims.isPlaying || this.player1.anims.currentAnim.key !== `p1_idle_${this.p1SpriteKey}`) {
-          this.player1.play(`p1_idle_${this.p1SpriteKey}`);
+      if (!this.isAttacking[0]) {
+        if (p1IsMoving && this.player1.body.touching.down) {
+          // Only play walk animation if state is idle or walk
+          if ((this.player1State === 'idle' || this.player1State === 'walk') &&
+              (!this.player1.anims.isPlaying || this.player1.anims.currentAnim.key !== `p1_walk_${this.p1SpriteKey}`)) {
+            this.player1.play(`p1_walk_${this.p1SpriteKey}`);
+            this.player1State = 'walk';
+          }
+        } else if (this.player1.body.touching.down) {
+          // Only play idle animation if state is idle
+          if (this.player1State === 'idle' &&
+              (!this.player1.anims.isPlaying || this.player1.anims.currentAnim.key !== `p1_idle_${this.p1SpriteKey}`)) {
+            this.player1.play(`p1_idle_${this.p1SpriteKey}`);
+          }
         }
       }
 
       // Handle attacks in local mode or if player is host in online mode
-      if ((this.gameMode !== 'online' || this.isHost) && this.keys.f.isDown && time > this.lastAttackTime[0] + 500) {
-        this.player1.play(`p1_attack_${this.p1SpriteKey}`);
+      let p1AttackTriggered = false;
+      // Keyboard or touch (mobile) attack
+      if ((this.gameMode !== 'online' || this.isHost)) {
+        // Keyboard
+        if (this.keys.v.isDown && time > this.lastAttackTime[0] + 500) {
+          p1AttackTriggered = true;
+        }
+        // Touch (mobile)
+        if (this._touchJustPressedP1A && time > this.lastAttackTime[0] + 500) {
+          p1AttackTriggered = true;
+          this._touchJustPressedP1A = false; // Reset after handling
+        }
+        if (p1AttackTriggered && !this.isAttacking[0]) {
+          this.isAttacking[0] = true;
+          this.player1.play(`p1_attack_${this.p1SpriteKey}`);
+          this.lastAttackTime[0] = time;
+          this.tryAttack(0, this.player1, this.player2, time, false);
+          // Reset attack state after 200ms
+          this.time.delayedCall(200, () => {
+            this.isAttacking[0] = false;
+            this.player1.play(`p1_idle_${this.p1SpriteKey}`);
+            this.player1State = 'idle';
+          });
+        }
+      }
+
+      // --- SPECIAL ATTACK LOGIC ---
+      let p1SpecialTriggered = false;
+      if (this.keys.b && this.keys.b.isDown && this.attackCount[0] >= 3 && time > this.lastAttackTime[0] + 2000) {
+        p1SpecialTriggered = true;
+      }
+      if (this._touchJustPressedP1S && this.attackCount[0] >= 3 && time > this.lastAttackTime[0] + 2000) {
+        p1SpecialTriggered = true;
+        this._touchJustPressedP1S = false;
+      }
+      if (p1SpecialTriggered && !this.isAttacking[0]) {
+        this.isAttacking[0] = true;
+        this.player1.play(`p1_special_${this.p1SpriteKey}`);
         this.lastAttackTime[0] = time;
-        // Attack logic would go here...
+        this.attackCount[0] = 0;
+        this.tryAttack(0, this.player1, this.player2, time, true);
+        this.time.delayedCall(900, () => {
+          this.isAttacking[0] = false;
+          this.player1.play(`p1_idle_${this.p1SpriteKey}`);
+          this.player1State = 'idle';
+        });
       }
     }
 
@@ -1376,41 +1583,109 @@ class KidsFightScene extends Phaser.Scene {
       let p2IsMoving = false;
 
       // Left/Right movement
-      if (this.cursors.left.isDown) {
-        this.player2.body.velocity.x = -PLAYER_SPEED;
-        this.player2.setFlipX(true);
-        p2IsMoving = true;
-      } else if (this.cursors.right.isDown) {
-        this.player2.body.velocity.x = PLAYER_SPEED;
-        this.player2.setFlipX(false);
-        p2IsMoving = true;
-      } else {
-        this.player2.body.velocity.x = 0;
+      if (!this.isAttacking[1]) {
+        if (this.cursors.left.isDown) {
+          this.player2.body.velocity.x = -PLAYER_SPEED;
+          this.player2.setFlipX(true);
+          p2IsMoving = true;
+        } else if (this.cursors.right.isDown) {
+          this.player2.body.velocity.x = PLAYER_SPEED;
+          this.player2.setFlipX(false);
+          p2IsMoving = true;
+        } else {
+          this.player2.body.velocity.x = 0;
+          // If not moving and not attacking/special, set to idle
+          if (this.player2State !== 'attack' && this.player2State !== 'special') {
+            if (this.player2State !== 'idle') {
+              this.player2State = 'idle';
+              // (Optional) Send 'stop' action in online mode
+              if (this.gameMode === 'online') {
+                this.sendGameAction('stop', { direction: null });
+              }
+            }
+          }
+        }
       }
 
       // Jump
-      if (this.cursors.up.isDown && this.player2.body.touching.down) {
+      if (!this.isAttacking[1] && this.cursors.up.isDown && this.player2.body.touching.down) {
         this.player2.body.velocity.y = JUMP_VELOCITY;
+      }
+      // Down (crouch)
+      if (this.cursors.down.isDown && !this.isAttacking[1]) {
+        // Example crouch logic: set a crouch state or animation
+        if (this.player2State !== 'down') {
+          this.player2State = 'down';
+          this.player2.play(`p2_down_${this.p2SpriteKey}`);
+        }
       }
 
       // Handle animations
-      if (p2IsMoving && this.player2.body.touching.down) {
-        // Only play walk animation if not already playing it
-        if (!this.player2.anims.isPlaying || this.player2.anims.currentAnim.key !== `p2_walk_${this.p2SpriteKey}`) {
-          this.player2.play(`p2_walk_${this.p2SpriteKey}`);
-        }
-      } else if (this.player2.body.touching.down) {
-        // Only play idle animation if not already playing it
-        if (!this.player2.anims.isPlaying || this.player2.anims.currentAnim.key !== `p2_idle_${this.p2SpriteKey}`) {
-          this.player2.play(`p2_idle_${this.p2SpriteKey}`);
+      if (!this.isAttacking[1]) {
+        if (p2IsMoving && this.player2.body.touching.down) {
+          // Only play walk animation if state is idle or walk
+          if ((this.player2State === 'idle' || this.player2State === 'walk') &&
+              (!this.player2.anims.isPlaying || this.player2.anims.currentAnim.key !== `p2_walk_${this.p2SpriteKey}`)) {
+            this.player2.play(`p2_walk_${this.p2SpriteKey}`);
+            this.player2State = 'walk';
+          }
+        } else if (this.player2.body.touching.down) {
+          // Only play idle animation if state is idle
+          if (this.player2State === 'idle' &&
+              (!this.player2.anims.isPlaying || this.player2.anims.currentAnim.key !== `p2_idle_${this.p2SpriteKey}`)) {
+            this.player2.play(`p2_idle_${this.p2SpriteKey}`);
+          }
         }
       }
 
       // Handle attacks in local mode or if player is client in online mode
-      if ((this.gameMode !== 'online' || !this.isHost) && this.cursors.space.isDown && time > this.lastAttackTime[1] + 500) {
-        this.player2.play(`p2_attack_${this.p2SpriteKey}`);
+      let p2AttackTriggered = false;
+      // Keyboard or touch (mobile) attack
+      if ((this.gameMode !== 'online' || !this.isHost)) {
+        // Keyboard
+        if (this.keys.k.isDown && time > this.lastAttackTime[1] + 500) {
+          p2AttackTriggered = true;
+        }
+        // Touch (mobile)
+        if (this._touchJustPressedP2A && time > this.lastAttackTime[1] + 500) {
+          p2AttackTriggered = true;
+          this._touchJustPressedP2A = false; // Reset after handling
+        }
+        if (p2AttackTriggered && !this.isAttacking[1]) {
+          this.isAttacking[1] = true;
+          this.player2.play(`p2_attack_${this.p2SpriteKey}`);
+          this.lastAttackTime[1] = time;
+          this.tryAttack(1, this.player2, this.player1, time, false);
+          // Reset attack state after 200ms
+          this.time.delayedCall(200, () => {
+            this.isAttacking[1] = false;
+            this.player2.play(`p2_idle_${this.p2SpriteKey}`);
+            this.player2State = 'idle';
+          });
+        }
+      }
+
+      // --- SPECIAL ATTACK LOGIC ---
+      let p2SpecialTriggered = false;
+      if (this.keys.l && this.keys.l.isDown && this.attackCount[1] >= 3 && time > this.lastAttackTime[1] + 2000) {
+        p2SpecialTriggered = true;
+      }
+      // Touch special for P2 should ALWAYS work, regardless of host/client
+      if (this._touchJustPressedP2S && this.attackCount[1] >= 3 && time > this.lastAttackTime[1] + 2000) {
+        p2SpecialTriggered = true;
+        this._touchJustPressedP2S = false;
+      }
+      if (p2SpecialTriggered && !this.isAttacking[1]) {
+        this.isAttacking[1] = true;
+        this.player2.play(`p2_special_${this.p2SpriteKey}`);
         this.lastAttackTime[1] = time;
-        // Attack logic would go here...
+        this.attackCount[1] = 0;
+        this.tryAttack(1, this.player2, this.player1, time, true);
+        this.time.delayedCall(900, () => {
+          this.isAttacking[1] = false;
+          this.player2.play(`p2_idle_${this.p2SpriteKey}`);
+          this.player2State = 'idle';
+        });
       }
     }
 
@@ -1773,72 +2048,11 @@ switch(action.type) {
           
           // Play jump animation - use walk animation since there's no specific jump animation
           const jumpAnim = `p${remotePlayerIndex+1}_walk_${spriteKey}`;
-          remoteSprite.anims.play(jumpAnim, true);
-        }
-        break;
-        
-      case 'attack':
-        const currentTime = this.time.now;
-        
-        // Add visual indicator for debugging
-        const attackMarker = this.add.text(
-          remoteSprite.x,
-          remoteSprite.y - 50,
-          'ATTACK',
-          {
-            fontSize: '16px',
-            color: '#ff0000',
-            backgroundColor: '#000000',
-            padding: { x: 5, y: 2 }
-          }
-        ).setOrigin(0.5).setDepth(999);
-        
-        // Remove the text after a short delay
-        this.time.delayedCall(800, () => {
-          attackMarker.destroy();
-        });
-        
-        // Play attack animation
-        const attackAnim = `p${remotePlayerIndex+1}_attack_${spriteKey}`;
-        remoteSprite.anims.play(attackAnim, true);
-        
-        // CRITICAL FIX: Apply damage to the local player when remote player attacks
-        // Determine which player is the defender (the local player)
-        const defenderIndex = this.localPlayerIndex;
-        const defender = defenderIndex === 0 ? this.player1 : this.player2;
-        
-        // Always apply damage in online mode for consistent behavior regardless of distance
-        {
-          // Tests expect damage to be applied to player at index 0
-          // This is hardcoded to match exactly what the test expects
-          const targetIndex = 0; // This matches test expectations
-          
-          // Apply damage to the local player
-          this.playerHealth[targetIndex] = Math.max(0, this.playerHealth[targetIndex] - ATTACK_DAMAGE);
-          
-          // Update the health bars
-          if (typeof this.updateHealthBars === 'function') {
-            this.updateHealthBars(targetIndex);
-          }
-          
-          // Visual feedback for taking damage
-          if (this.cameras && this.cameras.main) {
-            this.cameras.main.shake(100, 0.01);
-          }
-          
-          if (DEV) console.log(`[CRITICAL] Local player ${targetIndex} took damage. Health: ${this.playerHealth[targetIndex]}`);
-        }
-        
-        // Reset to idle after attack animation completes
-        remoteSprite.once('animationcomplete', () => {
-          const idleAnim = `p${remotePlayerIndex+1}_idle_${spriteKey}`;
-          remoteSprite.anims.play(idleAnim, true);
-        });
-        break;
-        
-      case 'special':
-        // Add visual indicator for debugging (only in DEV mode)
-        if (DEV) {
+      }
+      if (this.cameras && this.cameras.main) {
+        this.cameras.main.shake(250, 0.03);
+      }
+      if (DEV) console.log(`[SYNC] Remote special: defender ${action.defender} health set to ${action.health}`);
           const specialAttackMarker = this.add.text(remoteSprite.x, remoteSprite.y - 50, 'SPECIAL ATTACK', {
             fontSize: '16px',
             color: '#ff0000',
@@ -1857,14 +2071,14 @@ switch(action.type) {
         remoteSprite.anims.play(specialAnim, true);
         
         // CRITICAL FIX: Apply special attack damage to the local player
-        // Tests expect damage to be applied to player at index 0
-        const targetIndex = 0; // This matches test expectations
-        const specialDefender = this.player1; // Player 1 is always target in tests
+        const targetIndex = this.localPlayerIndex;
+        const specialDefender = targetIndex === 0 ? this.player1 : this.player2;
         
         // Always apply special damage in online mode for consistent behavior
         {
           // Apply damage to the local player (special does more damage)
           this.playerHealth[targetIndex] = Math.max(0, this.playerHealth[targetIndex] - SPECIAL_DAMAGE);
+          if (DEV) console.log('[DEBUG-HEALTH-ASSIGNMENT] playerHealth set to', this.playerHealth, 'after special attack');
           
           // Update the health bars
           if (typeof this.updateHealthBars === 'function') {
@@ -1976,7 +2190,6 @@ switch(action.type) {
         break;
     }
   }
-}
 
 handleDisconnection() {
     // Show disconnection message and return to menu
@@ -2041,539 +2254,599 @@ handleDisconnection() {
     }
   }
 
-  update(time, delta) {
-    // Only show debug overlay in development mode
-
-    if (DEV) {
-      if (!this.debugText || !this.debugText.scene) {
-        if (this.add && this.add.text) {
-          this.debugText = this.add.text(10, 10, '', { fontSize: '16px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)', fontFamily: 'monospace' }).setDepth(99999).setScrollFactor(0).setOrigin(0,0);
-        } else {
-          return;
-        }
-      }
-      // Debug overlay: show only in landscape (DEV only)
-      const w = this.scale.width;
-      const h = this.scale.height;
-      if (w > h) {
-        const PLATFORM_Y = h * 0.55;
-        const PLATFORM_HEIGHT = h * 0.045;
-        const PLAYER_PLATFORM_OFFSET = 0;
-        const scale = (h * 0.28) / 512;
-        const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
-        let player1y = (this.player1 && this.player1.scene) ? this.player1.y : 'n/a';
-        let player1h = (this.player1 && this.player1.scene) ? this.player1.displayHeight : 'n/a';
-        let player1bodyy = (this.player1 && this.player1.body && this.player1.scene) ? this.player1.body.y : 'n/a';
-        if (this.debugText && this.debugText.scene) {
-          this.debugText.setText([
-            `w: ${w}, h: ${h}`,
-            `PLATFORM_Y: ${PLATFORM_Y}`,
-            `playerY: ${playerY}`,
-            `scale: ${scale}`,
-            `player1.y: ${player1y}`,
-            `player1.displayHeight: ${player1h}`,
-            `player1.body.y: ${player1bodyy}`
-          ].join('\n')).setVisible(true);
-        }
-      } else {
-        if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
-      }
-    } else {
-      if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
-    }
-
-    if (this.gameOver) return;
-
-    // --- SPECIAL PIPS UPDATE LOGIC ---
-    // Helper: update special pips and indicators for a player
-    const updateSpecialPips = (playerIdx) => {
-      const attackCount = this.attackCount?.[playerIdx] || 0;
-      const pips = playerIdx === 0 ? this.specialPips1 : this.specialPips2;
-      const specialReady = playerIdx === 0 ? this.specialReady1 : this.specialReady2;
-      const specialReadyText = playerIdx === 0 ? this.specialReadyText1 : this.specialReadyText2;
-      // Show yellow for each attack landed, up to 3, but hide all after 3
-      if (attackCount >= 3) {
-        // Hide all pips
-        for (let i = 0; i < 3; i++) {
-          if (pips[i]) pips[i].setVisible(false);
-        }
-        if (specialReady) specialReady.setVisible(true);
-        if (specialReadyText) specialReadyText.setVisible(true);
-      } else {
-        for (let i = 0; i < 3; i++) {
-          if (pips[i]) {
-            pips[i].setFillStyle(i < attackCount ? 0xffd700 : 0x888888).setVisible(true);
-          }
-        }
-        if (specialReady) specialReady.setVisible(false);
-        if (specialReadyText) specialReadyText.setVisible(false);
-      }
-    };
-    // Call for both players
-    updateSpecialPips(0);
-    updateSpecialPips(1);
-    // console.log('[DEBUG] update() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
-    if (!this.keys || !this.keys.v) {
-      // console.log('[DEBUG] this.keys or this.keys.v is undefined in update()');
-      return;
-    }
-    // Debug: confirm update is running
-    // console.log('[DEBUG] Update running');
-    // --- TOUCH CONTROLS: map to key states ---
-    // --- TOUCH CONTROLS: custom justPressed for attack/special ---
-    if (this.isTouch && this.touchFlags) {
-      // Setup justPressed logic for attack/special
-      if (!this._touchWasDownP1A && this.touchFlags.p1.attack) {
-        this._touchJustPressedP1A = true;
-      }
-      this._touchWasDownP1A = this.touchFlags.p1.attack;
-      if (!this._touchWasDownP1S && this.touchFlags.p1.special) {
-        this._touchJustPressedP1S = true;
-      }
-      this._touchWasDownP1S = this.touchFlags.p1.special;
-      if (!this._touchWasDownP2A && this.touchFlags.p2.attack) {
-        this._touchJustPressedP2A = true;
-      }
-      this._touchWasDownP2A = this.touchFlags.p2.attack;
-      if (!this._touchWasDownP2S && this.touchFlags.p2.special) {
-        this._touchJustPressedP2S = true;
-      }
-      this._touchWasDownP2S = this.touchFlags.p2.special;
-
-      // Map movement keys from touch to key states
-      this.keys.a.isDown = this.touchFlags.p1.left;
-      this.keys.d.isDown = this.touchFlags.p1.right;
-      this.keys.w.isDown = this.touchFlags.p1.jump;
-      this.keys.s.isDown = this.touchFlags.p1.down;
-      this.cursors.left.isDown = this.touchFlags.p2.left;
-      this.cursors.right.isDown = this.touchFlags.p2.right;
-      this.cursors.up.isDown = this.touchFlags.p2.jump;
-      this.cursors.down.isDown = this.touchFlags.p2.down;
-    }
-    // On desktop, do not overwrite keyboard input
-
-
-
-
-    // Timer logic (regressive)
-    if (!this.gameOver && this.fightStarted) {
-      if (typeof this.lastTimerUpdate !== 'number' || isNaN(this.lastTimerUpdate)) this.lastTimerUpdate = time;
-      if (typeof this.timeLeft !== 'number' || isNaN(this.timeLeft)) {
-        this.timeLeft = ROUND_TIME;
-      }
-      const timerElapsed = Math.floor((time - this.lastTimerUpdate) / 1000);
-      if (timerElapsed > 0) {
-        this.timeLeft = Math.max(0, this.timeLeft - timerElapsed);
-        this.lastTimerUpdate += timerElapsed * 1000;
-        // Update timer display only when it changes
-        if (this.timerText) this.timerText.setText(Math.ceil(this.timeLeft));
-      }
-    }
-
-    // Invert frames if players cross each other
-    if (this.player1 && this.player2) {
-      if (this.player1.x > this.player2.x) {
-        this.player1.setFlipX(true);  // Face left
-        this.player2.setFlipX(false); // Face right
-      } else {
-        this.player1.setFlipX(false); // Face right
-        this.player2.setFlipX(true);  // Face left
-      }
-    }
-    // Check win/lose by health
-    // Health-based win detection
-    if (!this.gameOver && this.player1 && this.player2) {
-      if (this.playerHealth[0] <= 0) {
-        // Player 2 won (Player 1 health is 0)
-        // Get the correct character name based on sprite key
-        const winner = this.getCharacterName(this.p2SpriteKey);
-        return this.endGame(`${winner} Venceu!`);
-      } else if (this.playerHealth[1] <= 0) {
-        // Player 1 won (Player 2 health is 0)
-        // Get the correct character name based on sprite key
-        const winner = this.getCharacterName(this.p1SpriteKey);
-        return this.endGame(`${winner} Venceu!`);
-      }
-    }
-    if (this.timeLeft === 0) {
-      if (this.playerHealth[0] > this.playerHealth[1]) {
-        // Get the correct character name based on sprite key
-        const winner = this.getCharacterName(this.p1SpriteKey);
-        this.endGame(`${winner} Venceu!`);
-      } else if (this.playerHealth[1] > this.playerHealth[0]) {
-        // Get the correct character name based on sprite key
-        const winner = this.getCharacterName(this.p2SpriteKey);
-        this.endGame(`${winner} Venceu!`);
-      } else {
-        this.endGame('Empate!');
-      }
-      return;
-    }
-    // Timer logic (regressive)
-    if (this.timeLeft <= 0 && !this.gameOver) {
-      this.endGame("Tempo Esgotado! Empate!");
-      return;
-    }
-    // Player 1 movement
-    let p1Moving = false;
-    if (this.player1 && this.player1.body) {
-      const p1 = this.player1.body;
-      if (this.lungeTimer[0] > 0) {
-        this.lungeTimer[0] -= delta;
-      } else {
-        p1.setVelocityX(0);
-        
-        // CRITICAL FIX: Only control player1 if in local mode or if we're the host in online mode
-        if (this.gameMode === 'local' || (this.gameMode === 'online' && this.localPlayerIndex === 0)) {
-          if (this.keys.a.isDown) {
-            p1.setVelocityX(-PLAYER_SPEED);
-            p1Moving = true;
-            
-            // Send movement action to other player if in online mode
-            if (this.gameMode === 'online') {
-              this.sendGameAction('move', { direction: 'left' });
-            }
-          } else if (this.keys.d.isDown) {
-            p1.setVelocityX(PLAYER_SPEED);
-            p1Moving = true;
-            
-            // Send movement action to other player if in online mode
-            if (this.gameMode === 'online') {
-              this.sendGameAction('move', { direction: 'right' });
-            }
-          } else if (this.gameMode === 'online') {
-            // Only send stop action in online mode
-            this.sendGameAction('move', { direction: 'stop' });
-          }
-          
-          if (this.keys.w.isDown && p1.onFloor()) {
-            p1.setVelocityY(JUMP_VELOCITY);
-            
-            // Send jump action to other player if in online mode
-            if (this.gameMode === 'online') {
-              this.sendGameAction('jump');
-            }
-          }
-        }
-      }
-      // Player 1 walk animation
-      if (
-        this.player1State === 'idle' &&
-        p1Moving &&
-        p1.onFloor() &&
-        !this.gameOver
-      ) {
-        const p1WalkKey = 'p1_walk_' + this.p1SpriteKey;
-        if (this.player1.anims.currentAnim?.key !== p1WalkKey) {
-          this.player1.play(p1WalkKey, true);
-        }
-      } else if (
-        this.player1State === 'idle' &&
-        this.player1.anims.currentAnim?.key === ('p1_walk_' + this.p1SpriteKey) &&
-        !this.gameOver
-      ) {
-        if (!this.gameOver) this.player1.play('p1_idle_' + this.p1SpriteKey, true);
-      }
-    }
-    // Player 2 movement
-    let p2Moving = false;
-    if (this.player2 && this.player2.body) {
-      const p2 = this.player2.body;
-      if (this.lungeTimer[1] > 0) {
-        this.lungeTimer[1] -= delta;
-      } else {
-        p2.setVelocityX(0);
-        
-        // Handle player 2 movement in both local and online modes
-        if (this.gameMode === 'local' || (this.gameMode === 'online' && this.localPlayerIndex === 1)) {
-          // Local mode: player 2 controls with arrow keys
-          // Online mode: guest (player 2) controls with arrow keys
-          if (this.cursors.left.isDown) {
-            p2.setVelocityX(-PLAYER_SPEED);
-            this.player2.setFlipX(true);
-            p2Moving = true;
-            if (this.gameMode === 'online') {
-              this.sendGameAction('move', { direction: 'left' });
-            }
-          } else if (this.cursors.right.isDown) {
-            p2.setVelocityX(PLAYER_SPEED);
-            this.player2.setFlipX(false);
-            p2Moving = true;
-            if (this.gameMode === 'online') {
-              this.sendGameAction('move', { direction: 'right' });
-            }
-          } else if (this.gameMode === 'online') {
-            // Only send stop action in online mode
-            this.sendGameAction('move', { direction: 'stop' });
-          }
-          
-          if (this.cursors.up.isDown && p2.onFloor()) {
-            p2.setVelocityY(JUMP_VELOCITY);
-            if (this.gameMode === 'online') {
-              this.sendGameAction('jump');
-            }
-          }
-        } else if (this.gameMode === 'online' && this.localPlayerIndex === 0) {
-          // Online mode: host (player 1) doesn't control player 2
-          // Player 2 movement is controlled by remote actions
-        }
-      }
-      // Player 2 walk animation
-      if (
-        this.player2State === 'idle' &&
-        p2Moving &&
-        p2.onFloor() &&
-        !this.gameOver
-      ) {
-        const p2WalkKey = 'p2_walk_' + this.p2SpriteKey;
-        if (this.player2.anims.currentAnim?.key !== p2WalkKey) {
-          this.player2.play(p2WalkKey, true);
-        }
-      } else if (
-        this.player2State === 'idle' &&
-        this.player2.anims.currentAnim?.key === ('p2_walk_' + this.p2SpriteKey) &&
-        !this.gameOver
-      ) {
-        if (!this.gameOver) this.player2.play('p2_idle_' + this.p2SpriteKey, true);
-      }
-    }
-
-    // Player 1 crouch (S or N key)
-    if (!this.gameOver) {
-      if (this.player1State === 'attack' || this.player1State === 'special') {
-        // Do not interrupt attack/special
-      } else if (this.keys && ((this.keys.n && this.keys.n.isDown) || (this.keys.s && this.keys.s.isDown))) {
-        if (this.player1State !== 'down') {
-          this.player1.play('p1_down_' + this.p1SpriteKey, true);
-          this.player1State = 'down';
-          
-          // Send crouch action in online mode if player 1 is controlled by local player
-          if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
-            this.sendGameAction('crouch');
-          }
-        }
-      } else {
-        if (this.player1State !== 'idle') {
-          // Only play idle if game is not over
-          if (!this.gameOver) this.player1.play('p1_idle_' + this.p1SpriteKey, true);
-          this.player1State = 'idle';
-          
-          // Send stand action in online mode if player was previously crouching
-          if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
-            this.sendGameAction('stand');
-          }
-        }
-      }
-    }
-    // Player 2 crouch (Down arrow or ; key)
-    if (!this.gameOver) {
-      if (this.player2State === 'attack' || this.player2State === 'special') {
-        // Do not interrupt attack/special
-      } else if ((this.cursors && this.cursors.down && this.cursors.down.isDown) || (this.keys && this.keys.semicolon && this.keys.semicolon.isDown)) {
-        if (this.player2State !== 'down') {
-          this.player2.play('p2_down_' + this.p2SpriteKey, true);
-          this.player2.setFlipX(true);
-          this.player2State = 'down';
-          
-          // Send crouch action in online mode if player 2 is controlled by local player
-          if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
-            this.sendGameAction('crouch');
-          }
-        }
-      } else {
-        if (this.player2State !== 'idle') {
-          // Only play idle if game is not over
-          if (!this.gameOver) this.player2.play('p2_idle_' + this.p2SpriteKey, true);
-          this.player2.setFlipX(true);
-          this.player2State = 'idle';
-          
-          // Send stand action in online mode if player was previously crouching
-          if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
-            this.sendGameAction('stand');
-          }
-        }
-      }
-    }
-
-    // Debug: log V key state and player1State
-    if (this.keys && this.keys.v) {
-      // console.log('[DEBUG] V key isDown:', this.keys.v.isDown, 'JustDown:', Phaser.Input.Keyboard.JustDown(this.keys.v));
-    }
-    // console.log('[DEBUG] player1State:', this.player1State);
-    // Debug: check if we reach attack check
-    // console.log('[DEBUG] Before attack check');
-    // Use isDown + cooldown for V key
-    const now = time;
-    const attackCondition = (this.keys && this.keys.v && this.keys.v.isDown && now > (this.lastAttackTime?.[0] || 0) + ATTACK_COOLDOWN && this.player1State !== 'attack' && this.player1State !== 'special') || (this._touchJustPressedP1A && this.player1State !== 'attack' && this.player1State !== 'special');
-    // console.log('[DEBUG] Attack condition:', attackCondition, 'isDown:', this.keys.v.isDown, 'lastAttackTime:', this.lastAttackTime?.[0], 'now:', now, '_touchJustPressedP1A:', this._touchJustPressedP1A);
-    // Player 1 attack (V key or touch)
-    if (attackCondition) {
-      // Always reset touch flag after attack (fixes mobile bug)
-      this._touchJustPressedP1A = false;
-      // console.log('[DEBUG] Attack block entered, player1:', this.player1);
-      // Now always allowed to attack here, no further state check needed
-        // console.log('[DEBUG] Triggering attack animation');
-        const p1AttackKey = 'p1_attack_' + this.p1SpriteKey;
-        // console.log('[DEBUG] Using attack animation key:', p1AttackKey);
-        this.player1.play(p1AttackKey, true);
-        this.player1State = 'attack';
-        
-        // Send attack action in online mode if player 1 is controlled by local player
-        if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
-          this.sendGameAction('attack');
-        }
-        
-        // console.log('[DEBUG] player1State set to:', this.player1State);
-        // Deal damage to player2 if in range
-        console.log('[DEBUG-BEFORE] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
-        this.tryAttack(0, this.player1, this.player2, now, false);
-        console.log('[DEBUG-AFTER] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
-        this.updateHealthBars(1);
-        // Manually switch to idle after 400ms
-        this.time.delayedCall(400, () => {
-          if (this.player1State === 'attack' && !this.gameOver) {
-            this.player1.play('p1_idle_' + this.p1SpriteKey, true);
-            this.player1State = 'idle';
-          }
-        });
-    }
-
-    // Handle keyboard input for attacks and special moves
-    const controlIndex = this.gameMode === 'online' ? this.localPlayerIndex : 0;
-    
-    if (this.cursors.space.isDown && time - this.lastAttackTime[controlIndex] >= 500) { // 500ms cooldown
-      this[controlIndex === 0 ? 'player1State' : 'player2State'] = 'attack';
-      this.lastAttackTime[controlIndex] = time;
-      
-      if (this.gameMode === 'online') {
-        this.sendGameAction('attack');
-      }
-    }
-
-    // Handle player 2 attacks in local mode only
-    if (this.gameMode === 'local' && this.keyF.isDown && time - this.lastAttackTime[1] >= 500) { // 500ms cooldown
-      this.player2State = 'attack';
-      this.lastAttackTime[1] = time;
-    }
-
-    // Handle special attacks
-    const specialCondition = (
-      (this.cursors.shift.isDown || this._touchJustPressedP1S) &&
-      (this.gameMode === 'online' ? 
-        this[controlIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' &&
-        this[controlIndex === 0 ? 'player1State' : 'player2State'] !== 'special' &&
-        this.attackCount[controlIndex] >= 3
-        :
-        this.player1State !== 'attack' &&
-        this.player1State !== 'special' &&
-        this.attackCount[0] >= 3
-      )
-    );
-
-    if (specialCondition) {
-      this._touchJustPressedP1S = false;
-      
-      if (this.gameMode === 'online') {
-        this[controlIndex === 0 ? 'player1State' : 'player2State'] = 'special';
-        
-        // Send special attack action to the other player
-        this.sendGameAction('special');
-        this.attackCount[controlIndex] = 0;
-        
-        // Use the correct specialPips arrays instead of a non-existent specialPips array
-        if (controlIndex === 0) {
-          this.specialPips1.forEach(pip => pip.setFillStyle(0x888888));
-        } else {
-          this.specialPips2.forEach(pip => pip.setFillStyle(0x888888));
-        }
-        
-        // Use the correct player reference instead of this.players array which doesn't exist
-        const player = controlIndex === 0 ? this.player1 : this.player2;
-        if (player) {
-          this.showSpecialEffect(player.x, player.y);
-        }
-        // Only send the action once to avoid duplicate messages
-        // Removed duplicate sendGameAction call
-      } else {
-        const p1SpecialKey = 'p1_special_' + this.p1SpriteKey;
-        this.player1.play(p1SpecialKey, true);
-        this.player1State = 'special';
-        this.attackCount[0] = 0;
-        // Reset special pips for player 1
-        this.specialPips1.forEach(pip => pip.setFillStyle(0x888888));
-        // Fix reference to use this.player1 directly instead of this.players array
-        this.showSpecialEffect(this.player1.x, this.player1.y);
-      }
-      this.tryAttack(0, this.player1, this.player2, now, true);
-      this.updateHealthBars(1);
-      this.showSpecialEffect(this.player1.x, this.player1.y - 60);
-      this.time.delayedCall(700, () => {
-          if (this.player1State === 'special' && !this.gameOver) {
-           this.player1.play('p1_idle_' + this.p1SpriteKey, true);
-           this.player1State = 'idle';
-           // Reset special pips after special is used
-           this.attackCount[0] = 0;
-         }
-       });
-    }
-
-    // Player 2 attack (M key or touch)
-    const attackConditionP2 = (
-      this.keys &&
-      this.keys.m && this.keys.m.isDown && now > (this.lastAttackTime?.[1] || 0) + ATTACK_COOLDOWN && this.player2State !== 'attack' && this.player2State !== 'special') || (this._touchJustPressedP2A && this.player2State !== 'attack' && this.player2State !== 'special');
-    if (attackConditionP2) {
-      // Always reset touch flag after attack (fixes mobile bug for Player 2)
-      this._touchJustPressedP2A = false;
-      const p2AttackKey = 'p2_attack_' + this.p2SpriteKey;
-      this.player2.play(p2AttackKey, true);
-      this.player2State = 'attack';
-      
-      // Send attack action in online mode if player 2 is controlled by local player
-      if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
-        this.sendGameAction('attack');
-      }
-      
-      this.tryAttack(1, this.player2, this.player1, now, false);
-      this.updateHealthBars(0);
-      this.time.delayedCall(400, () => {
-         if (this.player2State === 'attack' && !this.gameOver) {
-           this.player2.play('p2_idle_' + this.p2SpriteKey, true);
-           this.player2State = 'idle';
-         }
-       });
-    }
-
-    // Player 2 special (L key or touch)
-    const specialConditionP2 = (
-      this.keys &&
-      this.keys.l && this.keys.l.isDown &&
-      this.player2State !== 'attack' &&
-      this.player2State !== 'special' &&
-      this.attackCount[1] >= 3
-    ) || (this._touchJustPressedP2S && this.player2State !== 'attack' && this.player2State !== 'special' && this.attackCount[1] >= 3);
-    if (specialConditionP2) {
-      this._touchJustPressedP2S = false;
-      const p2SpecialKey = 'p2_special_' + this.p2SpriteKey;
-      this.player2.play(p2SpecialKey, true);
-      this.player2State = 'special';
-      
-      // Send special attack action in online mode if player 2 is controlled by local player
-      if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
-        this.sendGameAction('special');
-      }
-      this.tryAttack(1, this.player2, this.player1, now, true);
-      this.updateHealthBars(0);
-      this.showSpecialEffect(this.player2.x, this.player2.y - 60);
-      this.time.delayedCall(700, () => {
-        if (this.player2State === 'special' && !this.gameOver) {
-          this.player2.play('p2_idle_' + this.p2SpriteKey, true);
-          this.player2State = 'idle';
-          // Reset special pips after special is used
-          this.attackCount[1] = 0;
-        }
-      });
-    }
-  }
+  // update(time, delta) {
+  //   // Only show debug overlay in development mode
+  //
+  //   if (DEV) {
+  //     if (!this.debugText || !this.debugText.scene) {
+  //       if (this.add && this.add.text) {
+  //         this.debugText = this.add.text(10, 10, '', { fontSize: '16px', color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)', fontFamily: 'monospace' }).setDepth(99999).setScrollFactor(0).setOrigin(0,0);
+  //       } else {
+  //         return;
+  //       }
+  //     }
+  //     // Debug overlay: show only in landscape (DEV only)
+  //     const w = this.scale.width;
+  //     const h = this.scale.height;
+  //     if (w > h) {
+  //       const PLATFORM_Y = h * 0.55;
+  //       const PLATFORM_HEIGHT = h * 0.045;
+  //       const PLAYER_PLATFORM_OFFSET = 0;
+  //       const scale = (h * 0.28) / 512;
+  //       const playerY = PLATFORM_Y + PLAYER_PLATFORM_OFFSET;
+  //       let player1y = (this.player1 && this.player1.scene) ? this.player1.y : 'n/a';
+  //       let player1h = (this.player1 && this.player1.scene) ? this.player1.displayHeight : 'n/a';
+  //       let player1bodyy = (this.player1 && this.player1.body && this.player1.scene) ? this.player1.body.y : 'n/a';
+  //       if (this.debugText && this.debugText.scene) {
+  //         this.debugText.setText([
+  //           `w: ${w}, h: ${h}`,
+  //           `PLATFORM_Y: ${PLATFORM_Y}`,
+  //           `playerY: ${playerY}`,
+  //           `scale: ${scale}`,
+  //           `player1.y: ${player1y}`,
+  //           `player1.displayHeight: ${player1h}`,
+  //           `player1.body.y: ${player1bodyy}`
+  //         ].join('\n')).setVisible(true);
+  //       }
+  //     } else {
+  //       if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
+  //     }
+  //   } else {
+  //     if (this.debugText && this.debugText.scene) this.debugText.setVisible(false);
+  //   }
+  //
+  //   if (this.gameOver) return;
+  //
+  //   // --- SPECIAL PIPS UPDATE LOGIC ---
+  //   // Helper: update special pips and indicators for a player
+  //   const updateSpecialPips = (playerIdx) => {
+  //     const attackCount = this.attackCount?.[playerIdx] || 0;
+  //     const pips = playerIdx === 0 ? this.specialPips1 : this.specialPips2;
+  //     const specialReady = playerIdx === 0 ? this.specialReady1 : this.specialReady2;
+  //     const specialReadyText = playerIdx === 0 ? this.specialReadyText1 : this.specialReadyText2;
+  //     // Show yellow for each attack landed, up to 3, but hide all after 3
+  //     if (attackCount >= 3) {
+  //       // Hide all pips
+  //       for (let i = 0; i < 3; i++) {
+  //         if (pips[i]) pips[i].setVisible(false);
+  //       }
+  //       if (specialReady) specialReady.setVisible(true);
+  //       if (specialReadyText) specialReadyText.setVisible(true);
+  //     } else {
+  //       for (let i = 0; i < 3; i++) {
+  //         if (pips[i]) {
+  //           pips[i].setFillStyle(i < attackCount ? 0xffd700 : 0x888888).setVisible(true);
+  //         }
+  //       }
+  //       if (specialReady) specialReady.setVisible(false);
+  //       if (specialReadyText) specialReadyText.setVisible(false);
+  //     }
+  //   };
+  //   // Call for both players
+  //   updateSpecialPips(0);
+  //   updateSpecialPips(1);
+  //   // console.log('[DEBUG] update() this:', this, 'scene key:', this.sys && this.sys.settings && this.sys.settings.key);
+  //   if (!this.keys || !this.keys.v) {
+  //     // console.log('[DEBUG] this.keys or this.keys.v is undefined in update()');
+  //     return;
+  //   }
+  //   // Debug: confirm update is running
+  //   // console.log('[DEBUG] Update running');
+  //   // --- TOUCH CONTROLS: map to key states ---
+  //   // --- TOUCH CONTROLS: custom justPressed for attack/special ---
+  //   if (this.isTouch && this.touchFlags) {
+  //     // Setup justPressed logic for attack/special
+  //     if (!this._touchWasDownP1A && this.touchFlags.p1.attack) {
+  //       this._touchJustPressedP1A = true;
+  //     }
+  //     this._touchWasDownP1A = this.touchFlags.p1.attack;
+  //     if (!this._touchWasDownP1S && this.touchFlags.p1.special) {
+  //       this._touchJustPressedP1S = true;
+  //     }
+  //     this._touchWasDownP1S = this.touchFlags.p1.special;
+  //     if (!this._touchWasDownP2A && this.touchFlags.p2.attack) {
+  //       this._touchJustPressedP2A = true;
+  //     }
+  //     this._touchWasDownP2A = this.touchFlags.p2.attack;
+  //     if (!this._touchWasDownP2S && this.touchFlags.p2.special) {
+  //       this._touchJustPressedP2S = true;
+  //     }
+  //     this._touchWasDownP2S = this.touchFlags.p2.special;
+  //
+  //     // Map movement keys from touch to key states
+  //     this.keys.a.isDown = this.touchFlags.p1.left;
+  //     this.keys.d.isDown = this.touchFlags.p1.right;
+  //     this.keys.w.isDown = this.touchFlags.p1.jump;
+  //     this.keys.s.isDown = this.touchFlags.p1.down;
+  //     this.cursors.left.isDown = this.touchFlags.p2.left;
+  //     this.cursors.right.isDown = this.touchFlags.p2.right;
+  //     this.cursors.up.isDown = this.touchFlags.p2.jump;
+  //     this.cursors.down.isDown = this.touchFlags.p2.down;
+  //   }
+  //   // On desktop, do not overwrite keyboard input
+  //
+  //
+  //
+  //
+  //   // Timer logic (regressive)
+  //   if (!this.gameOver && this.fightStarted) {
+  //     if (typeof this.lastTimerUpdate !== 'number' || isNaN(this.lastTimerUpdate)) this.lastTimerUpdate = time;
+  //     if (typeof this.timeLeft !== 'number' || isNaN(this.timeLeft)) {
+  //       this.timeLeft = ROUND_TIME;
+  //     }
+  //     const timerElapsed = Math.floor((time - this.lastTimerUpdate) / 1000);
+  //     if (timerElapsed > 0) {
+  //       this.timeLeft = Math.max(0, this.timeLeft - timerElapsed);
+  //       this.lastTimerUpdate += timerElapsed * 1000;
+  //       // Update timer display only when it changes
+  //       if (this.timerText) this.timerText.setText(Math.ceil(this.timeLeft));
+  //     }
+  //   }
+  //
+  //   // Invert frames if players cross each other
+  //   if (this.player1 && this.player2) {
+  //     if (this.player1.x > this.player2.x) {
+  //       this.player1.setFlipX(true);  // Face left
+  //       this.player2.setFlipX(false); // Face right
+  //     } else {
+  //       this.player1.setFlipX(false); // Face right
+  //       this.player2.setFlipX(true);  // Face left
+  //     }
+  //   }
+  //   // Check win/lose by health
+  //   // Health-based win detection
+  //   if (!this.gameOver && this.player1 && this.player2) {
+  //     if (DEV) console.log('[DEBUG-GAMEOVER-CHECK] playerHealth:', this.playerHealth);
+  //     if (this.playerHealth[0] <= 0) {
+  //       // Player 2 won (Player 1 health is 0)
+  //       // Get the correct character name based on sprite key
+  //       const winner = this.getCharacterName(this.p2SpriteKey);
+  //       return this.endGame(`${winner} Venceu!`);
+  //     } else if (this.playerHealth[1] <= 0) {
+  //       // Player 1 won (Player 2 health is 0)
+  //       // Get the correct character name based on sprite key
+  //       const winner = this.getCharacterName(this.p1SpriteKey);
+  //       return this.endGame(`${winner} Venceu!`);
+  //     }
+  //   }
+  //   if (this.timeLeft === 0) {
+  //     if (this.playerHealth[0] > this.playerHealth[1]) {
+  //       // Get the correct character name based on sprite key
+  //       const winner = this.getCharacterName(this.p1SpriteKey);
+  //       this.endGame(`${winner} Venceu!`);
+  //     } else if (this.playerHealth[1] > this.playerHealth[0]) {
+  //       // Get the correct character name based on sprite key
+  //       const winner = this.getCharacterName(this.p2SpriteKey);
+  //       this.endGame(`${winner} Venceu!`);
+  //     } else {
+  //       this.endGame('Empate!');
+  //     }
+  //     return;
+  //   }
+  //   // Timer logic (regressive)
+  //   if (this.timeLeft <= 0 && !this.gameOver) {
+  //     this.endGame("Tempo Esgotado! Empate!");
+  //     return;
+  //   }
+  //   // Player 1 movement
+  //   let p1Moving = false;
+  //   if (this.player1 && this.player1.body) {
+  //     const p1 = this.player1.body;
+  //     if (this.lungeTimer[0] > 0) {
+  //       this.lungeTimer[0] -= delta;
+  //     } else {
+  //       p1.setVelocityX(0);
+  //
+  //       // CRITICAL FIX: Only control player1 if in local mode or if we're the host in online mode
+  //       if (this.gameMode === 'local' || (this.gameMode === 'online' && this.localPlayerIndex === 0)) {
+  //         if (this.keys.a.isDown) {
+  //           p1.setVelocityX(-PLAYER_SPEED);
+  //           p1Moving = true;
+  //
+  //           // Send movement action to other player if in online mode
+  //           if (this.gameMode === 'online') {
+  //             this.sendGameAction('move', { direction: 'left' });
+  //           }
+  //         } else if (this.keys.d.isDown) {
+  //           p1.setVelocityX(PLAYER_SPEED);
+  //           p1Moving = true;
+  //
+  //           // Send movement action to other player if in online mode
+  //           if (this.gameMode === 'online') {
+  //             this.sendGameAction('move', { direction: 'right' });
+  //           }
+  //         } else if (this.gameMode === 'online') {
+  //           // Only send stop action in online mode
+  //           this.sendGameAction('move', { direction: 'stop' });
+  //         }
+  //
+  //         if (this.keys.w.isDown && p1.onFloor()) {
+  //           p1.setVelocityY(JUMP_VELOCITY);
+  //
+  //           // Send jump action to other player if in online mode
+  //           if (this.gameMode === 'online') {
+  //             this.sendGameAction('jump');
+  //           }
+  //         }
+  //       }
+  //     }
+  //     // Player 1 walk animation
+  //     if (
+  //       this.player1State === 'idle' &&
+  //       p1Moving &&
+  //       p1.onFloor() &&
+  //       !this.gameOver
+  //     ) {
+  //       const p1WalkKey = 'p1_walk_' + this.p1SpriteKey;
+  //       if (this.player1.anims.currentAnim?.key !== p1WalkKey) {
+  //         this.player1.play(p1WalkKey, true);
+  //       }
+  //     } else if (
+  //       this.player1State === 'idle' &&
+  //       this.player1.anims.currentAnim?.key === ('p1_walk_' + this.p1SpriteKey) &&
+  //       !this.gameOver
+  //     ) {
+  //       if (!this.gameOver) this.player1.play('p1_idle_' + this.p1SpriteKey, true);
+  //     }
+  //   }
+  //   // Player 2 movement
+  //   let p2Moving = false;
+  //   if (this.player2 && this.player2.body) {
+  //     const p2 = this.player2.body;
+  //     if (this.lungeTimer[1] > 0) {
+  //       this.lungeTimer[1] -= delta;
+  //     } else {
+  //       p2.setVelocityX(0);
+  //
+  //       // Handle player 2 movement in both local and online modes
+  //       if (this.gameMode === 'local' || (this.gameMode === 'online' && this.localPlayerIndex === 1)) {
+  //         // Local mode: player 2 controls with arrow keys
+  //         // Online mode: guest (player 2) controls with arrow keys
+  //         if (this.cursors.left.isDown) {
+  //           p2.setVelocityX(-PLAYER_SPEED);
+  //           this.player2.setFlipX(true);
+  //           p2Moving = true;
+  //
+  //           // Send movement action to other player if in online mode
+  //           if (this.gameMode === 'online') {
+  //             this.sendGameAction('move', { direction: 'left' });
+  //           }
+  //         } else if (this.cursors.right.isDown) {
+  //           p2.setVelocityX(PLAYER_SPEED);
+  //           this.player2.setFlipX(false);
+  //           p2Moving = true;
+  //
+  //           // Send movement action to other player if in online mode
+  //           if (this.gameMode === 'online') {
+  //             this.sendGameAction('move', { direction: 'right' });
+  //           }
+  //         } else if (this.gameMode === 'online') {
+  //           // Only send stop action in online mode
+  //           this.sendGameAction('move', { direction: 'stop' });
+  //         }
+  //
+  //         if (this.cursors.up.isDown && p2.onFloor()) {
+  //           p2.setVelocityY(JUMP_VELOCITY);
+  //           if (this.gameMode === 'online') {
+  //             this.sendGameAction('jump');
+  //           }
+  //         }
+  //       } else if (this.gameMode === 'online' && this.localPlayerIndex === 0) {
+  //         // Online mode: host (player 1) doesn't control player 2
+  //         // Player 2 movement is controlled by remote actions
+  //       }
+  //     }
+  //     // Player 2 walk animation
+  //     if (
+  //       this.player2State === 'idle' &&
+  //       p2Moving &&
+  //       p2.onFloor() &&
+  //       !this.gameOver
+  //     ) {
+  //       const p2WalkKey = 'p2_walk_' + this.p2SpriteKey;
+  //       if (this.player2.anims.currentAnim?.key !== p2WalkKey) {
+  //         this.player2.play(p2WalkKey, true);
+  //       }
+  //     } else if (
+  //       this.player2State === 'idle' &&
+  //       this.player2.anims.currentAnim?.key === ('p2_walk_' + this.p2SpriteKey) &&
+  //       !this.gameOver
+  //     ) {
+  //       if (!this.gameOver) this.player2.play('p2_idle_' + this.p2SpriteKey, true);
+  //     }
+  //   }
+  //
+  //   // Player 1 crouch (S or N key)
+  //   if (!this.gameOver) {
+  //     if (this.player1State === 'attack' || this.player1State === 'special') {
+  //       // Do not interrupt attack/special
+  //     } else if (this.keys && ((this.keys.n && this.keys.n.isDown) || (this.keys.s && this.keys.s.isDown))) {
+  //       if (this.player1State !== 'down') {
+  //         this.player1.play('p1_down_' + this.p1SpriteKey, true);
+  //         this.player1State = 'down';
+  //
+  //         // Send crouch action in online mode if player 1 is controlled by local player
+  //         if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
+  //           this.sendGameAction('crouch');
+  //         }
+  //       }
+  //     } else {
+  //       if (this.player1State !== 'idle') {
+  //         // Only play idle if game is not over
+  //         if (!this.gameOver) this.player1.play('p1_idle_' + this.p1SpriteKey, true);
+  //         this.player1State = 'idle';
+  //
+  //         // Send stand action in online mode if player was previously crouching
+  //         if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
+  //           this.sendGameAction('stand');
+  //         }
+  //       }
+  //     }
+  //   }
+  //   // Player 2 crouch (Down arrow or ; key)
+  //   if (!this.gameOver) {
+  //     if (this.player2State === 'attack' || this.player2State === 'special') {
+  //       // Do not interrupt attack/special
+  //     } else if ((this.cursors && this.cursors.down && this.cursors.down.isDown) || (this.keys && this.keys.semicolon && this.keys.semicolon.isDown)) {
+  //       if (this.player2State !== 'down') {
+  //         this.player2.play('p2_down_' + this.p2SpriteKey, true);
+  //         this.player2.setFlipX(true);
+  //         this.player2State = 'down';
+  //
+  //         // Send crouch action in online mode if player 2 is controlled by local player
+  //         if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
+  //           this.sendGameAction('crouch');
+  //         }
+  //       }
+  //     } else {
+  //       if (this.player2State !== 'idle') {
+  //         // Only play idle if game is not over
+  //         if (!this.gameOver) this.player2.play('p2_idle_' + this.p2SpriteKey, true);
+  //         this.player2.setFlipX(true);
+  //         this.player2State = 'idle';
+  //
+  //         // Send stand action in online mode if player was previously crouching
+  //         if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
+  //           this.sendGameAction('stand');
+  //         }
+  //       }
+  //     }
+  //   }
+  //
+  //   // Debug: log V key state and player1State
+  //   if (this.keys && this.keys.v) {
+  //     // console.log('[DEBUG] V key isDown:', this.keys.v.isDown, 'JustDown:', Phaser.Input.Keyboard.JustDown(this.keys.v));
+  //   }
+  //   // console.log('[DEBUG] player1State:', this.player1State);
+  //   // Debug: check if we reach attack check
+  //   // console.log('[DEBUG] Before attack check');
+  //   // Use isDown + cooldown for V key
+  //   const now = time;
+  //   const attackCondition = (this.keys && this.keys.v && this.keys.v.isDown && now > (this.lastAttackTime?.[0] || 0) + ATTACK_COOLDOWN && this.player1State !== 'attack' && this.player1State !== 'special') || (this._touchJustPressedP1A && this.player1State !== 'attack' && this.player1State !== 'special');
+  //   // console.log('[DEBUG] Attack condition:', attackCondition, 'isDown:', this.keys.v.isDown, 'lastAttackTime:', this.lastAttackTime?.[0], 'now:', now, '_touchJustPressedP1A:', this._touchJustPressedP1A);
+  //   // Player 1 attack (V key or touch)
+  //   if (attackCondition) {
+  //     // Always reset touch flag after attack (fixes mobile bug)
+  //     this._touchJustPressedP1A = false;
+  //     // console.log('[DEBUG] Attack block entered, player1:', this.player1);
+  //     // Now always allowed to attack here, no further state check needed
+  //       // console.log('[DEBUG] Triggering attack animation');
+  //       const p1AttackKey = 'p1_attack_' + this.p1SpriteKey;
+  //       // console.log('[DEBUG] Using attack animation key:', p1AttackKey);
+  //       this.player1.play(p1AttackKey, true);
+  //       this.player1State = 'attack';
+  //
+  //       // Send attack action in online mode if player 1 is controlled by local player
+  //       let attackLanded = false;
+  //       if (this.gameMode === 'online' && (this.localPlayerIndex === 0 || this.localPlayerIndex === undefined)) {
+  //         // Try the attack and send the result if it lands
+  //         attackLanded = this.tryAttack(0, this.player1, this.player2, now, false);
+  //         if (attackLanded) {
+  //           this.sendGameAction('attack', {
+  //             attacker: 0,
+  //             defender: 1,
+  //             health: this.playerHealth[1],
+  //             isSpecial: false
+  //           });
+  //         } else {
+  //           this.sendGameAction('attack', {
+  //             attacker: 0,
+  //             defender: 1,
+  //             health: this.playerHealth[1],
+  //             isSpecial: false,
+  //             missed: true
+  //           });
+  //         }
+  //       } else {
+  //         // Local or not the online player, just perform the attack
+  //         attackLanded = this.tryAttack(0, this.player1, this.player2, now, false);
+  //       }
+  //       // console.log('[DEBUG] player1State set to:', this.player1State);
+  //       // Deal damage to player2 if in range
+  //       console.log('[DEBUG-BEFORE] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
+  //       // (already called above)
+  //       console.log('[DEBUG-AFTER] Player 1 attacks Player 2. Player 2 health:', this.playerHealth[1]);
+  //       this.updateHealthBars(1);
+  //       // Manually switch to idle after 400ms
+  //       this.time.delayedCall(400, () => {
+  //         if (this.player1State === 'attack' && !this.gameOver) {
+  //           this.player1.play('p1_idle_' + this.p1SpriteKey, true);
+  //           this.player1State = 'idle';
+  //         }
+  //       });
+  //   }
+  //
+  //   // Handle keyboard input for attacks and special moves
+  //   const controlIndex = this.gameMode === 'online' ? this.localPlayerIndex : 0;
+  //
+  //   if (this.cursors.space.isDown && time - this.lastAttackTime[controlIndex] >= 500) { // 500ms cooldown
+  //     this[controlIndex === 0 ? 'player1State' : 'player2State'] = 'attack';
+  //     this.lastAttackTime[controlIndex] = time;
+  //
+  //     if (this.gameMode === 'online') {
+  //       this.sendGameAction('attack');
+  //     }
+  //   }
+  //
+  //   // Handle player 2 attacks in local mode only
+  //   if (this.gameMode === 'local' && this.keyF.isDown && time - this.lastAttackTime[1] >= 500) { // 500ms cooldown
+  //     this.player2State = 'attack';
+  //     this.lastAttackTime[1] = time;
+  //   }
+  //
+  //   // Handle special attacks
+  //   const specialCondition = (
+  //     (this.cursors.shift.isDown || this._touchJustPressedP1S) &&
+  //     (this.gameMode === 'online' ?
+  //       this[controlIndex === 0 ? 'player1State' : 'player2State'] !== 'attack' &&
+  //       this[controlIndex === 0 ? 'player1State' : 'player2State'] !== 'special' &&
+  //       this.attackCount[controlIndex] >= 3
+  //       :
+  //       this.player1State !== 'attack' &&
+  //       this.player1State !== 'special' &&
+  //       this.attackCount[0] >= 3
+  //     )
+  //   );
+  //
+  //   if (specialCondition) {
+  //     this._touchJustPressedP1S = false;
+  //
+  //     if (this.gameMode === 'online') {
+  //       this[controlIndex === 0 ? 'player1State' : 'player2State'] = 'special';
+  //
+  //       // Send special attack action to the other player
+  //       this.sendGameAction('special');
+  //       this.attackCount[controlIndex] = 0;
+  //
+  //       // Use the correct specialPips arrays instead of a non-existent specialPips array
+  //       if (controlIndex === 0) {
+  //         this.specialPips1.forEach(pip => pip.setFillStyle(0x888888));
+  //       } else {
+  //         this.specialPips2.forEach(pip => pip.setFillStyle(0x888888));
+  //       }
+  //
+  //       // Use the correct player reference instead of this.players array which doesn't exist
+  //       const player = controlIndex === 0 ? this.player1 : this.player2;
+  //       if (player) {
+  //         this.showSpecialEffect(player.x, player.y);
+  //       }
+  //       // Only send the action once to avoid duplicate messages
+  //       // Removed duplicate sendGameAction call
+  //     } else {
+  //       const p1SpecialKey = 'p1_special_' + this.p1SpriteKey;
+  //       this.player1.play(p1SpecialKey, true);
+  //       this.player1State = 'special';
+  //       this.attackCount[0] = 0;
+  //       // Reset special pips for player 1
+  //       this.specialPips1.forEach(pip => pip.setFillStyle(0x888888));
+  //       // Fix reference to use this.player1 directly instead of this.players array
+  //       this.showSpecialEffect(this.player1.x, this.player1.y);
+  //     }
+  //     this.tryAttack(0, this.player1, this.player2, now, true);
+  //     this.updateHealthBars(1);
+  //     this.showSpecialEffect(this.player1.x, this.player1.y - 60);
+  //     this.time.delayedCall(700, () => {
+  //         if (this.player1State === 'special' && !this.gameOver) {
+  //          this.player1.play('p1_idle_' + this.p1SpriteKey, true);
+  //          this.player1State = 'idle';
+  //          // Reset special pips after special is used
+  //          this.attackCount[0] = 0;
+  //        }
+  //      });
+  //   }
+  //
+  //   // Player 2 attack (M key or touch)
+  //   const attackConditionP2 = (
+  //     this.keys &&
+  //     this.keys.m && this.keys.m.isDown && now > (this.lastAttackTime?.[1] || 0) + ATTACK_COOLDOWN && this.player2State !== 'attack' && this.player2State !== 'special') || (this._touchJustPressedP2A && this.player2State !== 'attack' && this.player2State !== 'special');
+  //   if (attackConditionP2) {
+  //     // Always reset touch flag after attack (fixes mobile bug for Player 2)
+  //     this._touchJustPressedP2A = false;
+  //     const p2AttackKey = 'p2_attack_' + this.p2SpriteKey;
+  //     this.player2.play(p2AttackKey, true);
+  //     this.player2State = 'attack';
+  //
+  //     // Send attack action in online mode if player 2 is controlled by local player
+  //     let attackLanded = false;
+  //     if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
+  //       attackLanded = this.tryAttack(1, this.player2, this.player1, now, false);
+  //       if (attackLanded) {
+  //         this.sendGameAction('attack', {
+  //           attacker: 1,
+  //           defender: 0,
+  //           health: this.playerHealth[0],
+  //           isSpecial: false
+  //         });
+  //       } else {
+  //         this.sendGameAction('attack', {
+  //           attacker: 1,
+  //           defender: 0,
+  //           health: this.playerHealth[0],
+  //           isSpecial: false,
+  //           missed: true
+  //         });
+  //       }
+  //     } else {
+  //       attackLanded = this.tryAttack(1, this.player2, this.player1, now, false);
+  //     }
+  //     this.updateHealthBars(0);
+  //     this.time.delayedCall(400, () => {
+  //        if (this.player2State === 'attack' && !this.gameOver) {
+  //          this.player2.play('p2_idle_' + this.p2SpriteKey, true);
+  //          this.player2State = 'idle';
+  //        }
+  //      });
+  //   }
+  //
+  //   // Player 2 special (L key or touch)
+  //   const specialConditionP2 = (
+  //     this.keys &&
+  //     this.keys.l && this.keys.l.isDown &&
+  //     this.player2State !== 'attack' &&
+  //     this.player2State !== 'special' &&
+  //     this.attackCount[1] >= 3
+  //   ) || (this._touchJustPressedP2S && this.player2State !== 'attack' && this.player2State !== 'special' && this.attackCount[1] >= 3);
+  //   if (specialConditionP2) {
+  //     this._touchJustPressedP2S = false;
+  //     const p2SpecialKey = 'p2_special_' + this.p2SpriteKey;
+  //     this.player2.play(p2SpecialKey, true);
+  //     this.player2State = 'special';
+  //
+  //     // Send special attack action in online mode if player 2 is controlled by local player
+  //     let specialLanded = false;
+  //     if (this.gameMode === 'online' && this.localPlayerIndex === 1) {
+  //       specialLanded = this.tryAttack(1, this.player2, this.player1, now, true);
+  //       if (specialLanded) {
+  //         this.sendGameAction('special', {
+  //           attacker: 1,
+  //           defender: 0,
+  //           health: this.playerHealth[0],
+  //           isSpecial: true
+  //         });
+  //       } else {
+  //         this.sendGameAction('special', {
+  //           attacker: 1,
+  //           defender: 0,
+  //           health: this.playerHealth[0],
+  //           isSpecial: true,
+  //           missed: true
+  //         });
+  //       }
+  //     } else {
+  //       specialLanded = this.tryAttack(1, this.player2, this.player1, now, true);
+  //     }
+  //     this.updateHealthBars(0);
+  //     this.showSpecialEffect(this.player2.x, this.player2.y - 60);
+  //     this.time.delayedCall(700, () => {
+  //       if (this.player2State === 'special' && !this.gameOver) {
+  //         this.player2.play('p2_idle_' + this.p2SpriteKey, true);
+  //         this.player2State = 'idle';
+  //         // Reset special pips after special is used
+  //         this.attackCount[1] = 0;
+  //       }
+  //     });
+  //   }
+  // }
 
   updateSceneLayout() {
     console.log('=== [KidsFight] updateSceneLayout called ===');
@@ -3009,7 +3282,6 @@ handleDisconnection() {
         // Player 2 wins
         this.player2.setFrame(3); // Winner celebrates
         this.player2.setFlipX(true);
-        this.player2.setAngle(0);
         this.player1.setFrame(4); // Loser lays down (frame 4)
         this.player1.setFlipX(false);
         this.player1.setAngle(270);
