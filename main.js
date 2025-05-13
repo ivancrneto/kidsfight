@@ -1,3 +1,10 @@
+// DIAGNOSTIC: Unique build marker
+window.KIDSFIGHT_BUILD_ID = 'prod-test-' + Date.now();
+console.log('KIDSFIGHT_BUILD_ID:', window.KIDSFIGHT_BUILD_ID);
+
+// DIAGNOSTIC: Log NODE_ENV at runtime
+console.log('process.env.NODE_ENV:', process.env.NODE_ENV);
+
 // Utility: Mobile and orientation detection
 function isMobile() {
   return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
@@ -168,6 +175,11 @@ const config = {
     autoCenter: Phaser.Scale.CENTER_BOTH
   }
 };
+
+import { DEV } from './globals.js';
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('DEV:', DEV);
+window.DEV = DEV;
 
 window.onload = () => {
   // Set initial size to fit screen

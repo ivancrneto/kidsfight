@@ -1,9 +1,10 @@
 // D.Isa player patch script
 // This script adds D.Isa as a playable character and ensures proper WebSocket integration for online mode
 
+import { DEV } from './globals.js';
 // Wait for the game to initialize
 window.addEventListener('load', function() {
-  console.log('[D.Isa Patch] Initializing D.Isa character patch');
+  if (DEV) console.log('[D.Isa Patch] Initializing D.Isa character patch');
   
   // Wait for the game to be fully loaded
   const checkInterval = setInterval(function() {
@@ -14,17 +15,17 @@ window.addEventListener('load', function() {
       );
       
       if (playerSelectScene) {
-        console.log('[D.Isa Patch] PlayerSelectScene found, adding D.Isa character');
+        if (DEV) console.log('[D.Isa Patch] PlayerSelectScene found, adding D.Isa character');
         clearInterval(checkInterval);
         
         // Add D.Isa to CHARACTER_KEYS if not already present
         if (playerSelectScene.CHARACTER_KEYS && !playerSelectScene.CHARACTER_KEYS.includes('player9')) {
           playerSelectScene.CHARACTER_KEYS.push('player9');
-          console.log('[D.Isa Patch] Added player9 to CHARACTER_KEYS:', playerSelectScene.CHARACTER_KEYS);
+          if (DEV) console.log('[D.Isa Patch] Added player9 to CHARACTER_KEYS:', playerSelectScene.CHARACTER_KEYS);
           
           // Patch the WebSocket manager to handle player9 correctly
           if (window.wsManager) {
-            console.log('[D.Isa Patch] Patching WebSocket manager for online mode');
+            if (DEV) console.log('[D.Isa Patch] Patching WebSocket manager for online mode');
             
             // Store the original onmessage handler
             const originalOnMessage = window.wsManager.ws ? window.wsManager.ws.onmessage : null;
@@ -37,11 +38,11 @@ window.addEventListener('load', function() {
                   
                   // Handle character selection messages
                   if (data.type === 'character_selected') {
-                    console.log('[D.Isa Patch] Received character selection via WebSocket:', data);
+                    if (DEV) console.log('[D.Isa Patch] Received character selection via WebSocket:', data);
                     
                     // If the character index is 8 (D.Isa), make sure it's handled correctly
                     if (data.character === 8) {
-                      console.log('[D.Isa Patch] Remote player selected D.Isa');
+                      if (DEV) console.log('[D.Isa Patch] Remote player selected D.Isa');
                       
                       // Update the player's selection based on which player number
                       if (data.playerNum === 1) {
@@ -75,7 +76,7 @@ window.addEventListener('load', function() {
           // Call original create method first
           originalCreate.apply(this, arguments);
           
-          console.log('[D.Isa Patch] Patching player selection scene for online mode, gameMode:', this.gameMode, 'isHost:', this.isHost);
+          if (DEV) console.log('[D.Isa Patch] Patching player selection scene for online mode, gameMode:', this.gameMode, 'isHost:', this.isHost);
           
           // Get screen dimensions for positioning
           const screenWidth = this.cameras.main.width;
@@ -83,7 +84,7 @@ window.addEventListener('load', function() {
           
           // Create D.Isa's spritesheet if it doesn't exist
           if (!this.textures.exists('player9')) {
-            console.log('[D.Isa Patch] Creating D.Isa spritesheet');
+            if (DEV) console.log('[D.Isa Patch] Creating D.Isa spritesheet');
             const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
             const frameHeight = 512;
             
@@ -104,7 +105,7 @@ window.addEventListener('load', function() {
                 x += frameWidths[i];
               }
               
-              console.log('[D.Isa Patch] D.Isa spritesheet created successfully');
+              if (DEV) console.log('[D.Isa Patch] D.Isa spritesheet created successfully');
             } else {
               console.error('[D.Isa Patch] player9_raw texture not found');
             }
@@ -141,7 +142,7 @@ window.addEventListener('load', function() {
           // We'll replace the last character in the grid (Ivan) with D.Isa
           // This ensures D.Isa will be visible on all devices including mobile
           
-          console.log('[D.Isa Patch] Replacing last character position with D.Isa');
+          if (DEV) console.log('[D.Isa Patch] Replacing last character position with D.Isa');
           
           // Find the position of the last character (player8) in the grid
           // This is typically Ivan at position 7 in the CHARACTER_KEYS array
@@ -156,7 +157,7 @@ window.addEventListener('load', function() {
           const p2DisaX = p2LastChar ? p2LastChar.x : p2FaceX[3];
           const disaY = p1LastChar ? p1LastChar.y - faceOffsetY : faceY2; // Subtract faceOffsetY to get the circle position
           
-          console.log('[D.Isa Patch] D.Isa will replace character at position:', 
+          if (DEV) console.log('[D.Isa Patch] D.Isa will replace character at position:', 
             { p1x: p1DisaX, p2x: p2DisaX, y: disaY, lastCharIndex: lastCharIndex });
           
           // Hide the existing character sprites that we're replacing
@@ -191,12 +192,12 @@ window.addEventListener('load', function() {
             child.text === 'Ivan'
           );
           
-          console.log('[D.Isa Patch] Found name labels to replace:', nameLabels.length);
+          if (DEV) console.log('[D.Isa Patch] Found name labels to replace:', nameLabels.length);
           
           // Update the existing name labels to show D.Isa instead
           nameLabels.forEach(label => {
             label.setText('D.Isa');
-            console.log('[D.Isa Patch] Updated name label at position:', { x: label.x, y: label.y });
+            if (DEV) console.log('[D.Isa Patch] Updated name label at position:', { x: label.x, y: label.y });
           });
           
           // If we couldn't find any labels to update, create new ones
@@ -211,7 +212,7 @@ window.addEventListener('load', function() {
             
             this.add.text(p1DisaX, disaY + 22, 'D.Isa', nameStyle).setOrigin(0.5).setAlpha(0.8);
             this.add.text(p2DisaX, disaY + 22, 'D.Isa', nameStyle).setOrigin(0.5).setAlpha(0.8);
-            console.log('[D.Isa Patch] Created new name labels for D.Isa');
+            if (DEV) console.log('[D.Isa Patch] Created new name labels for D.Isa');
           }
           
           // Make D.Isa interactive based on online mode rules
@@ -220,11 +221,11 @@ window.addEventListener('load', function() {
             p1DisaSprite.setInteractive();
             p1DisaSprite.on('pointerdown', () => {
               this.selected.p1 = 'player9';
-              console.log('[D.Isa Patch] P1 selected D.Isa');
+              if (DEV) console.log('[D.Isa Patch] P1 selected D.Isa');
               this.p1Selector.setPosition(p1DisaSprite.x, p1DisaSprite.y - faceOffsetY);
               
               if (this.gameMode === 'online' && window.wsManager && window.wsManager.send) {
-                console.log('[D.Isa Patch] Sending P1 D.Isa selection via WebSocket');
+                if (DEV) console.log('[D.Isa Patch] Sending P1 D.Isa selection via WebSocket');
                 window.wsManager.send({
                   type: 'character_selected',
                   character: 8, // Index for D.Isa (after the original 8 characters)
@@ -240,11 +241,11 @@ window.addEventListener('load', function() {
             p2DisaSprite.setInteractive();
             p2DisaSprite.on('pointerdown', () => {
               this.selected.p2 = 'player9';
-              console.log('[D.Isa Patch] P2 selected D.Isa');
+              if (DEV) console.log('[D.Isa Patch] P2 selected D.Isa');
               this.p2Selector.setPosition(p2DisaSprite.x, p2DisaSprite.y - faceOffsetY);
               
               if (this.gameMode === 'online' && window.wsManager && window.wsManager.send) {
-                console.log('[D.Isa Patch] Sending P2 D.Isa selection via WebSocket');
+                if (DEV) console.log('[D.Isa Patch] Sending P2 D.Isa selection via WebSocket');
                 window.wsManager.send({
                   type: 'character_selected',
                   character: 8, // Index for D.Isa (after the original 8 characters)
@@ -256,7 +257,7 @@ window.addEventListener('load', function() {
             p2DisaSprite.setAlpha(0.5); // Dim if not selectable in online mode
           }
           
-          console.log('[D.Isa Patch] Added D.Isa to player selection grid for both P1 and P2');
+          if (DEV) console.log('[D.Isa Patch] Added D.Isa to player selection grid for both P1 and P2');
         }
         
         // Add D.Isa's sprite loading
@@ -267,7 +268,7 @@ window.addEventListener('load', function() {
           // Load D.Isa's sprite if not already loaded
           if (!this.textures.exists('player9_raw')) {
             this.load.image('player9_raw', './sprites-d_isa.png');
-            console.log('[D.Isa Patch] Added D.Isa sprite to preload queue');
+            if (DEV) console.log('[D.Isa Patch] Added D.Isa sprite to preload queue');
           }
         };
         
@@ -279,7 +280,7 @@ window.addEventListener('load', function() {
           
           // Create D.Isa's spritesheet if it doesn't exist
           if (!this.textures.exists('player9')) {
-            console.log('[D.Isa Patch] Creating D.Isa spritesheet');
+            if (DEV) console.log('[D.Isa Patch] Creating D.Isa spritesheet');
             const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
             const frameHeight = 512;
             
@@ -300,7 +301,7 @@ window.addEventListener('load', function() {
                 x += frameWidths[i];
               }
               
-              console.log('[D.Isa Patch] D.Isa spritesheet created successfully');
+              if (DEV) console.log('[D.Isa Patch] D.Isa spritesheet created successfully');
               
               // Add D.Isa to the selection grid
               // This is a simplified approach - in a real implementation, 
@@ -319,7 +320,7 @@ window.addEventListener('load', function() {
               // Make it interactive
               disaSprite.setInteractive();
               disaSprite.on('pointerdown', () => {
-                console.log('[D.Isa Patch] D.Isa selected');
+                if (DEV) console.log('[D.Isa Patch] D.Isa selected');
                 
                 // Determine which player to update based on game mode and host status
                 if (this.gameMode === 'online') {
@@ -331,7 +332,7 @@ window.addEventListener('load', function() {
                     
                     // Send WebSocket message for player 1 selecting D.Isa
                     if (window.wsManager && window.wsManager.send) {
-                      console.log('[D.Isa Patch] Sending P1 D.Isa selection via WebSocket');
+                      if (DEV) console.log('[D.Isa Patch] Sending P1 D.Isa selection via WebSocket');
                       window.wsManager.send({
                         type: 'character_selected',
                         character: 8, // Index for D.Isa (after the original 8 characters)
@@ -346,7 +347,7 @@ window.addEventListener('load', function() {
                     
                     // Send WebSocket message for player 2 selecting D.Isa
                     if (window.wsManager && window.wsManager.send) {
-                      console.log('[D.Isa Patch] Sending P2 D.Isa selection via WebSocket');
+                      if (DEV) console.log('[D.Isa Patch] Sending P2 D.Isa selection via WebSocket');
                       window.wsManager.send({
                         type: 'character_selected',
                         character: 8, // Index for D.Isa (after the original 8 characters)
@@ -389,7 +390,7 @@ window.addEventListener('load', function() {
       );
       
       if (kidsFightScene) {
-        console.log('[D.Isa Patch] KidsFightScene found, patching for D.Isa support');
+        if (DEV) console.log('[D.Isa Patch] KidsFightScene found, patching for D.Isa support');
         
         // Patch the preload method to load D.Isa's sprite if needed
         const originalKFPreload = kidsFightScene.preload;
@@ -399,7 +400,7 @@ window.addEventListener('load', function() {
           // Load D.Isa's sprite if not already loaded
           if (!this.textures.exists('player9_raw')) {
             this.load.image('player9_raw', './sprites-d_isa.png');
-            console.log('[D.Isa Patch] Added D.Isa sprite to KidsFightScene preload');
+            if (DEV) console.log('[D.Isa Patch] Added D.Isa sprite to KidsFightScene preload');
           }
         };
         
@@ -411,7 +412,7 @@ window.addEventListener('load', function() {
           
           // Create D.Isa's spritesheet if it doesn't exist
           if (!this.textures.exists('player9')) {
-            console.log('[D.Isa Patch] Creating D.Isa spritesheet in KidsFightScene');
+            if (DEV) console.log('[D.Isa Patch] Creating D.Isa spritesheet in KidsFightScene');
             const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
             const frameHeight = 512;
             
@@ -432,13 +433,13 @@ window.addEventListener('load', function() {
                 x += frameWidths[i];
               }
               
-              console.log('[D.Isa Patch] D.Isa spritesheet created successfully in KidsFightScene');
+              if (DEV) console.log('[D.Isa Patch] D.Isa spritesheet created successfully in KidsFightScene');
             }
           }
           
           // Patch the player creation logic to handle player9
           if (this.p1Key === 'player9' || this.p2Key === 'player9') {
-            console.log('[D.Isa Patch] D.Isa selected for gameplay, patching player creation');
+            if (DEV) console.log('[D.Isa Patch] D.Isa selected for gameplay, patching player creation');
             
             // Create animations for D.Isa if needed
             if (!this.anims.exists('player9_idle')) {
@@ -477,7 +478,7 @@ window.addEventListener('load', function() {
                 repeat: 0
               });
               
-              console.log('[D.Isa Patch] Created animations for D.Isa');
+              if (DEV) console.log('[D.Isa Patch] Created animations for D.Isa');
             }
           }
         };

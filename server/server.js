@@ -230,7 +230,8 @@ wss.on('connection', (ws) => {
                 console.log(`[GAME START] Sending start_game to Host`);
                 readyRoom.host.send(JSON.stringify({
                   type: 'start_game',
-                  scenario: selectedScenario
+                  scenario: selectedScenario,
+                  health: [100, 100]
                 }));
               } else {
                 console.error(`[ERROR] Cannot send start_game to Host - not connected`);
@@ -240,7 +241,8 @@ wss.on('connection', (ws) => {
                 console.log(`[GAME START] Sending start_game to Guest`);
                 readyRoom.client.send(JSON.stringify({
                   type: 'start_game',
-                  scenario: selectedScenario
+                  scenario: selectedScenario,
+                  health: [100, 100]
                 }));
               } else {
                 console.error(`[ERROR] Cannot send start_game to Guest - not connected`);

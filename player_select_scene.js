@@ -10,11 +10,12 @@ import player8RawImg from './sprites-ivan3.png';
 import player9RawImg from './sprites-d_isa.png';
 import gameLogoImg from './android-chrome-192x192.png';
 import wsManager from './websocket_manager';
+import { DEV } from './globals.js';
 
 class PlayerSelectScene extends Phaser.Scene {
   constructor() {
     super({ key: 'PlayerSelectScene' });
-    console.log('PlayerSelectScene constructor called');
+    if (DEV) console.log('PlayerSelectScene constructor called');
     // Character sprite keys for mapping
     this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8', 'player9'];
     this.selected = { p1: 'player1', p2: 'player2' }; // Default selections using sprite keys
@@ -22,7 +23,7 @@ class PlayerSelectScene extends Phaser.Scene {
   
   init(data) {
     // Reset selections when scene is restarted
-    console.log('[PlayerSelectScene] Init called, resetting selections');
+    if (DEV) console.log('[PlayerSelectScene] Init called, resetting selections');
     // Character sprite keys for mapping
     this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8', 'player9'];
     
@@ -42,7 +43,7 @@ class PlayerSelectScene extends Phaser.Scene {
     // For online mode, store host status and setup WebSocket handlers
     if (this.gameMode === 'online') {
       this.isHost = data.isHost;
-      console.log('[PlayerSelectScene] Online mode initialized:', {
+      if (DEV) console.log('[PlayerSelectScene] Online mode initialized:', {
         isHost: this.isHost,
         roomCode: data.roomCode
       });
@@ -52,7 +53,7 @@ class PlayerSelectScene extends Phaser.Scene {
       if (ws) {
         ws.onmessage = (event) => {
           const data = JSON.parse(event.data);
-          console.log('[PlayerSelectScene] Received websocket message:', data);
+          if (DEV) console.log('[PlayerSelectScene] Received websocket message:', data);
           
           switch(data.type) {
             case 'character_selected':
@@ -60,7 +61,7 @@ class PlayerSelectScene extends Phaser.Scene {
               const playerKey = data.playerNum === 1 ? 'p1' : 'p2';
               const characterKey = this.CHARACTER_KEYS[data.character];
               this.selected[playerKey] = characterKey;
-              console.log('[PlayerSelectScene] Updated character selection:', {
+              if (DEV) console.log('[PlayerSelectScene] Updated character selection:', {
                 playerNum: data.playerNum,
                 characterIndex: data.character,
                 characterKey,
@@ -74,10 +75,10 @@ class PlayerSelectScene extends Phaser.Scene {
               
               if (optionsArray && selector && characterIndex >= 0 && characterIndex < optionsArray.length) {
                 const selectedOption = optionsArray[characterIndex];
-                console.log(`[PlayerSelectScene] Moving ${playerKey} selector to option:`, selectedOption);
+                if (DEV) console.log(`[PlayerSelectScene] Moving ${playerKey} selector to option:`, selectedOption);
                 selector.setPosition(selectedOption.x, selectedOption.y - this.faceOffsetY);
               } else {
-                console.error(`[PlayerSelectScene] Could not update visual selection for ${playerKey}:`, {
+                if (DEV) console.error(`[PlayerSelectScene] Could not update visual selection for ${playerKey}:`, {
                   playerKey,
                   characterIndex,
                   hasOptionsArray: !!optionsArray,
@@ -90,7 +91,7 @@ class PlayerSelectScene extends Phaser.Scene {
             case 'scenario_selected':
               // Update scenario selection (only client receives this from host)
               if (!this.isHost && data.scenario) {
-                console.log('[PlayerSelectScene] Host selected scenario:', data.scenario);
+                if (DEV) console.log('[PlayerSelectScene] Host selected scenario:', data.scenario);
                 this.scenarioKey = data.scenario;
                 
                 // If we have a scenario info text, update it
@@ -111,7 +112,7 @@ class PlayerSelectScene extends Phaser.Scene {
               break;
               
             case 'error':
-              console.error('[PlayerSelectScene] Error:', data.message);
+              if (DEV) console.error('[PlayerSelectScene] Error:', data.message);
               break;
           }
         };
@@ -120,7 +121,7 @@ class PlayerSelectScene extends Phaser.Scene {
   }
   
   preload() {
-    console.log('[PlayerSelectScene] Preload started');
+    if (DEV) console.log('[PlayerSelectScene] Preload started');
     this.load.image('select_bg', scenarioImg);
     this.load.image('player1_raw', player1RawImg);
     this.load.image('player2_raw', player2RawImg);
@@ -132,7 +133,7 @@ class PlayerSelectScene extends Phaser.Scene {
     this.load.image('player8_raw', player8RawImg);
     this.load.image('player9_raw', player9RawImg);
     this.load.image('game_logo', gameLogoImg);
-    console.log('[PlayerSelectScene] Assets queued for loading');
+    if (DEV) console.log('[PlayerSelectScene] Assets queued for loading');
   }
   
   create() {
@@ -146,12 +147,14 @@ class PlayerSelectScene extends Phaser.Scene {
   }
 
   createScene() {
+    console.log('[SCENE] this.add at createScene:', this.add);
+
 
     // Log screen dimensions for debugging
     const cam = this.cameras.main;
     const screenWidth = cam.width;
     const screenHeight = cam.height;
-    console.log(`[PlayerSelectScene] Create called - Screen dimensions: ${screenWidth}x${screenHeight}`);
+    if (DEV) console.log(`[PlayerSelectScene] Create called - Screen dimensions: ${screenWidth}x${screenHeight}`);
     
     // Responsive background and logo
     const bg = this.add.rectangle(screenWidth / 2, screenHeight / 2, screenWidth, screenHeight, 0x000000, 0.7);
@@ -181,7 +184,7 @@ class PlayerSelectScene extends Phaser.Scene {
     // --- CREATE CUSTOM SPRITESHEETS FIRST ---
     // Player 1
     if (!this.textures.exists('player1')) {
-      console.log('[PlayerSelectScene] Creating player1 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player1 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 440, 440, 440];
       const frameHeight = 512;
       const player1Texture = this.textures.get('player1_raw').getSourceImage();
@@ -202,7 +205,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Player 2
     if (!this.textures.exists('player2')) {
-      console.log('[PlayerSelectScene] Creating player2 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player2 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
       const frameHeight = 512;
       const player2Texture = this.textures.get('player2_raw').getSourceImage();
@@ -223,7 +226,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Player 3 (José)
     if (!this.textures.exists('player3')) {
-      console.log('[PlayerSelectScene] Creating player3 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player3 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
       const frameHeight = 512;
       const player3Texture = this.textures.get('player3_raw').getSourceImage();
@@ -244,7 +247,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Player 4 (Davi S)
     if (!this.textures.exists('player4')) {
-      console.log('[PlayerSelectScene] Creating player4 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player4 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
       const frameHeight = 512;
       const player4Texture = this.textures.get('player4_raw').getSourceImage();
@@ -265,7 +268,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Player 5 (Carol) Spritesheet
     if (!this.textures.exists('player5')) {
-      console.log('[PlayerSelectScene] Creating player5 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player5 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
       const frameHeight = 512;
       const player5Texture = this.textures.get('player5_raw').getSourceImage();
@@ -286,7 +289,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Player 6 (Roni) Spritesheet
     if (!this.textures.exists('player6')) {
-      console.log('[PlayerSelectScene] Creating player6 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player6 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
       const frameHeight = 512;
       const player6Texture = this.textures.get('player6_raw').getSourceImage();
@@ -307,7 +310,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Player 7 (Jacqueline) Spritesheet
     if (!this.textures.exists('player7')) {
-      console.log('[PlayerSelectScene] Creating player7 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player7 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
       const frameHeight = 512;
       const player7Texture = this.textures.get('player7_raw').getSourceImage();
@@ -328,7 +331,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Player 8 (Ivan) Spritesheet
     if (!this.textures.exists('player8')) {
-      console.log('[PlayerSelectScene] Creating player8 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player8 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
       const frameHeight = 512;
       const player8Texture = this.textures.get('player8_raw').getSourceImage();
@@ -349,7 +352,7 @@ class PlayerSelectScene extends Phaser.Scene {
     
     // Player 9 (D.Isa) Spritesheet
     if (!this.textures.exists('player9')) {
-      console.log('[PlayerSelectScene] Creating player9 spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating player9 spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400]; // You can adjust this if D.Isa's frames differ
       const frameHeight = 512; // Adjust if D.Isa's frame height is different
       const player9Texture = this.textures.get('player9_raw').getSourceImage();
@@ -370,16 +373,16 @@ class PlayerSelectScene extends Phaser.Scene {
     }
     
     // Add environment check for development mode
-    const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || (typeof __DEV__ !== 'undefined' && __DEV__);
+    
     
     // Only show debug messages in development environment
     if (DEV) {
       // DEBUG: Log CHARACTER_KEYS
-      console.log('[DEBUG] CHARACTER_KEYS:', this.CHARACTER_KEYS);
+      if (DEV) console.log('[DEBUG] CHARACTER_KEYS:', this.CHARACTER_KEYS);
       
       // DEBUG: Check if D.Isa sprite is loaded
       if (this.textures.exists('player9')) {
-        console.log('[DEBUG] D.Isa sprite is loaded');
+        if (DEV) console.log('[DEBUG] D.Isa sprite is loaded');
       } else {
         console.warn('[DEBUG] D.Isa sprite is NOT loaded');
       }
@@ -482,7 +485,7 @@ class PlayerSelectScene extends Phaser.Scene {
         option.on('pointerdown', () => {
           // The index in p1Options array directly maps to the character index (0-7)
           this.selected.p1 = this.CHARACTER_KEYS[i];
-          console.log('[PlayerSelectScene] P1 selected:', i, this.CHARACTER_KEYS[i]);
+          if (DEV) console.log('[PlayerSelectScene] P1 selected:', i, this.CHARACTER_KEYS[i]);
           this.p1Selector.setPosition(option.x, option.y - this.faceOffsetY);
           
           if (this.gameMode === 'online') {
@@ -495,7 +498,7 @@ class PlayerSelectScene extends Phaser.Scene {
           }
         });
       } else {
-        if (DEV) console.log('DEBUG: Calling setAlpha on option', option);
+        if (DEV) if (DEV) console.log('DEBUG: Calling setAlpha on option', option);
 option.setAlpha(0.5); // Dim opponent's options
       }
     }
@@ -507,8 +510,8 @@ option.setAlpha(0.5); // Dim opponent's options
         option.setInteractive();
         option.on('pointerdown', () => {
           // The index in p2Options array directly maps to the character index (0-7)
-          this.selected.p2 = this.CHARACTER_KEYS[i+4]; // Note: p2Options starts at index 4 in CHARACTER_KEYS
-          console.log('[PlayerSelectScene] P2 selected:', i, this.CHARACTER_KEYS[i+4]);
+          this.selected.p2 = this.CHARACTER_KEYS[i];
+          if (DEV) console.log('[PlayerSelectScene] P2 selected:', i, this.CHARACTER_KEYS[i]);
           this.p2Selector.setPosition(option.x, option.y - this.faceOffsetY);
           
           if (this.gameMode === 'online') {
@@ -521,7 +524,7 @@ option.setAlpha(0.5); // Dim opponent's options
           }
         });
       } else {
-        if (DEV) console.log('DEBUG: Calling setAlpha on option', option);
+        if (DEV) if (DEV) console.log('DEBUG: Calling setAlpha on option', option);
 option.setAlpha(0.5); // Dim opponent's options
       }
     }
@@ -537,7 +540,7 @@ option.setAlpha(0.5); // Dim opponent's options
     
     // Display scenario info text for online mode
     if (this.gameMode === 'online' && this.isHost) {
-      console.log('[PlayerSelectScene] Creating scenario info text for host');
+      if (DEV) console.log('[PlayerSelectScene] Creating scenario info text for host');
       // We'll select the scenario after player selection
       this.scenarioText = this.add.text(this.cameras.main.width * 0.5, this.cameras.main.height * 0.65, 
         'Você escolherá o cenário após selecionar os personagens', {
@@ -551,6 +554,8 @@ option.setAlpha(0.5); // Dim opponent's options
     
     // Move the start button and text a bit to the left
     const buttonX = cam.centerX - 18;
+    console.log('[SCENE] this.add at startBtn:', this.add);
+    console.log('[SCENE] this.add.image at startBtn:', this.add.image);
     const startBtn = this.add.rectangle(buttonX, buttonY, buttonW, buttonH, 0x00ff00)
       .setStrokeStyle(4, 0x000000); // Add black border for better visibility
     const startText = this.add.text(buttonX, buttonY, 'COMEÇAR LUTA!', {
@@ -570,7 +575,7 @@ option.setAlpha(0.5); // Dim opponent's options
       this.startFight();
     });
     
-    console.log('[PlayerSelectScene] UI created');
+    if (DEV) console.log('[PlayerSelectScene] UI created');
     
     // Update all positions on resize
     this.scale.on('resize', () => {
@@ -615,7 +620,7 @@ option.setAlpha(0.5); // Dim opponent's options
     if (this.gameMode === 'online') {
       // If host, first select scenario before proceeding
       if (this.isHost) {
-        console.log('[PlayerSelectScene] Host selecting scenario before starting fight');
+        if (DEV) console.log('[PlayerSelectScene] Host selecting scenario before starting fight');
         
         // Launch scenario selection scene
         this.scene.pause();
@@ -629,11 +634,11 @@ option.setAlpha(0.5); // Dim opponent's options
         // Listen for scenario selection
         this.events.once('resume', (scene, data) => {
           if (data && data.scenario) {
-            console.log('[PlayerSelectScene] Received scenario selection from ScenarioSelectScene:', data.scenario);
+            if (DEV) console.log('[PlayerSelectScene] Received scenario selection from ScenarioSelectScene:', data.scenario);
             this.scenarioKey = data.scenario;
             
             // Send scenario selection to the other player
-            console.log('[PlayerSelectScene] Sending scenario_selected message to other player:', data.scenario);
+            if (DEV) console.log('[PlayerSelectScene] Sending scenario_selected message to other player:', data.scenario);
             wsManager.send({
               type: 'scenario_selected',
               scenario: data.scenario
@@ -666,14 +671,14 @@ option.setAlpha(0.5); // Dim opponent's options
       character: charIndex,
       playerNum: playerNum
     });
-    console.log('[PlayerSelectScene] Sending character selection:', {
+    if (DEV) console.log('[PlayerSelectScene] Sending character selection:', {
       charKey: myChar,
       charIndex,
       playerNum
     });
     
     // Add a debug button in online mode for testing and development
-    if (this.gameMode === 'online') {
+    if (this.gameMode === 'online' && this.isHost && DEV) {
       const debugButton = this.add.text(
         this.cameras.main.width * 0.5,
         this.cameras.main.height * 0.9,
@@ -687,7 +692,7 @@ option.setAlpha(0.5); // Dim opponent's options
       ).setOrigin(0.5).setDepth(100).setInteractive();
       
       debugButton.on('pointerdown', () => {
-        console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
+        if (DEV) console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
         this.launchGame();
       });
     }
@@ -711,21 +716,21 @@ option.setAlpha(0.5); // Dim opponent's options
       type: 'player_ready',
       character: charIndex
     });
-    console.log('[PlayerSelectScene] Sending player ready message');
+    if (DEV) console.log('[PlayerSelectScene] Sending player ready message');
     
     // Set up handler for start_game message
     const originalOnMessage = wsManager.ws.onmessage;
     wsManager.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('[PlayerSelectScene] Received message:', data);
+        if (DEV) console.log('[PlayerSelectScene] Received message:', data);
         
         if (data.type === 'start_game') {
-          console.log('[PlayerSelectScene] Received start_game message, starting game');
+          if (DEV) console.log('[PlayerSelectScene] Received start_game message, starting game');
           
           // Update scenario if provided in the start_game message
           if (data.scenario) {
-            console.log('[PlayerSelectScene] Using scenario from start_game message:', data.scenario);
+            if (DEV) console.log('[PlayerSelectScene] Using scenario from start_game message:', data.scenario);
             this.scenarioKey = data.scenario;
           }
           
@@ -748,7 +753,7 @@ option.setAlpha(0.5); // Dim opponent's options
             this.launchGame();
           });
         } else if (data.type === 'player_ready') {
-          console.log('[PlayerSelectScene] Other player is ready');
+          if (DEV) console.log('[PlayerSelectScene] Other player is ready');
           if (this.waitingText) {
             this.waitingText.setText('Other player is ready! Starting game soon...');
             this.waitingText.setColor('#00ff00');
@@ -777,14 +782,14 @@ option.setAlpha(0.5); // Dim opponent's options
           originalOnMessage(event);
         }
       } catch (error) {
-        console.error('[PlayerSelectScene] Error processing message:', error);
+        if (DEV) console.error('[PlayerSelectScene] Error processing message:', error);
       }
     };
     
     // Add a debug button to manually trigger the start game (only in development environment)
-    const DEV = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') || (typeof __DEV__ !== 'undefined' && __DEV__);
     
-    if (this.gameMode === 'online' && DEV) {
+    
+    if (this.gameMode === 'online' && this.isHost && DEV) {
       const debugButton = this.add.text(
         this.cameras.main.width * 0.5,
         this.cameras.main.height * 0.9,
@@ -799,14 +804,14 @@ option.setAlpha(0.5); // Dim opponent's options
       ).setOrigin(0.5).setDepth(100).setInteractive();
       
       debugButton.on('pointerdown', () => {
-        console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
+        if (DEV) console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
         this.launchGame();
       });
     }
   }
   
   launchGame() {
-    console.log('[PlayerSelectScene] Starting fight with:', {
+    if (DEV) console.log('[PlayerSelectScene] Starting fight with:', {
       p1: this.selected.p1,
       p2: this.selected.p2,
       isHost: this.isHost

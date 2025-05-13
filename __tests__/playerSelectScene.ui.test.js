@@ -13,8 +13,11 @@ describe('PlayerSelectScene UI (mocked Phaser)', () => {
       circle: jest.fn((x, y, r, color, alpha) => ({ x, y, r, color, alpha, setStrokeStyle: jest.fn().mockReturnThis(), setInteractive: jest.fn().mockReturnThis(), setPosition: jest.fn(function (nx, ny) { this.x = nx; this.y = ny; return this; }) })),
       sprite: jest.fn((x, y, key, frame) => ({ x, y, key, frame, setScale: jest.fn().mockReturnThis(), setCrop: jest.fn().mockReturnThis(), setInteractive: jest.fn().mockReturnThis(), on: jest.fn(), setPosition: jest.fn() })),
       rectangle: jest.fn((x, y, w, h, color) => ({ x, y, w, h, color, setStrokeStyle: jest.fn().mockReturnThis(), setInteractive: jest.fn().mockReturnThis(), setPosition: jest.fn().mockReturnThis(), on: jest.fn().mockReturnThis() })),
+
       text: jest.fn((x, y, text, style) => ({ x, y, text, style, setOrigin: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis() })),
-      image: jest.fn((x, y, key) => ({ setOrigin: jest.fn().mockReturnThis(), setScale: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis() })),
+      image: jest.fn((x, y, key) => ({ setOrigin: jest.fn().mockReturnThis(), setScale: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis(), setStrokeStyle: jest.fn().mockReturnThis(), setInteractive: jest.fn().mockReturnThis(), on: jest.fn().mockReturnThis() })),
+
+
     };
     scene.cameras = { main: { centerX: 400, width: 800, height: 600 } };
     scene.textures = { exists: jest.fn(() => true), get: jest.fn(() => ({ getSourceImage: jest.fn() })) };

@@ -22,7 +22,8 @@ class WebSocketManager {
       // Use localhost in development, production server in production
       const wsUrl = DEV
         ? 'ws://localhost:8081'
-        : 'wss://kidsfight.netlify.app';
+        //: 'wss://kidsfight.netlify.app';
+        : 'ws://localhost:8081';
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {

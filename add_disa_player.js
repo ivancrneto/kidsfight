@@ -12,7 +12,7 @@
         const playerSelectScene = window.game.scene.scenes.find(scene => scene.constructor.name === 'PlayerSelectScene');
         
         if (playerSelectScene) {
-          console.log('[D.Isa] PlayerSelectScene found, adding D.Isa character');
+          if (DEV) console.log('[D.Isa] PlayerSelectScene found, adding D.Isa character');
           clearInterval(checkInterval);
           addDIsaCharacter(playerSelectScene.constructor);
         }
@@ -20,7 +20,9 @@
     }, 100);
   });
   
-  function addDIsaCharacter(PlayerSelectScene) {
+  import { DEV } from './globals.js';
+
+function addDIsaCharacter(PlayerSelectScene) {
     // Store the original preload method
     const originalPreload = PlayerSelectScene.prototype.preload;
   
@@ -31,7 +33,7 @@
     
     // Load D.Isa's sprite
     this.load.image('player9_raw', './sprites-d_isa.png');
-    console.log('[PlayerSelectScene] Added D.Isa sprite to preload queue');
+    if (DEV) console.log('[PlayerSelectScene] Added D.Isa sprite to preload queue');
   };
   
   // Store the original createScene method
@@ -42,7 +44,7 @@
     // Add D.Isa to CHARACTER_KEYS array if not already present
     if (!this.CHARACTER_KEYS.includes('player9')) {
       this.CHARACTER_KEYS.push('player9');
-      console.log('[PlayerSelectScene] Added D.Isa to CHARACTER_KEYS:', this.CHARACTER_KEYS);
+      if (DEV) console.log('[PlayerSelectScene] Added D.Isa to CHARACTER_KEYS:', this.CHARACTER_KEYS);
     }
     
     // Call the original createScene method
@@ -50,7 +52,7 @@
     
     // Create D.Isa's spritesheet if it doesn't exist yet
     if (!this.textures.exists('player9')) {
-      console.log('[PlayerSelectScene] Creating D.Isa spritesheet');
+      if (DEV) console.log('[PlayerSelectScene] Creating D.Isa spritesheet');
       const frameWidths = [300, 300, 400, 460, 500, 400, 400, 400];
       const frameHeight = 512;
       const player9Texture = this.textures.get('player9_raw').getSourceImage();
@@ -120,7 +122,7 @@
         if (lastNameX < this.cameras.main.width / 2) {
           // Player 1 selection
           this.selected.p1 = 'player9';
-          console.log('[PlayerSelectScene] P1 selected: D.Isa');
+          if (DEV) console.log('[PlayerSelectScene] P1 selected: D.Isa');
           
           // Update selector position
           if (this.p1Selector) {
@@ -138,7 +140,7 @@
         } else {
           // Player 2 selection
           this.selected.p2 = 'player9';
-          console.log('[PlayerSelectScene] P2 selected: D.Isa');
+          if (DEV) console.log('[PlayerSelectScene] P2 selected: D.Isa');
           
           // Update selector position
           if (this.p2Selector) {
