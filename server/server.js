@@ -356,6 +356,49 @@ wss.on('connection', (ws) => {
             console.error(`[ERROR] Cannot forward action - ${isHost ? 'Guest' : 'Host'} not connected`);
           }
           break;
+        
+        case 'health_update':
+          const healthRoom = gameRooms.get(roomCode);
+          if (!healthRoom) {
+            console.error(`Room ${roomCode} not found for health update`);
+            return;
+          }
+
+          // CRITICAL: Need to identify the affected player in a way the receiver understands
+          // For online play between two players, we'll use a simple rule:
+          // When host attacks guest, playerIndex is 1 (guest's health)
+          // When guest attacks host, playerIndex is 0 (host's health)
+          
+          // Determine which player was attacked
+          const senderIsHost = isHost;
+          const attackedPlayerIndex = data.playerIndex;
+          
+          // Enhanced logging to diagnose the health update message
+          console.log(`[HEALTH SERVER] RECEIVED HEALTH UPDATE:`, {
+            roomCode, 
+            senderIsHost,
+            message: `${senderIsHost ? 'Host' : 'Guest'} reports that Player ${attackedPlayerIndex}'s health is now ${data.health}`,
+            rawMessage: data
+          });
+
+          // Forward the health update to the other player with clear identification
+          const healthTarget = isHost ? healthRoom.client : healthRoom.host;
+          if (healthTarget) {
+            console.log(`[HEALTH SERVER] FORWARDING to ${isHost ? 'Guest' : 'Host'}`, {
+              playerIndex: attackedPlayerIndex,
+              health: data.health,
+              message: `Your health is now ${data.health}`
+            });
+            
+            healthTarget.send(JSON.stringify({
+              type: 'health_update',
+              playerIndex: attackedPlayerIndex,
+              health: data.health
+            }));
+          } else {
+            console.error(`[HEALTH SERVER] ERROR: Cannot forward health update - ${isHost ? 'Guest' : 'Host'} not connected`);
+          }
+          break;
       }
     } catch (error) {
       console.error('Error handling message:', error);
