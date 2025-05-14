@@ -79,18 +79,125 @@ class KidsFightScene extends Phaser.Scene {
     
     console.log('[KidsFightScene] Setting up WebSocket handlers');
     
-    // Store the original message handler if it exists
-    const originalOnMessage = this.wsManager.ws.onmessage;
-    
-    // Set up WebSocket message handler
+    // IMPORTANT: Single consolidated WebSocket message handler
+    // This is the ONLY place where wsManager.ws.onmessage should be assigned
     this.wsManager.ws.onmessage = (event) => {
+      console.log('§[HEALTH SYNC][RECEIVER] RAW WS EVENT:', event.data);
       try {
         const data = JSON.parse(event.data);
         console.log('[KidsFightScene] Received message:', data);
+        // Also add the critical log for debugging
+        console.log('[CRITICAL] KidsFightScene received WebSocket message:', data);
+
+        // --- REPLAY CALLBACK DISPATCH ---
+        if (this.replayResponseCallback && (data.type === 'replay_request' || data.type === 'replay_response')) {
+          this.replayResponseCallback(data);
+          // Only clear callback after replay_response
+          if (data.type === 'replay_response') this.replayResponseCallback = null;
+          return;
+        }
         
         // Handle different message types
         if (data.type === 'game_action') {
+          console.log('[CRITICAL] Received game action:', data.action);
           this.handleRemoteAction(data.action);
+        } else if (data.type === 'player_update') {
+          // Handle remote player movement and position updates
+          console.log('§[PLAYER SYNC][RECEIVER] Received player_update:', data);
+          
+          if (this.gameMode === 'online' && this.players && this.players.length >= 2) {
+            // Determine which player index to update - the opposite of localPlayerIndex
+            const playerToUpdate = this.localPlayerIndex === 0 ? 1 : 0;
+            const remotePlayer = this.players[playerToUpdate];
+            
+            console.log('§[PLAYER SYNC][RECEIVER] Player info:', {
+              gameMode: this.gameMode,
+              localPlayerIndex: this.localPlayerIndex,
+              playerToUpdate,
+              hasRemotePlayer: !!remotePlayer,
+              remoteX: remotePlayer ? remotePlayer.x : 'N/A',
+              remoteY: remotePlayer ? remotePlayer.y : 'N/A',
+              receivedX: data.x,
+              receivedY: data.y
+            });
+            
+            if (remotePlayer) {
+              // Update position and velocity
+              remotePlayer.x = data.x;
+              remotePlayer.y = data.y;
+              remotePlayer.body.velocity.x = data.velocityX;
+              remotePlayer.body.velocity.y = data.velocityY;
+              
+              // Update visual state (flip direction and animation frame)
+              if (typeof data.flipX === 'boolean') {
+                remotePlayer.setFlipX(data.flipX);
+              }
+              
+              // Update animation frame if provided
+              if (typeof data.frame === 'number') {
+                remotePlayer.setFrame(data.frame);
+              }
+              
+              console.log('§[PLAYER SYNC][RECEIVER] Updated remote player position:', {
+                x: remotePlayer.x,
+                y: remotePlayer.y,
+                velocityX: remotePlayer.body.velocity.x,
+                velocityY: remotePlayer.body.velocity.y,
+                frame: remotePlayer.frame.name,
+                flipX: remotePlayer.flipX
+              });
+            }
+          }
+        } else if (data.type === 'player_disconnected') {
+          this.handleDisconnection();
+        } else if (data.type === 'start_game') {
+          if (Array.isArray(data.health) && data.health.length === 2) {
+            this.playerHealth = [...data.health];
+            if (DEV) console.log('[DEBUG-HEALTH-SERVER] playerHealth set from server data:', this.playerHealth);
+            console.log('[KidsFightScene] Initialized playerHealth from server:', this.playerHealth);
+          } else {
+            // fallback to default if not provided
+            this.playerHealth = [100, 100];
+            if (DEV) console.log('[DEBUG-HEALTH-FALLBACK] playerHealth set to [100, 100] (fallback)');
+            console.warn('[KidsFightScene] No health provided by server, using defaults');
+          }
+        } else if (data.type === 'health_update') { 
+          console.log('§[HEALTH SYNC][DEBUG] health_update message detected:', data);
+          // --- ONLINE MODE: Receive health update from remote ---
+          if (typeof data.playerIndex === 'number' && typeof data.health === 'number') {
+            // Use the exact player index as received - no perspective mapping needed
+            // The server correctly sends the appropriate playerIndex
+            const playerIndex = data.playerIndex;
+            
+            // Extra logging for player index mapping (receiver)
+            console.log('§[HEALTH SYNC][RECEIVER] Received health_update:', {
+              localPlayerIndex: this.localPlayerIndex,
+              receivedPlayerIndex: playerIndex,
+              receivedHealth: data.health,
+              isHost: this.isHost,
+              playerHealthBefore: [...this.playerHealth],
+              isOnlineMode: this.gameMode === 'online',
+              time: new Date().toISOString()
+            });
+            
+            const oldHealth = this.playerHealth[playerIndex];
+            this.playerHealth[playerIndex] = data.health;
+            this.updateHealthBars(playerIndex);
+            
+            // Enhanced logging for health updates
+            if (DEV) {
+              console.log(`[SYNC] Remote health update: player ${playerIndex} health changed from ${oldHealth} to ${data.health}`);
+              console.log(`[HEALTH-DEBUG] Player ${playerIndex + 1} health bar state:`, {
+                barReference: playerIndex === 0 ? 'healthBar1' : 'healthBar2',
+                healthBarExists: playerIndex === 0 ? !!this.healthBar1 : !!this.healthBar2,
+                healthRatio: data.health / MAX_HEALTH,
+                expectedWidth: 200 * (data.health / MAX_HEALTH),
+                actualWidth: playerIndex === 0 && this.healthBar1 ? this.healthBar1.width : 
+                             (playerIndex === 1 && this.healthBar2 ? this.healthBar2.width : 'unknown')
+              });
+              console.log('§[HEALTH SYNC][RECEIVER] playerHealthAfter:', [...this.playerHealth]);
+            }
+          }
         } 
         // Handle replay requests when game is over
         else if (data.type === 'replay_request') {
@@ -259,6 +366,16 @@ class KidsFightScene extends Phaser.Scene {
   tryAttack(playerIndex, attacker, target, time, isSpecial = false) {
     if (!attacker || !target || this.gameOver) return;
     
+    // Always log attack attempts for debugging
+    console.log('🔴 ATTACK ATTEMPT:', { 
+      playerIndex, 
+      attackerX: attacker.x, 
+      targetX: target.x, 
+      isSpecial,
+      gameOver: this.gameOver,
+      isOnlineMode: this.gameMode === 'online'
+    });
+    
     // Record the attack time
     this.lastAttackTime[playerIndex] = time;
     
@@ -273,8 +390,57 @@ class KidsFightScene extends Phaser.Scene {
       
       // Apply damage to the correct health pool (opposite of attacker)
       const targetIndex = playerIndex === 0 ? 1 : 0;
+      const oldHealth = this.playerHealth[targetIndex];
       this.playerHealth[targetIndex] -= damageAmount;
-      if (DEV) console.log('[DEBUG-HEALTH-ASSIGNMENT] playerHealth set to', this.playerHealth, 'after attack');
+      const newHealth = this.playerHealth[targetIndex];
+      
+      // Always log health changes for debugging (no DEV condition)
+      console.log('🔴 HEALTH CHANGED:', {
+        attacker: `Player ${playerIndex + 1}`,
+        target: `Player ${targetIndex + 1}`,
+        damageAmount,
+        healthBefore: oldHealth,
+        healthAfter: newHealth,
+        allHealth: this.playerHealth
+      });
+      console.log(`🔴 PLAYER ${targetIndex + 1} HEALTH: ${oldHealth} → ${newHealth} (damage: ${damageAmount})`);
+      
+      // Keep original DEV logs as well
+      if (DEV) {
+        console.log('[DEBUG-HEALTH-ASSIGNMENT]', {
+          attacker: `Player ${playerIndex + 1}`,
+          target: `Player ${targetIndex + 1}`,
+          damageAmount,
+          healthBefore: oldHealth,
+          healthAfter: newHealth,
+          allHealth: this.playerHealth
+        });
+        console.log(`[ATTACK-DEBUG] Player ${targetIndex + 1} received attack: health ${oldHealth} -> ${newHealth} (damage: ${damageAmount})`);
+      }
+      // --- ONLINE MODE: Sync health to remote ---
+      if (this.gameMode === 'online' && this.wsManager) {
+        // Extra logging for player index mapping (sender)
+        console.log('§[HEALTH SYNC][SENDER] About to send health_update:', {
+          localPlayerIndex: this.localPlayerIndex,
+          targetIndex,
+          health: this.playerHealth[targetIndex],
+          isHost: this.isHost,
+          playerHealth: [...this.playerHealth],
+          time: new Date().toISOString()
+        });
+        // Use the dedicated health update method for more reliable synchronization
+        const success = this.wsManager.sendHealthUpdate(targetIndex, this.playerHealth[targetIndex]);
+        
+        if (!success) {
+          console.log('❌ HEALTH UPDATE FAILED:', {
+            isOnlineMode: this.gameMode === 'online',
+            hasWsManager: !!this.wsManager,
+            isConnected: this.wsManager ? this.wsManager.isConnected() : false,
+            playerIndex: targetIndex,
+            health: this.playerHealth[targetIndex]
+          });
+        }
+      }
       
       // Ensure health doesn't go below 0
       if (this.playerHealth[targetIndex] < 0) {
@@ -313,19 +479,89 @@ class KidsFightScene extends Phaser.Scene {
 
   // Update the health bar for a player
   updateHealthBars(playerIndex) {
+    // Always log health bar updates for debugging
+    console.log(`🔴 UPDATE HEALTH BAR for Player ${playerIndex + 1}:`, {
+      playerHealth: this.playerHealth,
+      currentHealth: this.playerHealth[playerIndex],
+      hasHealthBar1: !!this.healthBar1,
+      hasHealthBar2: !!this.healthBar2
+    });
+    
+    // Select the correct health bar based on player index
+    const healthBar = playerIndex === 0 ? this.healthBar1 : this.healthBar2;
+    if (!healthBar) {
+      console.error(`🚫 ERROR: Health bar for player ${playerIndex + 1} not found!`);
+      return;
+    }
+    
     const currentHealth = this.playerHealth[playerIndex];
     const barWidth = 200; // Must match what's set in create()
+    const barHeight = 20; // Must match height in create()
     
     // Calculate ratio for display
     const healthRatio = Math.max(0, currentHealth / MAX_HEALTH);
+    const newWidth = barWidth * healthRatio;
     
-    // Update the appropriate health bar
-    if (playerIndex === 0) {
-      // Player 1 health bar
-      this.healthBar1.width = barWidth * healthRatio;
-    } else {
-      // Player 2 health bar
-      this.healthBar2.width = barWidth * healthRatio;
+    // Try all possible ways to update the health bar
+    try {
+      // Method 1: Use scaleX (most reliable in Phaser)
+      healthBar.scaleX = healthRatio;
+      
+      // Method 2: Direct width property (if available)
+      if (typeof healthBar.width === 'number') {
+        healthBar.width = newWidth;
+      }
+      
+      // Method 3: Use displayWidth property (if available)
+      if (typeof healthBar.displayWidth !== 'undefined') {
+        healthBar.displayWidth = newWidth;
+      }
+      
+      // Method 4: Use setSize API if available
+      if (typeof healthBar.setSize === 'function') {
+        healthBar.setSize(newWidth, barHeight);
+      }
+      
+      // Method 5: Use setScale API if available
+      if (typeof healthBar.setScale === 'function') {
+        healthBar.setScale(healthRatio, 1);
+      }
+      
+      // Method 6: Use setDisplaySize API if available
+      if (typeof healthBar.setDisplaySize === 'function') {
+        healthBar.setDisplaySize(newWidth, barHeight);
+      }
+      
+      // Ensure the health bar is visible
+      if (typeof healthBar.setVisible === 'function') {
+        healthBar.setVisible(true);
+      }
+      if (typeof healthBar.setAlpha === 'function') {
+        healthBar.setAlpha(1);
+      }
+      
+      console.log(`✅ Health bar update successful for player ${playerIndex + 1} with ratio: ${healthRatio}`);
+    } catch (error) {
+      console.error(`🔥 Error updating health bar for player ${playerIndex + 1}:`, error);
+    }
+    
+    // Add detailed logging about health bar update
+    if (DEV) {
+      const barStatus = {
+        exists: !!healthBar,
+        width: healthBar.width,
+        displayWidth: healthBar.displayWidth,
+        scaleX: healthBar.scaleX,
+        newWidth: newWidth,
+        ratio: healthRatio,
+        currentHealth,
+        maxHealth: MAX_HEALTH,
+        successfulUpdate: (healthBar.width === newWidth || 
+                           healthBar.displayWidth === newWidth || 
+                           healthBar.scaleX === healthRatio)
+      };
+      
+      console.log(`[HEALTHBAR-UPDATE] Player ${playerIndex + 1} health bar:`, barStatus);
     }
   }
 
@@ -501,8 +737,11 @@ class KidsFightScene extends Phaser.Scene {
       this.wsManager = wsManager;
       this.wsManager.isHost = this.isHost;
       
-      // Only show debug info text in development mode
+      // CRITICAL FIX: Register this scene with the WebSocketManager for direct position syncing
+      this.wsManager.setGameScene(this);
+      console.log('[CRITICAL] Registered KidsFightScene with WebSocketManager for direct position sync');
       
+      // Only show debug info text in development mode
       if (DEV) {
         // Add debug info text
         this.debugInfoText = this.add.text(
@@ -521,38 +760,143 @@ class KidsFightScene extends Phaser.Scene {
         this.debugInfoText = { setText: () => {}, setVisible: () => {}, scene: null };
       }
       
-      // CRITICAL FIX: Set up WebSocket message handler
+      // CRITICAL FIX: Set up reliable direct WebSocket message handler
       if (wsManager.ws) {
-        console.log('[CRITICAL] Setting up WebSocket message handler in KidsFightScene');
+        console.log('[CRITICAL] Setting up direct WebSocket handler in KidsFightScene');
         
-        // Store the original onmessage handler if it exists
-        const originalOnMessage = wsManager.ws.onmessage;
-        
-        wsManager.ws.onmessage = (event) => {
+        // Directly override the WebSocket onmessage with our handler
+        // This bypasses any intermediate handlers that might filter messages
+        const directWSHandler = (event) => {
           try {
-            const data = JSON.parse(event.data);
-            console.log('[CRITICAL] KidsFightScene received WebSocket message:', data);
+            // Log raw message receipt
+            console.log('[DIRECT-WS] RAW MESSAGE RECEIVED:', event.data.substring(0, 100) + (event.data.length > 100 ? '...' : ''));
             
-            if (data.type === 'game_action') {
-              console.log('[CRITICAL] Received game action:', data.action);
-              this.handleRemoteAction(data.action);
-            } else if (data.type === 'player_disconnected') {
-              this.handleDisconnection();
-            } else if (data.type === 'start_game') {
-              if (Array.isArray(data.health) && data.health.length === 2) {
-                this.playerHealth = [...data.health];
-                if (DEV) console.log('[DEBUG-HEALTH-SERVER] playerHealth set from server data:', this.playerHealth);
-                console.log('[KidsFightScene] Initialized playerHealth from server:', this.playerHealth);
+            const data = JSON.parse(event.data);
+            
+            // Log all message types for debugging
+            console.log('[DIRECT-WS] Message type:', data.type);
+            
+            // Handle player_update messages here
+            if (data.type === 'player_update') {
+              console.log('[DIRECT-WS] ✅ Received player_update message:', data);
+              
+              // Determine which player to update based on isHost
+              const remotePlayerIndex = this.isHost ? 1 : 0;
+              const remotePlayer = remotePlayerIndex === 0 ? this.player1 : this.player2;
+              
+              console.log('[DIRECT-WS] Remote player info:', { 
+                remotePlayerIndex, 
+                isHost: this.isHost,
+                playerExists: !!remotePlayer,
+                remotePlayerCurrentPos: remotePlayer ? { x: remotePlayer.x, y: remotePlayer.y } : null
+              });
+              
+              // Make sure the player exists
+              if (remotePlayer) {
+                // Update position directly
+                if (typeof data.x === 'number' && typeof data.y === 'number') {
+                  remotePlayer.x = data.x;
+                  remotePlayer.y = data.y;
+                }
+                
+                // Update velocity
+                if (typeof data.velocityX === 'number' && typeof data.velocityY === 'number' && remotePlayer.body) {
+                  remotePlayer.body.velocity.x = data.velocityX;
+                  remotePlayer.body.velocity.y = data.velocityY;
+                }
+                
+                // Update animation frame
+                if (typeof data.frame === 'number') {
+                  remotePlayer.setFrame(data.frame);
+                }
+                
+                // Update flip X
+                if (typeof data.flipX === 'boolean') {
+                  remotePlayer.setFlipX(data.flipX);
+                }
+                
+                console.log('§[DIRECT-PLAYER-SYNC] ✅ UPDATED PLAYER POSITION:', {
+                  oldX: data.x !== remotePlayer.x ? remotePlayer.x : 'same',
+                  newX: data.x,
+                  oldY: data.y !== remotePlayer.y ? remotePlayer.y : 'same',
+                  newY: data.y,
+                  velocityX: data.velocityX,
+                  velocityY: data.velocityY,
+                  frame: remotePlayer.frame?.name,
+                  flipX: remotePlayer.flipX
+                });
+              }
+            }
+            if (data.type === 'game_action' && data.action) {
+              const action = data.action;
+              // Only process movement-related actions (e.g., move, stop)
+              const remotePlayerIndex = this.isHost ? 1 : 0;
+              const remotePlayer = remotePlayerIndex === 0 ? this.player1 : this.player2;
+              console.log('[DIRECT-WS] Handling game_action for remote player:', { remotePlayerIndex, isHost: this.isHost, playerExists: !!remotePlayer, action });
+              if (remotePlayer && action.position) {
+                // Update position
+                remotePlayer.x = action.position.x;
+                remotePlayer.y = action.position.y;
+                // Optionally update velocity, frame, flipX if sent
+                if (typeof action.velocityX === 'number' && typeof action.velocityY === 'number' && remotePlayer.body) {
+                  remotePlayer.body.velocity.x = action.velocityX;
+                  remotePlayer.body.velocity.y = action.velocityY;
+                }
+                if (typeof action.frame === 'number') {
+                  remotePlayer.setFrame(action.frame);
+                }
+                if (typeof action.flipX === 'boolean') {
+                  remotePlayer.setFlipX(action.flipX);
+                }
+                console.log('[DIRECT-PLAYER-SYNC] ✅ UPDATED PLAYER POSITION (game_action):', {
+                  x: remotePlayer.x,
+                  y: remotePlayer.y,
+                  velocityX: remotePlayer.body ? remotePlayer.body.velocity.x : undefined,
+                  velocityY: remotePlayer.body ? remotePlayer.body.velocity.y : undefined,
+                  frame: remotePlayer.frame,
+                  flipX: remotePlayer.flipX
+                });
               } else {
-                // fallback to default if not provided
-                this.playerHealth = [100, 100];
-                if (DEV) console.log('[DEBUG-HEALTH-FALLBACK] playerHealth set to [100, 100] (fallback)');
-                console.warn('[KidsFightScene] No health provided by server, using defaults');
+                console.warn('[DIRECT-PLAYER-SYNC] ❌ Remote player or action.position missing in game_action', { remotePlayer, action });
+              }
+            }
+            
+            // Handle health_update messages for remote player health sync
+            if (data.type === 'health_update' && typeof data.health === 'number') {
+              const remotePlayerIndex = this.isHost ? 1 : 0;
+              const remotePlayer = remotePlayerIndex === 0 ? this.player1 : this.player2;
+              if (remotePlayer) {
+                remotePlayer.health = data.health;
+                // --- CRITICAL FIX: Sync the playerHealth array used by updateHealthBars ---
+                const playerIndex = typeof data.playerIndex === 'number' ? data.playerIndex : null;
+                if (playerIndex !== null && Array.isArray(this.playerHealth)) {
+                  this.playerHealth[playerIndex] = data.health;
+                  if (typeof this.updateHealthBars === 'function') {
+                    this.updateHealthBars(playerIndex);
+                  }
+                }
+                console.log('[DIRECT-PLAYER-SYNC] ✅ UPDATED REMOTE PLAYER HEALTH:', {
+                  remotePlayerIndex,
+                  newHealth: data.health
+                });
+              } else {
+                console.warn('[DIRECT-PLAYER-SYNC] ❌ Remote player not found for health update');
               }
             }
           } catch (error) {
-            console.error('[CRITICAL] Error handling WebSocket message:', error);
+            console.error('[DIRECT-WS] ❌ Error processing message:', error, 'Raw data:', event.data.substring(0, 100));
           }
+        };
+        
+        // Keep reference to original handler for other message types
+        const originalHandler = wsManager.ws.onmessage;
+        
+        // Set up our handler to run first, then call the original
+        wsManager.ws.onmessage = (event) => {
+          // Process with our direct handler first
+          directWSHandler(event);
+          // Then let the original handler process other message types
+          if (originalHandler) originalHandler(event);
         };
       } else {
         console.error('[CRITICAL] WebSocket not initialized in KidsFightScene');
@@ -1211,11 +1555,35 @@ class KidsFightScene extends Phaser.Scene {
     this.healthBar1Border.setStrokeStyle(2, 0x000000);
     this.healthBar2Border.setStrokeStyle(2, 0x000000);
     
-    // Single health bars for each player
-    this.healthBar1 = this.add.rectangle(200, 30, barWidth, barHeight, 0xff4444);
-    this.healthBar2 = this.add.rectangle(600, 30, barWidth, barHeight, 0x44aaff);
+    // Single health bars for each player with high depth to ensure visibility
+    this.healthBar1 = this.add.rectangle(200, 30, barWidth, barHeight, 0xff4444).setDepth(100);
+    this.healthBar2 = this.add.rectangle(600, 30, barWidth, barHeight, 0x44aaff).setDepth(100);
     this.healthBar1.setOrigin(0.5);
     this.healthBar2.setOrigin(0.5);
+    
+    // Ensure health bars are visible and fully opaque
+    this.healthBar1.setAlpha(1).setVisible(true);
+    this.healthBar2.setAlpha(1).setVisible(true);
+    
+    // Re-render the health bars to force a visual update
+    this.healthBar1Border.setDepth(99);
+    this.healthBar2Border.setDepth(99);
+    
+    // DEBUG: Log all properties and methods of health bars
+    console.log('🔍 HEALTHBAR1 CREATED:', {
+      width: this.healthBar1.width,
+      height: this.healthBar1.height,
+      displayWidth: this.healthBar1.displayWidth,
+      displayHeight: this.healthBar1.displayHeight,
+      scaleX: this.healthBar1.scaleX,
+      scaleY: this.healthBar1.scaleY,
+      x: this.healthBar1.x,
+      y: this.healthBar1.y,
+      origin: this.healthBar1.originX + ',' + this.healthBar1.originY,
+      hasSetSize: typeof this.healthBar1.setSize === 'function',
+      hasSetDisplaySize: typeof this.healthBar1.setDisplaySize === 'function',
+      hasSetScale: typeof this.healthBar1.setScale === 'function'
+    });
 
     // --- SPECIAL HIT CIRCLES (PIPS) ---
     // Player 1 special pips (left, above health bar)
@@ -1691,11 +2059,32 @@ class KidsFightScene extends Phaser.Scene {
 
     // In online mode, send player position to other player
     if (this.gameMode === 'online' && wsManager && wsManager.isConnected()) {
+      // CRITICAL DEBUG - Log game mode and connection status
+      console.log('[PLAYER-SYNC] ONLINE MODE CHECK:', {
+        gameMode: this.gameMode,
+        wsManagerExists: !!wsManager,
+        isConnected: wsManager ? wsManager.isConnected() : false,
+        wsReadyState: wsManager && wsManager.ws ? wsManager.ws.readyState : 'no websocket',
+        isHost: this.isHost,
+        localPlayerIndex: this.localPlayerIndex
+      });
+      
       const playerToSync = this.isHost ? this.player1 : this.player2;
       const playerIndex = this.isHost ? 0 : 1;
 
+      // Verbose debugging for player objects
+      console.log('[PLAYER-SYNC] PLAYER OBJECTS:', {
+        player1Exists: !!this.player1,
+        player2Exists: !!this.player2,
+        playerToSyncExists: !!playerToSync,
+        playerToSyncHasBody: playerToSync ? !!playerToSync.body : false,
+        player1Position: this.player1 ? {x: this.player1.x, y: this.player1.y} : 'N/A',
+        player2Position: this.player2 ? {x: this.player2.x, y: this.player2.y} : 'N/A'
+      });
+
       if (playerToSync && playerToSync.body) {
-        wsManager.send({
+        // Log EVERY position update during troubleshooting
+        const playerUpdateData = {
           type: 'player_update',
           x: playerToSync.x,
           y: playerToSync.y,
@@ -1704,8 +2093,36 @@ class KidsFightScene extends Phaser.Scene {
           health: this.playerHealth[playerIndex],
           frame: playerToSync.frame.name,
           flipX: playerToSync.flipX
+        };
+        
+        // Log EVERY update during troubleshooting
+        console.log('[PLAYER-SYNC] ✓ SENDING PLAYER UPDATE:', {
+          localPlayerIndex: this.localPlayerIndex,
+          isHost: this.isHost, 
+          playerIndex,
+          position: {x: playerUpdateData.x, y: playerUpdateData.y},
+          velocity: {x: playerUpdateData.velocityX, y: playerUpdateData.velocityY},
+          frame: playerUpdateData.frame,
+          flipX: playerUpdateData.flipX,
+          timestamp: Date.now()
         });
+        
+        // Send the update to the other player
+        try {
+          wsManager.send(playerUpdateData);
+          console.log('[PLAYER-SYNC] ✓ WebSocket message sent successfully');
+        } catch (error) {
+          console.error('[PLAYER-SYNC] ❌ Error sending WebSocket message:', error);
+        }
+      } else {
+        console.log('[PLAYER-SYNC] ❌ Cannot sync - player or physics body missing');
       }
+    } else {
+      console.log('[PLAYER-SYNC] ❌ Not in online mode or WebSocket not connected', {
+        gameMode: this.gameMode,
+        wsManagerExists: !!wsManager,
+        isConnected: wsManager ? wsManager.isConnected() : false
+      });
     }
   }
 
@@ -3003,91 +3420,51 @@ handleDisconnection() {
         newPlayersButton.disableInteractive();
         newPlayersButton.setAlpha(0.5);
         
-        // Set up a temporary handler specifically for replay responses
-        const originalOnMessage = this.wsManager.ws.onmessage;
-        this.wsManager.ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('[KidsFightScene] Received message in temporary handler:', data);
-            
-            // Check if this is a replay request from the other player
-            if (data.type === 'replay_request') {
-              console.log('[KidsFightScene] Received replay request in temporary handler');
-              
-              // Reset the original handler to avoid recursion
-              this.wsManager.ws.onmessage = originalOnMessage;
-              
-              // Show the popup directly
-              this.showReplayRequestPopup(data);
-              return;
-            }
-            
-            // Handle replay responses
-            if (data.type === 'replay_response' && this.replayRequested) {
-              console.log('[KidsFightScene] Received replay response in temporary handler:', data);
-              
-              if (data.accepted) {
-                // Other player accepted, restart the game
-                waitingText.setText('Outro jogador aceitou! Reiniciando...');
-                waitingText.setColor('#00ff00');
-                
-                // Reset the game with the same players after a short delay
-                this.time.delayedCall(1000, () => {
-                  if (!this.restarting) {
-                    this.restarting = true; // Prevent multiple restarts
-                    console.log('[KidsFightScene] Restarting game with same players...');
-                    this.scene.restart({
-                      p1: this.selected.p1,
-                      p2: this.selected.p2,
-                      scenario: this.selectedScenario,
-                      mode: 'online',
-                      isHost: this.isHost,
-                      roomCode: this.roomCode
-                    });
-                  }
-                });
-              } else {
-                // Other player rejected or there was an error
-                waitingText.setText('Outro jogador não aceitou ou houve um erro.');
-                waitingText.setColor('#ff0000');
-                
-                // Re-enable buttons after a short delay
-                this.time.delayedCall(2000, () => {
-                  replayButton.setInteractive({ useHandCursor: true });
-                  replayButton.setAlpha(1);
-                  newPlayersButton.setInteractive({ useHandCursor: true });
-                  newPlayersButton.setAlpha(1);
-                  waitingText.setVisible(false);
-                  this.replayRequested = false;
-                });
-              }
-              
-              // Reset the original handler
-              this.wsManager.ws.onmessage = originalOnMessage;
-              return;
-            }
-            
-            // For any other message, pass to the original handler
-            if (originalOnMessage) {
-              originalOnMessage(event);
-            }
-          } catch (error) {
-            console.error('[KidsFightScene] Error in temporary handler:', error);
-            // Reset the original handler on error
-            this.wsManager.ws.onmessage = originalOnMessage;
+        // Set up a replay response callback instead of overwriting ws.onmessage
+        this.replayResponseCallback = (data) => {
+          if (data.type === 'replay_request') {
+            // Show the popup directly
+            this.showReplayRequestPopup(data);
+            return;
           }
-        };
-      } else {
-        // In local mode, just restart immediately
-        this.scene.restart({
-          p1: this.selected.p1,
-          p2: this.selected.p2,
-          scenario: this.selectedScenario
-        });
+          if (data.type === 'replay_response' && this.replayRequested) {
+            if (data.accepted) {
+              // Other player accepted, restart the game
+              waitingText.setText('Outro jogador aceitou! Reiniciando...');
+              waitingText.setColor('#00ff00');
+              // Reset the game with the same players after a short delay
+              this.time.delayedCall(1000, () => {
+                if (!this.restarting) {
+                  this.restarting = true; // Prevent multiple restarts
+                  console.log('[KidsFightScene] Restarting game with same players...');
+                  this.scene.restart({
+                    p1: this.selected.p1,
+                    p2: this.selected.p2,
+                    scenario: this.selectedScenario,
+                    mode: 'online',
+                    isHost: this.isHost,
+                    roomCode: this.roomCode
+                  });
+                }
+              });
+            } else {
+              // Other player rejected or there was an error
+              waitingText.setText('Outro jogador não aceitou ou houve um erro.');
+              waitingText.setColor('#ff0000');
+              // Re-enable buttons after a short delay
+              this.time.delayedCall(2000, () => {
+                replayButton.setInteractive({ useHandCursor: true });
+                replayButton.setAlpha(1);
+                newPlayersButton.setInteractive({ useHandCursor: true });
+                newPlayersButton.setAlpha(1);
+                waitingText.setVisible(false);
+                this.newPlayersRequested = false;
+              });
+            }
+          }}
       }
     });
-
-
+        
     // Button to choose different players
     const newPlayersButton = this.add.text(
       this.cameras.main.width / 2,
