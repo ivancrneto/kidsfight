@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: kidsfight-ws
+    env: node
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production

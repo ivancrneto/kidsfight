@@ -35,7 +35,7 @@ class WebSocketManager {
         // Default server configuration
         wsUrl = DEV
           ? 'ws://localhost:8081'
-          : 'wss://kidsfight-websocket.glitch.me';
+          : 'wss://kidsfight-ws.onrender.com';
         console.log('[WebSocketManager] Using default server:', wsUrl);
       }
       this.ws = new WebSocket(wsUrl);
