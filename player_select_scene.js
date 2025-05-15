@@ -22,6 +22,26 @@ class PlayerSelectScene extends Phaser.Scene {
   }
   
   init(data) {
+    // ORIENTATION CHANGE PROTECTION: Check if this scene was triggered by an orientation change
+    // If we detect a recent orientation change and no explicit navigation from GameModeScene,
+    // redirect to GameModeScene immediately
+    const now = Date.now();
+    const lastOrientationTime = window.lastOrientationChangeTime || 0;
+    const fromGameMode = data && data.fromGameMode === true;
+    const timeSinceOrientation = now - lastOrientationTime;
+    
+    // If scene was launched within 2 seconds of orientation change and not explicitly from GameMode
+    if (timeSinceOrientation < 2000 && !fromGameMode) {
+      console.log('[PlayerSelectScene] 🚨 PROTECTION: Detected invalid scene navigation after orientation change');
+      console.log('[PlayerSelectScene] Time since orientation change:', timeSinceOrientation + 'ms');
+      console.log('[PlayerSelectScene] Redirecting to GameModeScene...');
+      
+      // Immediately redirect to GameModeScene instead of continuing initialization
+      this.scene.stop('PlayerSelectScene');
+      this.scene.start('GameModeScene');
+      return; // Skip the rest of initialization
+    }
+    
     // Reset selections when scene is restarted
     if (DEV) console.log('[PlayerSelectScene] Init called, resetting selections');
     // Character sprite keys for mapping
@@ -483,7 +503,7 @@ class PlayerSelectScene extends Phaser.Scene {
       if (this.gameMode !== 'online' || this.isHost) {
         option.setInteractive();
         option.on('pointerdown', () => {
-          // The index in p1Options array directly maps to the character index (0-7)
+          // The index in this.p1Options array directly maps to the character index (0-7)
           this.selected.p1 = this.CHARACTER_KEYS[i];
           if (DEV) console.log('[PlayerSelectScene] P1 selected:', i, this.CHARACTER_KEYS[i]);
           this.p1Selector.setPosition(option.x, option.y - this.faceOffsetY);
@@ -509,7 +529,7 @@ option.setAlpha(0.5); // Dim opponent's options
       if (this.gameMode !== 'online' || !this.isHost) {
         option.setInteractive();
         option.on('pointerdown', () => {
-          // The index in p2Options array directly maps to the character index (0-7)
+          // The index in this.p2Options array directly maps to the character index (0-7)
           this.selected.p2 = this.CHARACTER_KEYS[i];
           if (DEV) console.log('[PlayerSelectScene] P2 selected:', i, this.CHARACTER_KEYS[i]);
           this.p2Selector.setPosition(option.x, option.y - this.faceOffsetY);
@@ -603,13 +623,13 @@ option.setAlpha(0.5); // Dim opponent's options
       const faceY2 = screenHeight * 0.52;
       for (let i = 0; i < 4; i++) {
         p1FaceBGs[i*2].setPosition(p1FaceX[i], faceY1);
-        p1Options[i*2].setPosition(p1FaceX[i], faceY1 + faceOffsetY);
+        this.p1Options[i*2].setPosition(p1FaceX[i], faceY1 + faceOffsetY);
         p1FaceBGs[i*2+1].setPosition(p1FaceX[i], faceY2);
-        p1Options[i*2+1].setPosition(p1FaceX[i], faceY2 + faceOffsetY);
+        this.p1Options[i*2+1].setPosition(p1FaceX[i], faceY2 + faceOffsetY);
         p2FaceBGs[i*2].setPosition(p2FaceX[i], faceY1);
-        p2Options[i*2].setPosition(p2FaceX[i], faceY1 + faceOffsetY);
+        this.p2Options[i*2].setPosition(p2FaceX[i], faceY1 + faceOffsetY);
         p2FaceBGs[i*2+1].setPosition(p2FaceX[i], faceY2);
-        p2Options[i*2+1].setPosition(p2FaceX[i], faceY2 + faceOffsetY);
+        this.p2Options[i*2+1].setPosition(p2FaceX[i], faceY2 + faceOffsetY);
       }
       // Optionally update player names if you store references
     });

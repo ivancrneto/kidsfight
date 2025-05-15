@@ -63,7 +63,7 @@ class WebSocketManager {
         try {
           data = JSON.parse(event.data);
         } catch (error) {
-          console.error('[WebSocketManager] Failed to parse message:', error, event.data);
+          console.error('[WebSocketManager] Error processing message:', error, event.data);
           return; // Exit early if we can't parse the message
         }
         

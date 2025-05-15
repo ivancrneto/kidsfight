@@ -1,3 +1,20 @@
+import scenario1Img from './scenario1.png';
+import player1RawImg from './sprites-bento3.png';
+import player2RawImg from './sprites-davir3.png';
+import player3RawImg from './sprites-jose3.png';
+import player4RawImg from './sprites-davis3.png';
+import player5RawImg from './sprites-carol3.png';
+import player6RawImg from './sprites-roni3.png';
+import player7RawImg from './sprites-jacqueline3.png';
+import player8RawImg from './sprites-ivan3.png';
+import RotatePromptScene from './rotate_prompt_scene.js';
+import GameModeScene from './game_mode_scene.js';
+import OnlineModeScene from './online_mode_scene.js';
+import PlayerSelectScene from './player_select_scene.js';
+import ScenarioSelectScene from './scenario_select_scene.js';
+import KidsFightScene from './kidsfight_scene.js';
+import { DEV } from './globals.js';
+
 // DIAGNOSTIC: Unique build marker
 window.KIDSFIGHT_BUILD_ID = 'prod-test-' + Date.now();
 console.log('KIDSFIGHT_BUILD_ID:', window.KIDSFIGHT_BUILD_ID);
@@ -14,21 +31,6 @@ function isLandscape() {
 }
 
 // Parcel image imports for Phaser asset loading
-import scenario1Img from './scenario1.png';
-import player1RawImg from './sprites-bento3.png';
-import player2RawImg from './sprites-davir3.png';
-import player3RawImg from './sprites-jose3.png';
-import player4RawImg from './sprites-davis3.png';
-import player5RawImg from './sprites-carol3.png';
-import player6RawImg from './sprites-roni3.png';
-import player7RawImg from './sprites-jacqueline3.png';
-import player8RawImg from './sprites-ivan3.png';
-import RotatePromptScene from './rotate_prompt_scene.js';
-import GameModeScene from './game_mode_scene.js';
-import OnlineModeScene from './online_mode_scene.js';
-import PlayerSelectScene from './player_select_scene.js';
-import ScenarioSelectScene from './scenario_select_scene.js';
-import KidsFightScene from './kidsfight_scene.js';
 
 // Load gameUtils.js via script tag instead of import
 // The functions will be available globally
@@ -60,7 +62,16 @@ function resizeGame(game) {
   // Use window.innerWidth/innerHeight for true viewport size (accounts for mobile browser UI)
   const w = window.innerWidth;
   const h = window.innerHeight;
-  game.scale.resize(w, h);
+  if (!game.scale || typeof game.scale.resize !== 'function') {
+    console.warn('resizeGame: game.scale is not available', game && game.scale);
+    return;
+  }
+  try {
+    game.scale.resize(w, h);
+  } catch (e) {
+    console.error('resizeGame: Exception during game.scale.resize', e, game.scale);
+    return;
+  }
   applyGameCss();
   // --- Ensure ALL active scenes reposition after resize/orientation change ---
   if (game.scene && typeof game.scene.getScenes === 'function') {
@@ -75,91 +86,54 @@ function resizeGame(game) {
 
 
 // --- Responsive Touch Controls Positioning ---
-KidsFightScene.prototype.updateControlPositions = function() {
-  if (!this.isTouch || !this.touchControls || !this.cameras || !this.cameras.main) return;
-  const cam = this.cameras.main;
-  const w = cam.width;
-  const h = cam.height;
-  const isNarrow = w / h < 1.8; // Detect narrower aspect ratios like iPhone 14 landscape
-  
-  // Adjust spacing for narrower screens
-  const p1LeftX = isNarrow ? 0.07 : 0.08;
-  const p1RightX = isNarrow ? 0.16 : 0.18;
-  const p1AttackX = isNarrow ? 0.26 : 0.28;
-  const p1SpecialX = isNarrow ? 0.34 : 0.36;
-  
-  const p2RightX = isNarrow ? 0.93 : 0.92;
-  const p2LeftX = isNarrow ? 0.84 : 0.82;
-  const p2AttackX = isNarrow ? 0.74 : 0.72;
-  const p2SpecialX = isNarrow ? 0.66 : 0.64;
-  
-  // Player 1
-  this.touchControls.p1.left.setPosition(w * p1LeftX, h * 0.85);
-  this.touchControls.p1.right.setPosition(w * p1RightX, h * 0.85);
-  this.touchControls.p1.jump.setPosition(w * (p1LeftX + (p1RightX - p1LeftX) / 2), h * 0.7);
-  this.touchControls.p1.down.setPosition(w * (p1LeftX + (p1RightX - p1LeftX) / 2), h * 0.97);
-  this.touchControls.p1.attack.setPosition(w * p1AttackX, h * 0.89);
-  this.touchControls.p1.special.setPosition(w * p1SpecialX, h * 0.89);
-  
-  // Player 2
-  this.touchControls.p2.left.setPosition(w * p2LeftX, h * 0.85);
-  this.touchControls.p2.right.setPosition(w * p2RightX, h * 0.85);
-  this.touchControls.p2.jump.setPosition(w * (p2LeftX + (p2RightX - p2LeftX) / 2), h * 0.7);
-  this.touchControls.p2.down.setPosition(w * (p2LeftX + (p2RightX - p2LeftX) / 2), h * 0.97);
-  this.touchControls.p2.attack.setPosition(w * p2AttackX, h * 0.89);
-  this.touchControls.p2.special.setPosition(w * p2SpecialX, h * 0.89);
-  
-  // Labels (order must match creation)
-  if (this.touchLabels && this.touchLabels.length === 12) {
-    this.touchLabels[0].setPosition(w * (p1LeftX - 0.02), h * 0.83);
-    this.touchLabels[1].setPosition(w * (p1RightX - 0.02), h * 0.83);
-    this.touchLabels[2].setPosition(w * (p1LeftX + (p1RightX - p1LeftX) / 2 - 0.02), h * 0.68);
-    this.touchLabels[3].setPosition(w * (p1LeftX + (p1RightX - p1LeftX) / 2 - 0.02), h * 0.95);
-    this.touchLabels[4].setPosition(w * (p1AttackX - 0.03), h * 0.87);
-    this.touchLabels[5].setPosition(w * (p1SpecialX - 0.03), h * 0.87);
-    
-    this.touchLabels[6].setPosition(w * (p2LeftX - 0.03), h * 0.83);
-    this.touchLabels[7].setPosition(w * (p2RightX - 0.03), h * 0.83);
-    this.touchLabels[8].setPosition(w * (p2LeftX + (p2RightX - p2LeftX) / 2 - 0.03), h * 0.68);
-    this.touchLabels[9].setPosition(w * (p2LeftX + (p2RightX - p2LeftX) / 2 - 0.03), h * 0.95);
-    this.touchLabels[10].setPosition(w * (p2AttackX - 0.03), h * 0.87);
-    this.touchLabels[11].setPosition(w * (p2SpecialX - 0.03), h * 0.87);
-  }
-  
-  // Adjust button sizes for narrower screens
-  if (isNarrow) {
-    // Make buttons slightly smaller on narrow screens
-    const buttonScale = 0.9;
-    Object.values(this.touchControls.p1).forEach(btn => {
-      if (btn.displayWidth) {
-        btn.setScale(buttonScale);
-      }
-    });
-    Object.values(this.touchControls.p2).forEach(btn => {
-      if (btn.displayWidth) {
-        btn.setScale(buttonScale);
-      }
-    });
-  } else {
-    // Reset to normal size on wider screens
-    Object.values(this.touchControls.p1).forEach(btn => {
-      if (btn.displayWidth) {
-        btn.setScale(1);
-      }
-    });
-    Object.values(this.touchControls.p2).forEach(btn => {
-      if (btn.displayWidth) {
-        btn.setScale(1);
-      }
-    });
-  }
-}
+
 
 // Phaser Game Config (must be after KidsFightScene is defined)
+// --- DIAGNOSTIC: Global Scene Transition Logger ---
+(function() {
+  const logStyle = 'background: #222; color: #bada55; font-weight: bold;';
+  function logSceneTransition(method, sourceScene, targetScene, args) {
+    console.log(`%c[SCENE TRANSITION]`, logStyle,
+      `Method: ${method}\n  Source: ${sourceScene && sourceScene.scene && sourceScene.scene.key}\n  Target: ${targetScene}\n  Time: ${new Date().toISOString()}\n  Args:`, args,
+      '\n  Stack:', new Error().stack.split('\n').slice(2, 7).join('\n'));
+  }
+
+  // Patch start
+  const origStart = Phaser.Scene.prototype.start;
+  Phaser.Scene.prototype.start = function(key, data = {}) {
+    logSceneTransition('start', this, key, data);
+    // --- Existing CRITICAL INTERCEPT for PlayerSelectScene after orientation ---
+    const now = Date.now();
+    const lastOrientationTime = window.lastOrientationChangeTime || 0;
+    const timeSinceOrientationChange = now - lastOrientationTime;
+    if (key === 'PlayerSelectScene' && timeSinceOrientationChange < 3000 && !data.fromGameMode) {
+      console.log('%c[SCENE INTERCEPT] Prevented PlayerSelectScene after orientation', logStyle);
+      return origStart.call(this, 'GameModeScene');
+    }
+    return origStart.apply(this, arguments);
+  };
+
+  // Patch switch
+  const origSwitch = Phaser.Scene.prototype.switch;
+  Phaser.Scene.prototype.switch = function(key) {
+    logSceneTransition('switch', this, key, arguments);
+    return origSwitch.apply(this, arguments);
+  };
+
+  // Patch stop
+  const origStop = Phaser.Scene.prototype.stop;
+  Phaser.Scene.prototype.stop = function(key) {
+    logSceneTransition('stop', this, key, arguments);
+    return origStop.apply(this, arguments);
+  };
+})();
+
+
+console.log('PlayerSelectScene typeof:', typeof PlayerSelectScene, PlayerSelectScene);
 const config = {
   type: Phaser.AUTO,
-  width: GAME_WIDTH,
-  height: GAME_HEIGHT,
+  width: window.innerWidth,
+  height: window.innerHeight,
   backgroundColor: '#222',
   parent: 'game-container',
   scene: [RotatePromptScene, GameModeScene, OnlineModeScene, PlayerSelectScene, ScenarioSelectScene, KidsFightScene],
@@ -176,9 +150,7 @@ const config = {
   }
 };
 
-import { DEV } from './globals.js';
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('DEV:', DEV);
+
 window.DEV = DEV;
 
 window.onload = () => {
@@ -233,52 +205,122 @@ window.onload = () => {
 
   let lastWasPortrait = null;
   let recreateTimeout = null;
+  
+  // Track last orientation change time to prevent multiple handlers firing too quickly
+  let lastOrientationChangeTime = 0;
+  
   function showCorrectScene() {
-    // For debugging: Always show the game regardless of orientation
-    const portrait = false; // Force landscape mode for testing
+    // Debounce orientation changes that happen too quickly
+    const now = Date.now();
+    if (now - lastOrientationChangeTime < 300) {
+      console.log('[KidsFight] Orientation change debounced');
+      return;
+    }
+    lastOrientationChangeTime = now;
+    
+    // Get actual orientation state
+    const portrait = !isLandscape();
     console.log('[KidsFight] Orientation check:', { 
       isMobile: isMobile(), 
       isLandscape: isLandscape(), 
       portrait: portrait,
       windowWidth: window.innerWidth,
-      windowHeight: window.innerHeight
+      windowHeight: window.innerHeight,
+      timestamp: now
     });
     
+    // CRITICAL FIX: If we're in portrait mode, show rotate prompt
     if (portrait) {
       if (!game) {
         game = createGame('RotatePromptScene');
       } else {
-        game.scene.stop('KidsFightScene');
-        game.scene.stop('PlayerSelectScene');
-        game.scene.stop('ScenarioSelectScene');
+        // Force stop ALL scenes to prevent any scene from persisting
+        const allSceneKeys = [
+          'PlayerSelectScene', 'GameModeScene', 'KidsFightScene',
+          'ScenarioSelectScene', 'OnlineModeScene'
+        ];
+        
+        allSceneKeys.forEach(key => {
+          try {
+            if (game.scene.isActive(key)) {
+              console.log(`[KidsFight] Stopping scene: ${key}`);
+              game.scene.stop(key);
+            }
+          } catch (e) {
+            console.error(`[KidsFight] Error stopping scene ${key}:`, e);
+          }
+        });
+        
+        // Start rotate prompt scene
+        console.log('[KidsFight] Starting RotatePromptScene');
         game.scene.start('RotatePromptScene');
       }
       lastWasPortrait = true;
-    } else {
-      if (lastWasPortrait) {
-        // Destroy and recreate the game instance for a clean landscape start, with a delay to allow resize
+    } 
+    // LANDSCAPE MODE HANDLING
+    else {
+      // Coming from portrait mode - update scene and resize only
+      if (lastWasPortrait === true) {
+        console.log('[KidsFight] ⚠️ Orientation changed from portrait to landscape - updating scene and resizing');
+        // Instead of destroying/recreating the game, just restart the main scene and resize
         if (game) {
-          game.destroy(true);
-          game = null;
+          try {
+            // Resume or start your main scene as appropriate
+            game.scene.stop('RotatePromptScene');
+            game.scene.start('GameModeScene'); // Or whichever scene should be active
+            resizeGame(game);
+          } catch (e) {
+            console.error('[KidsFight] Error updating scene or resizing:', e);
+          }
         }
-        // Remove all canvas elements from #game-container to ensure a clean slate
-        const container = document.getElementById('game-container');
-        if (container) {
-          const canvases = container.querySelectorAll('canvas');
-          canvases.forEach(c => c.parentNode.removeChild(c));
+        // Cancel any pending recreate timeouts
+        if (recreateTimeout) {
+          clearTimeout(recreateTimeout);
+          recreateTimeout = null;
         }
-        if (recreateTimeout) clearTimeout(recreateTimeout);
+        
+        // Create fresh game instance with longer delay to ensure complete cleanup
         recreateTimeout = setTimeout(() => {
-          game = createGame('GameModeScene');
-        }, 120);
+          console.log('[KidsFight] ⚠️ Creating fresh game instance with GameModeScene');
+          try {
+            game = createGame('GameModeScene');
+          } catch (e) {
+            console.error('[KidsFight] Error creating game:', e);
+            // One more attempt if the first fails
+            setTimeout(() => {
+              console.log('[KidsFight] Retry creating game');
+              game = createGame('GameModeScene');
+            }, 100);
+          }
+        }, 300); // Increased delay for more reliable cleanup
+        
         lastWasPortrait = false;
-      } else {
+      } 
+      // Already in landscape mode
+      else {
         if (!game) {
+          // No game instance exists, create one with main menu
+          console.log('[KidsFight] Creating new game instance with GameModeScene');
           game = createGame('GameModeScene');
         } else {
-          game.scene.stop('RotatePromptScene');
-          if (!game.scene.isActive('PlayerSelectScene') && !game.scene.isActive('KidsFightScene')) {
-            game.scene.start('PlayerSelectScene');
+          // Game exists and we're in landscape - check if PlayerSelectScene is incorrectly showing
+          try {
+            // CRITICAL BUG FIX: Force stop PlayerSelectScene if it's active after orientation change
+            if (game.scene.isActive('PlayerSelectScene')) {
+              console.log('[KidsFight] ⚠️ CRITICAL FIX: PlayerSelectScene detected - forcing GameModeScene');
+              game.scene.stop('PlayerSelectScene');
+              game.scene.start('GameModeScene');
+            }
+            // If no scene is active, ensure GameModeScene is shown
+            else if (game.scene.getScenes(true).length === 0 || 
+                    (game.scene.getScenes(true).length === 1 && 
+                     game.scene.isActive('RotatePromptScene'))) {
+              console.log('[KidsFight] No gameplay scenes active, starting GameModeScene');
+              game.scene.stop('RotatePromptScene');
+              game.scene.start('GameModeScene');
+            }
+          } catch (e) {
+            console.error('[KidsFight] Error handling landscape scenes:', e);
           }
         }
       }
@@ -290,12 +332,21 @@ window.onload = () => {
 
   // Helper: double-resize to fix mobile browser chrome issues
   function resizeWithDelay() {
+    // CRITICAL FIX: Track timestamp of orientation changes globally
+    window.lastOrientationChangeTime = Date.now();
+    console.log('[KidsFight] Orientation change detected at timestamp:', window.lastOrientationChangeTime);
+    
     showCorrectScene();
     // Only resize and update layout if in landscape
     if (game && isLandscape()) {
       resizeGame(game);
       setTimeout(() => resizeGame(game), 250);
     }
+  }
+
+  // Initialize the global timestamp tracker if it doesn't exist
+  if (typeof window.lastOrientationChangeTime === 'undefined') {
+    window.lastOrientationChangeTime = 0;
   }
 
   window.addEventListener('resize', resizeWithDelay);

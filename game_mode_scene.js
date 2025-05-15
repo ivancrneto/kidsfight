@@ -65,10 +65,18 @@ class GameModeScene extends Phaser.Scene {
 
     // Button click handlers
     localButton.on('pointerdown', () => {
-      // Start loading the next scene
-      this.scene.launch('PlayerSelectScene', { mode: 'local' });
+      console.log('[GameModeScene] Local play button clicked - launching PlayerSelectScene');
+      // Start loading the next scene with a marker that this was an intentional transition
+      // This helps distinguish between legitimate navigation and orientation change issues
+      this.scene.launch('PlayerSelectScene', { 
+        mode: 'local',
+        fromGameMode: true,  // Flag to indicate this is a legitimate navigation
+        timestamp: Date.now() // Add timestamp for verification
+      });
+      
       // Keep this scene active until the next one is ready
       this.scene.get('PlayerSelectScene').events.once('create', () => {
+        console.log('[GameModeScene] PlayerSelectScene created, stopping GameModeScene');
         this.scene.stop();
       });
     });

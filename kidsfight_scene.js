@@ -69,6 +69,42 @@ class KidsFightScene extends Phaser.Scene {
       default: return 'Jogador';
     }
   }
+
+  // Responsive Touch Controls Positioning
+  updateControlPositions() {
+    if (!this || !('isTouch' in this) || !this.isTouch || !this.touchControls || !this.cameras || !this.cameras.main) return;
+    const cam = this.cameras.main;
+    const w = cam.width;
+    const h = cam.height;
+    const isNarrow = w / h < 1.8; // Detect narrower aspect ratios like iPhone 14 landscape
+
+    // Adjust spacing for narrower screens
+    const p1LeftX = isNarrow ? 0.07 : 0.08;
+    const p1RightX = isNarrow ? 0.16 : 0.18;
+    const p1AttackX = isNarrow ? 0.26 : 0.28;
+    const p1SpecialX = isNarrow ? 0.34 : 0.36;
+
+    const p2RightX = isNarrow ? 0.93 : 0.92;
+    const p2LeftX = isNarrow ? 0.84 : 0.82;
+    const p2AttackX = isNarrow ? 0.74 : 0.72;
+    const p2SpecialX = isNarrow ? 0.66 : 0.64;
+
+    // Player 1
+    this.touchControls.p1.left.setPosition(w * p1LeftX, h * 0.85);
+    this.touchControls.p1.right.setPosition(w * p1RightX, h * 0.85);
+    this.touchControls.p1.jump.setPosition(w * (p1LeftX + (p1RightX - p1LeftX) / 2), h * 0.7);
+    this.touchControls.p1.down.setPosition(w * (p1LeftX + (p1RightX - p1LeftX) / 2), h * 0.97);
+    this.touchControls.p1.attack.setPosition(w * p1AttackX, h * 0.89);
+    this.touchControls.p1.special.setPosition(w * p1SpecialX, h * 0.89);
+
+    // Player 2
+    this.touchControls.p2.left.setPosition(w * p2LeftX, h * 0.85);
+    this.touchControls.p2.right.setPosition(w * p2RightX, h * 0.85);
+    this.touchControls.p2.jump.setPosition(w * (p2LeftX + (p2RightX - p2LeftX) / 2), h * 0.7);
+    this.touchControls.p2.down.setPosition(w * (p2LeftX + (p2RightX - p2LeftX) / 2), h * 0.97);
+    this.touchControls.p2.attack.setPosition(w * p2AttackX, h * 0.89);
+    this.touchControls.p2.special.setPosition(w * p2SpecialX, h * 0.89);
+  }
   
   // Handle incoming WebSocket messages
   setupWebSocketHandlers() {
@@ -622,6 +658,7 @@ class KidsFightScene extends Phaser.Scene {
     this.player1State = 'idle';
     this.player2State = 'idle';
     this.isAttacking = [false, false];
+    this.isTouch = false;
     
     // // console.log('[constructor] timeLeft:', this.timeLeft, 'ROUND_TIME:', typeof ROUND_TIME !== 'undefined' ? ROUND_TIME : 'undefined');
   }
