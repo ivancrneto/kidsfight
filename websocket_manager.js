@@ -8,15 +8,20 @@ class WebSocketManager {
   isHost;
   
   constructor() {
+    this._debugInstanceId = Math.random().toString(36).substring(2, 10);
+    console.log(`[WSM-AGGRESSIVE] WebSocketManager constructor called [instance ${this._debugInstanceId}]`);
     if (WebSocketManager.instance) {
+      console.log(`[WSM-AGGRESSIVE] Returning existing instance [instance ${WebSocketManager.instance._debugInstanceId}]`);
       return WebSocketManager.instance;
     }
     WebSocketManager.instance = this;
     this.ws = null;
     this.isHost = false;
+    console.log(`[WSM-AGGRESSIVE] New instance created [instance ${this._debugInstanceId}]`);
   }
 
   connect() {
+    console.log(`[WSM-AGGRESSIVE] connect() called [instance ${this._debugInstanceId}]`);
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       if (DEV) console.log('[WebSocketManager] Creating new connection');
       // Always use a shared WebSocket server to ensure messages are relayed between clients
@@ -39,8 +44,10 @@ class WebSocketManager {
         console.log('[WebSocketManager] Using default server:', wsUrl);
       }
       this.ws = new WebSocket(wsUrl);
+      console.log(`[WSM-AGGRESSIVE] WebSocket created: ${wsUrl} [instance ${this._debugInstanceId}]`);
       
       this.ws.onopen = () => {
+        console.log(`[WSM-AGGRESSIVE] WebSocket connection opened [instance ${this._debugInstanceId}]`);
         if (DEV) console.log('[WebSocketManager] Connection opened');
       };
       
@@ -49,12 +56,14 @@ class WebSocketManager {
       };
       
       this.ws.onclose = () => {
+        console.log(`[WSM-AGGRESSIVE] WebSocket connection closed [instance ${this._debugInstanceId}]`);
         if (DEV) console.log('[WebSocketManager] Connection closed');
       };
       
       // CRITICAL FIX: Use a single global handler for ALL WebSocket messages
       // This ensures we don't miss any messages due to multiple handlers overwriting each other
       this.ws.onmessage = (event) => {
+        console.log(`[WSM-AGGRESSIVE] WebSocket onmessage fired [instance ${this._debugInstanceId}]. Data:`, event.data.substring(0, 200));
         console.log('🔴🔴 [FAILSAFE] Raw WebSocket message received:', event.data.substring(0, 100));
         console.log('[FULL-LOG] RECEIVED MESSAGE LENGTH:', event.data.length);
         
@@ -62,6 +71,7 @@ class WebSocketManager {
         let data;
         try {
           data = JSON.parse(event.data);
+          console.log(`[WSM-AGGRESSIVE] Parsed WebSocket message [instance ${this._debugInstanceId}]:`, data);
         } catch (error) {
           console.error('[WebSocketManager] Error processing message:', error, event.data);
           return; // Exit early if we can't parse the message
@@ -338,6 +348,7 @@ class WebSocketManager {
       
       // Special handling for health update messages
       if (typeof message === 'object' && message.type === 'health_update') {
+        console.log(`[WSM-AGGRESSIVE] Sending health_update message [instance ${this._debugInstanceId}]:`, message);
         console.log(' [WebSocketManager] Sending health update:', message);
       }
       else if (typeof message === 'object' && message.type === 'game_action') {
@@ -396,6 +407,7 @@ class WebSocketManager {
   
   // Add a specific method for sending health updates to ensure they're properly formatted
   sendHealthUpdate(playerIndex, health) {
+    console.log(`[WSM-AGGRESSIVE] sendHealthUpdate called with [instance ${this._debugInstanceId}]:`, { playerIndex, health });
     if (!this.isConnected()) {
       console.log(' Cannot send health update - not connected:', {
         playerIndex,
@@ -522,6 +534,7 @@ class WebSocketManager {
   }
 }
 
-// Create and export a singleton instance
+// Aggressive log for singleton creation
+console.log('[WSM-AGGRESSIVE] Creating WebSocketManager singleton instance (file load)');
 const wsManager = new WebSocketManager();
 export default wsManager;

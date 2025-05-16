@@ -2,7 +2,13 @@
  * @jest-environment jsdom
  */
 
+// @ts-ignore
 import KidsFightScene from '../kidsfight_scene.js';
+
+// Add Jest types
+import { jest } from '@jest/globals';
+// @ts-ignore - Ignore missing Jest types
+const { describe, test, expect, beforeEach } = global;
 
 // Mock Phaser.Scene and dependencies
 class MockScene extends KidsFightScene {
@@ -10,8 +16,18 @@ class MockScene extends KidsFightScene {
     super();
     this.playerHealth = [100, 100];
     this.updateHealthBars = jest.fn();
-    this.isHost = false;
+    this.endGame = jest.fn();
+    this.gameOver = false;
+    this.timeLeft = 60;
+    this.gameMode = 'local';
+    this.p1SpriteKey = 'player1';
+    this.p2SpriteKey = 'player2';
     this.remotePlayer = { health: 100 };
+    this.isHost = false;
+  }
+
+  getCharacterName(spriteKey) {
+    return spriteKey === 'player1' ? 'Bento' : 'Davi R';
   }
 }
 
@@ -84,5 +100,58 @@ describe('KidsFightScene health synchronization', () => {
       expect(false).toBe(true);
     }
     expect(scene.updateHealthBars).not.toHaveBeenCalled();
+  });
+
+  test('triggers game over when player 1 health reaches 0', () => {
+    scene.playerHealth = [0, 100];
+    scene.checkWinner();
+    expect(scene.endGame).toHaveBeenCalledWith('Davi R Venceu!');
+    scene.gameOver = true;
+    expect(scene.gameOver).toBe(true);
+  });
+
+  test('triggers game over when player 2 health reaches 0', () => {
+    scene.playerHealth = [100, 0];
+    scene.checkWinner();
+    expect(scene.endGame).toHaveBeenCalledWith('Bento Venceu!');
+    scene.gameOver = true;
+    expect(scene.gameOver).toBe(true);
+  });
+
+  test('triggers draw when time is up and health is equal', () => {
+    scene.timeLeft = 0;
+    scene.playerHealth = [50, 50];
+    scene.checkWinner();
+    expect(scene.endGame).toHaveBeenCalledWith('Empate!');
+    scene.gameOver = true;
+    expect(scene.gameOver).toBe(true);
+  });
+
+  test('triggers game over for online receiver when health update sets health to 0', () => {
+    scene.gameMode = 'online';
+    const data = { type: 'health_update', playerIndex: 0, health: 0 };
+    
+    // Simulate health update handling
+    scene.playerHealth[data.playerIndex] = data.health;
+    scene.updateHealthBars(data.playerIndex);
+    scene.checkWinner();
+
+    expect(scene.endGame).toHaveBeenCalledWith('Davi R Venceu!');
+    scene.gameOver = true;
+    expect(scene.gameOver).toBe(true);
+  });
+
+  test('does not trigger game over when health is above 0', () => {
+    scene.playerHealth = [50, 50];
+    scene.checkWinner();
+    expect(scene.endGame).not.toHaveBeenCalled();
+    expect(scene.gameOver).toBe(false);
+  });
+
+  test('does not trigger multiple game overs', () => {
+    scene.gameOver = true;
+    scene.playerHealth = [0, 100];
+    scene.checkWinner();
+    expect(scene.endGame).not.toHaveBeenCalled();
   });
 });

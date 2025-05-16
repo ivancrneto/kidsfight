@@ -115,9 +115,22 @@ class KidsFightScene extends Phaser.Scene {
     
     console.log('[KidsFightScene] Setting up WebSocket handlers');
     
-    // IMPORTANT: Single consolidated WebSocket message handler
-    // This is the ONLY place where wsManager.ws.onmessage should be assigned
+    // IMPORTANT: WebSocket handler delegation pattern
+    // Save any existing handler
+    const originalOnMessage = this.wsManager.ws.onmessage;
+    // Assign a delegating handler
     this.wsManager.ws.onmessage = (event) => {
+      // First, try our own handler
+      if (this.handleWebSocketMessage) {
+        this.handleWebSocketMessage(event);
+      }
+      // Then, delegate to any original handler
+      if (originalOnMessage) {
+        originalOnMessage(event);
+      }
+    };
+    // Define the main handler for our scene
+    this.handleWebSocketMessage = (event) => {
       console.log('§[HEALTH SYNC][RECEIVER] RAW WS EVENT:', event.data);
       try {
         const data = JSON.parse(event.data);
@@ -219,6 +232,7 @@ class KidsFightScene extends Phaser.Scene {
             const oldHealth = this.playerHealth[playerIndex];
             this.playerHealth[playerIndex] = data.health;
             this.updateHealthBars(playerIndex);
+            this.checkWinner();
             
             // Enhanced logging for health updates
             if (DEV) {
@@ -486,10 +500,8 @@ class KidsFightScene extends Phaser.Scene {
       // Update health bars
       this.updateHealthBars(targetIndex);
       
-      // Check for game over
-      if (this.playerHealth[targetIndex] <= 0 && !this.gameOver) {
-        this.endGame(playerIndex);
-      }
+      // Check for game over using new helper
+      this.checkWinner();
       
       // Show hit effect
       this.showHitEffect(target.x, target.y);
@@ -511,6 +523,35 @@ class KidsFightScene extends Phaser.Scene {
     }
     
     return false; // No hit
+  }
+
+  // --- WINNER CHECKER ---
+  checkWinner() {
+    if (this.gameOver) return;
+    if (this.playerHealth[0] <= 0) {
+      // Player 2 won
+      const winner = this.getCharacterName(this.p2SpriteKey);
+      this.endGame(`${winner} Venceu!`);
+      return true;
+    } else if (this.playerHealth[1] <= 0) {
+      // Player 1 won
+      const winner = this.getCharacterName(this.p1SpriteKey);
+      this.endGame(`${winner} Venceu!`);
+      return true;
+    } else if (this.timeLeft <= 0) {
+      // Time's up - check who has more health
+      if (this.playerHealth[0] > this.playerHealth[1]) {
+        const winner = this.getCharacterName(this.p1SpriteKey);
+        this.endGame(`${winner} Venceu!`);
+      } else if (this.playerHealth[1] > this.playerHealth[0]) {
+        const winner = this.getCharacterName(this.p2SpriteKey);
+        this.endGame(`${winner} Venceu!`);
+      } else {
+        this.endGame('Empate!');
+      }
+      return true;
+    }
+    return false;
   }
 
   // Update the health bar for a player
@@ -911,6 +952,8 @@ class KidsFightScene extends Phaser.Scene {
                   if (typeof this.updateHealthBars === 'function') {
                     this.updateHealthBars(playerIndex);
                   }
+                  // Check for winner after health update
+                  this.checkWinner();
                 }
                 console.log('[DIRECT-PLAYER-SYNC] ✅ UPDATED REMOTE PLAYER HEALTH:', {
                   remotePlayerIndex,
