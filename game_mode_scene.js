@@ -89,7 +89,53 @@ class GameModeScene extends Phaser.Scene {
   resize() {
     const w = this.scale.width;
     const h = this.scale.height;
+    
+    // Update background
     this.bg.setSize(w, h).setPosition(w/2, h/2);
+    
+    // Update title text
+    const titleText = /** @type {Phaser.GameObjects.Text} */ (
+      this.children.list.find(child => 
+        child instanceof Phaser.GameObjects.Text && child.text === 'Escolha o Modo de Jogo'
+      )
+    );
+    if (titleText) {
+      titleText.setPosition(w/2, h * 0.3)
+        .setFontSize(Math.max(24, Math.round(w * 0.045)) + 'px');
+    }
+    
+    // Update buttons
+    const localButton = /** @type {Phaser.GameObjects.Text} */ (
+      this.children.list.find(child => 
+        child instanceof Phaser.GameObjects.Text && child.text === 'Jogar Local'
+      )
+    );
+    const onlineButton = /** @type {Phaser.GameObjects.Text} */ (
+      this.children.list.find(child => 
+        child instanceof Phaser.GameObjects.Text && child.text === 'Jogar Online'
+      )
+    );
+    
+    const buttonStyle = {
+      fontSize: Math.max(20, Math.round(w * 0.035)) + 'px',
+      backgroundColor: '#4a4a4a',
+      padding: {
+        left: Math.round(w * 0.02),
+        right: Math.round(w * 0.02),
+        top: Math.round(w * 0.012),
+        bottom: Math.round(w * 0.012)
+      }
+    };
+    
+    if (localButton) {
+      localButton.setPosition(w/2, h * 0.5)
+        .setStyle(buttonStyle);
+    }
+    
+    if (onlineButton) {
+      onlineButton.setPosition(w/2, h * 0.6)
+        .setStyle(buttonStyle);
+    }
   }
 }
 

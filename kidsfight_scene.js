@@ -527,7 +527,7 @@ class KidsFightScene extends Phaser.Scene {
 
   // --- WINNER CHECKER ---
   checkWinner() {
-    if (this.gameOver) return;
+    if (this.gameOver) return false;
     if (this.playerHealth[0] <= 0) {
       // Player 2 won
       const winner = this.getCharacterName(this.p2SpriteKey);
@@ -3348,6 +3348,21 @@ handleDisconnection() {
   updateSceneLayout() {
     console.log('=== [KidsFight] updateSceneLayout called ===');
     const result = updateSceneLayout(this);
+
+    // Update game over buttons position if they exist
+    if (this.replayButton) {
+      this.replayButton.setPosition(
+        this.cameras.main.width / 2,
+        this.cameras.main.height * 0.6
+      );
+    }
+    if (this.newPlayersButton) {
+      this.newPlayersButton.setPosition(
+        this.cameras.main.width / 2,
+        this.cameras.main.height * 0.7
+      );
+    }
+
     console.log('=== [KidsFight] updateSceneLayout finish called ===');
     return result;
   }
@@ -3435,17 +3450,17 @@ handleDisconnection() {
     }
 
     // Button to replay with same players
-    const replayButton = this.add.text(
+    this.replayButton = this.add.text(
       this.cameras.main.width / 2,
-      this.cameras.main.height / 2 + 50,
+      this.cameras.main.height * 0.6,
       'Jogar Novamente (Mesmos Jogadores)',
       buttonStyle
     );
-    replayButton.setOrigin(0.5);
-    replayButton.setInteractive({ useHandCursor: true });
-    replayButton.on('pointerover', () => replayButton.setStyle({ backgroundColor: '#666666' }));
-    replayButton.on('pointerout', () => replayButton.setStyle({ backgroundColor: '#4a4a4a' }));
-    replayButton.on('pointerdown', () => {
+    this.replayButton.setOrigin(0.5);
+    this.replayButton.setInteractive({ useHandCursor: true });
+    this.replayButton.on('pointerover', () => this.replayButton.setStyle({ backgroundColor: '#666666' }));
+    this.replayButton.on('pointerout', () => this.replayButton.setStyle({ backgroundColor: '#4a4a4a' }));
+    this.replayButton.on('pointerdown', () => {
       // Check if we're in online mode
       if (this.gameMode === 'online' && this.wsManager && this.wsManager.isConnected()) {
         // Prevent multiple clicks
@@ -3495,10 +3510,10 @@ handleDisconnection() {
         this.wsManager.send(requestData);
         
         // Disable buttons while waiting
-        replayButton.disableInteractive();
-        replayButton.setAlpha(0.5);
-        newPlayersButton.disableInteractive();
-        newPlayersButton.setAlpha(0.5);
+        this.replayButton.disableInteractive();
+        this.replayButton.setAlpha(0.5);
+        this.newPlayersButton.disableInteractive();
+        this.newPlayersButton.setAlpha(0.5);
         
         // Set up a replay response callback instead of overwriting ws.onmessage
         this.replayResponseCallback = (data) => {
@@ -3533,10 +3548,10 @@ handleDisconnection() {
               waitingText.setColor('#ff0000');
               // Re-enable buttons after a short delay
               this.time.delayedCall(2000, () => {
-                replayButton.setInteractive({ useHandCursor: true });
-                replayButton.setAlpha(1);
-                newPlayersButton.setInteractive({ useHandCursor: true });
-                newPlayersButton.setAlpha(1);
+                this.replayButton.setInteractive({ useHandCursor: true });
+                this.replayButton.setAlpha(1);
+                this.newPlayersButton.setInteractive({ useHandCursor: true });
+                this.newPlayersButton.setAlpha(1);
                 waitingText.setVisible(false);
                 this.newPlayersRequested = false;
               });
@@ -3546,17 +3561,17 @@ handleDisconnection() {
     });
         
     // Button to choose different players
-    const newPlayersButton = this.add.text(
+    this.newPlayersButton = this.add.text(
       this.cameras.main.width / 2,
-      this.cameras.main.height / 2 + 100,
+      this.cameras.main.height * 0.7,
       'Escolher Outros Jogadores',
       buttonStyle
     );
-    newPlayersButton.setOrigin(0.5);
-    newPlayersButton.setInteractive({ useHandCursor: true });
-    newPlayersButton.on('pointerover', () => newPlayersButton.setStyle({ backgroundColor: '#666666' }));
-    newPlayersButton.on('pointerout', () => newPlayersButton.setStyle({ backgroundColor: '#4a4a4a' }));
-    newPlayersButton.on('pointerdown', () => {
+    this.newPlayersButton.setOrigin(0.5);
+    this.newPlayersButton.setInteractive({ useHandCursor: true });
+    this.newPlayersButton.on('pointerover', () => this.newPlayersButton.setStyle({ backgroundColor: '#666666' }));
+    this.newPlayersButton.on('pointerout', () => this.newPlayersButton.setStyle({ backgroundColor: '#4a4a4a' }));
+    this.newPlayersButton.on('pointerdown', () => {
       // Check if we're in online mode
       if (this.gameMode === 'online' && this.wsManager && this.wsManager.isConnected()) {
         // Prevent multiple clicks
@@ -3590,10 +3605,10 @@ handleDisconnection() {
         });
         
         // Disable buttons while waiting
-        replayButton.disableInteractive();
-        replayButton.setAlpha(0.5);
-        newPlayersButton.disableInteractive();
-        newPlayersButton.setAlpha(0.5);
+        this.replayButton.disableInteractive();
+        this.replayButton.setAlpha(0.5);
+        this.newPlayersButton.disableInteractive();
+        this.newPlayersButton.setAlpha(0.5);
         
         // Set up handler for replay response that preserves the ability to show popups
         const newPlayersOriginalOnMessage = this.wsManager.ws.onmessage;
