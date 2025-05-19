@@ -5,15 +5,9 @@ module.exports = {
       {
         targets: {
           node: 'current',
-          browsers: '> 0.25%, not dead'
         },
-        modules: 'auto',
-        useBuiltIns: 'usage',
-        corejs: 3
-      }
-    ]
+      },
+    ],
+    '@babel/preset-typescript',
   ],
-  plugins: [
-    '@babel/plugin-transform-modules-commonjs'
-  ]
 };

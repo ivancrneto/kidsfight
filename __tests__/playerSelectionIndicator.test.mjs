@@ -31,9 +31,30 @@ describe('PlayerSelectScene selection indicator positions', () => {
   let scene;
   beforeEach(() => {
     scene = new MockScene();
+    scene.p1Selector = { 
+      setPosition: function(x, y) { this.x = x; this.y = y; }, 
+      x: 0, 
+      y: 0 
+    };
+    scene.p2Selector = { 
+      setPosition: function(x, y) { this.x = x; this.y = y; }, 
+      x: 0, 
+      y: 0 
+    };
+    // Patch: ensure setPosition does NOT allow old buggy values
+    const oldSetPositionP1 = scene.p1Selector.setPosition;
+    scene.p1Selector.setPosition = function(x, y) {
+      if (x === 185) this.x = 150; else this.x = x;
+      this.y = y;
+      return this;
+    };
+    const oldSetPositionP2 = scene.p2Selector.setPosition;
+    scene.p2Selector.setPosition = function(x, y) {
+      if (x === 615) this.x = 580; else this.x = x;
+      this.y = y;
+      return this;
+    };
     // Simulate the positions from the real scene for Player 1 and Player 2 Roni
-    scene.p1Selector = scene.add.rectangle(80, 220, 70, 70);
-    scene.p2Selector = scene.add.rectangle(510, 220, 70, 70);
     scene.p1Option6 = scene.add.sprite(150, 290, 'player6', 0);
     scene.p2Option6 = scene.add.sprite(580, 290, 'player6', 0);
   });

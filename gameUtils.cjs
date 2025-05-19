@@ -1,9 +1,29 @@
+console.log('LOADED: gameUtils.cjs - TOP LEVEL');
+
+// LOADED FROM gameUtils.cjs - TEST UNIQUE LOG
+console.log('LOADED FROM gameUtils.cjs - TEST UNIQUE LOG');
+
 // CommonJS version of gameUtils for Jest tests
 
 // Pure game logic utilities for KidsFightScene
 
 // Layout update logic for scene objects
 function updateSceneLayout(scene) {
+
+  // DEBUG: Top-level entry log
+  console.log('FUNC: Entered updateSceneLayout');
+
+  // DEBUG: Log scale, width, height at the start
+  console.log('FUNC: scene.scale:', scene.scale);
+  if (scene.scale) {
+    console.log('FUNC: scene.scale.width:', scene.scale.width);
+    console.log('FUNC: scene.scale.height:', scene.scale.height);
+  }
+
+  // DEBUG: Log player1/player2/platform and their setPosition before layout logic
+  console.log('FUNC: scene.player1:', scene.player1, 'setPosition:', scene.player1 && scene.player1.setPosition);
+  console.log('FUNC: scene.player2:', scene.player2, 'setPosition:', scene.player2 && scene.player2.setPosition);
+  console.log('FUNC: scene.platform:', scene.platform, 'setPosition:', scene.platform && scene.platform.setPosition, 'setSize:', scene.platform && scene.platform.setSize);
 
   // Defensive: Only update layout if scene is fully initialized
   if (!scene.isReady) {
@@ -17,8 +37,11 @@ function updateSceneLayout(scene) {
   if (scene.children && scene.children.list) {
     const bg = scene.children.list.find(obj => obj.texture && obj.texture.key === 'scenario1');
     if (bg) {
+      console.log('FUNC: Calling bg.setPosition with', w / 2, h / 2);
       bg.setPosition(w / 2, h / 2);
+      console.log('FUNC: Calling bg.displayWidth with', w);
       bg.displayWidth = w;
+      console.log('FUNC: Calling bg.displayHeight with', h);
       bg.displayHeight = h;
     }
   }
@@ -31,25 +54,19 @@ function updateSceneLayout(scene) {
   const p2X = w * 0.7;
 
   // Defensive: Player 1
-  if (!scene.player1 || typeof scene.player1 !== 'object') {
-    console.warn('[KidsFight] player1 is missing or not an object:', scene.player1);
-  } else if (
-    typeof scene.player1.setPosition !== 'function'
-  ) {
-    console.warn('[KidsFight] player1.setPosition is not a function', scene.player1, typeof scene.player1);
-  } else {
+  if (scene.player1 && typeof scene.player1 === 'object' && typeof scene.player1.setPosition === 'function') {
+    console.log('FUNC: Calling player1.setPosition with', p1X, playerY);
     scene.player1.setPosition(p1X, playerY);
+  } else {
+    console.log('FUNC: Skipping player1.setPosition');
   }
 
   // Defensive: Player 2
-  if (!scene.player2 || typeof scene.player2 !== 'object') {
-    console.warn('[KidsFight] player2 is missing or not an object:', scene.player2);
-  } else if (
-    typeof scene.player2.setPosition !== 'function'
-  ) {
-    console.warn('[KidsFight] player2.setPosition is not a function', scene.player2, typeof scene.player2);
-  } else {
+  if (scene.player2 && typeof scene.player2 === 'object' && typeof scene.player2.setPosition === 'function') {
+    console.log('FUNC: Calling player2.setPosition with', p2X, playerY);
     scene.player2.setPosition(p2X, playerY);
+  } else {
+    console.log('FUNC: Skipping player2.setPosition');
   }
 
   // Platform
@@ -59,56 +76,58 @@ function updateSceneLayout(scene) {
   const PLATFORM_Y = playerY + PLATFORM_HEIGHT / 2;
 
   // Defensive: Platform
-  if (!scene.platform || typeof scene.platform !== 'object') {
-    console.warn('[KidsFight] platform is missing or not an object:', scene.platform);
-  } else if (
-    typeof scene.platform.setPosition !== 'function' ||
-    typeof scene.platform.setSize !== 'function'
-  ) {
-    console.warn('[KidsFight] platform.setPosition or setSize is not a function', scene.platform, typeof scene.platform);
+  if (scene.platform && typeof scene.platform === 'object') {
+    if (typeof scene.platform.setPosition === 'function') {
+      console.log('FUNC: Calling platform.setPosition with', w / 2, PLATFORM_Y);
+      scene.platform.setPosition(w / 2, PLATFORM_Y);
+    } else {
+      console.log('FUNC: Skipping platform.setPosition');
+    }
+    if (typeof scene.platform.setSize === 'function') {
+      console.log('FUNC: Calling platform.setSize with', w, PLATFORM_HEIGHT);
+      scene.platform.setSize(w, PLATFORM_HEIGHT);
+    } else {
+      console.log('FUNC: Skipping platform.setSize');
+    }
   } else {
-    scene.platform.setPosition(w / 2, PLATFORM_Y).setSize(w, PLATFORM_HEIGHT);
+    console.log('FUNC: Skipping platform logic');
   }
 
   // Health bars
   // Defensive: Health Bar 1
-  if (!scene.healthBar1 || typeof scene.healthBar1 !== 'object') {
-    console.warn('[KidsFight] healthBar1 is missing or not an object:', scene.healthBar1);
-  } else if (
-    typeof scene.healthBar1.setPosition !== 'function' ||
-    typeof scene.healthBar1.setSize !== 'function'
-  ) {
-    console.warn('[KidsFight] healthBar1.setPosition or setSize is not a function', scene.healthBar1, typeof scene.healthBar1);
-  } else {
-    const barWidth = w * 0.25;
-    const barHeight = h * 0.05;
-    const barY = h * 0.07;
-    const bar1X = w * 0.25;
-    if (scene.healthBar1 && typeof scene.healthBar1.setPosition === 'function' && typeof scene.healthBar1.setSize === 'function') {
-      scene.healthBar1.setPosition(bar1X, barY).setSize(barWidth, barHeight);
+  if (scene.healthBar1 && typeof scene.healthBar1 === 'object') {
+    if (typeof scene.healthBar1.setPosition === 'function') {
+      console.log('FUNC: Calling healthBar1.setPosition with', w * 0.25, h * 0.07);
+      scene.healthBar1.setPosition(w * 0.25, h * 0.07);
     } else {
-      console.error('[KidsFight] Tried to set layout on healthBar1 but it is null or invalid:', scene.healthBar1);
+      console.log('FUNC: Skipping healthBar1.setPosition');
     }
+    if (typeof scene.healthBar1.setSize === 'function') {
+      console.log('FUNC: Calling healthBar1.setSize with', w * 0.25, h * 0.05);
+      scene.healthBar1.setSize(w * 0.25, h * 0.05);
+    } else {
+      console.log('FUNC: Skipping healthBar1.setSize');
+    }
+  } else {
+    console.log('FUNC: Skipping healthBar1 logic');
   }
 
   // Defensive: Health Bar 2
-  if (!scene.healthBar2 || typeof scene.healthBar2 !== 'object') {
-    console.warn('[KidsFight] healthBar2 is missing or not an object:', scene.healthBar2);
-  } else if (
-    typeof scene.healthBar2.setPosition !== 'function' ||
-    typeof scene.healthBar2.setSize !== 'function'
-  ) {
-    console.warn('[KidsFight] healthBar2.setPosition or setSize is not a function', scene.healthBar2, typeof scene.healthBar2);
-  } else {
-    const barWidth = w * 0.25;
-    const barHeight = h * 0.05;
-    const barY = h * 0.07;
-    const bar2X = w * 0.75;
-    if (scene.healthBar2 && typeof scene.healthBar2.setPosition === 'function' && typeof scene.healthBar2.setSize === 'function') {
-      scene.healthBar2.setPosition(bar2X, barY).setSize(barWidth, barHeight);
+  if (scene.healthBar2 && typeof scene.healthBar2 === 'object') {
+    if (typeof scene.healthBar2.setPosition === 'function') {
+      console.log('FUNC: Calling healthBar2.setPosition with', w * 0.75, h * 0.07);
+      scene.healthBar2.setPosition(w * 0.75, h * 0.07);
     } else {
-      console.error('[KidsFight] Tried to set layout on healthBar2 but it is null or invalid:', scene.healthBar2);
+      console.log('FUNC: Skipping healthBar2.setPosition');
     }
+    if (typeof scene.healthBar2.setSize === 'function') {
+      console.log('FUNC: Calling healthBar2.setSize with', w * 0.25, h * 0.05);
+      scene.healthBar2.setSize(w * 0.25, h * 0.05);
+    } else {
+      console.log('FUNC: Skipping healthBar2.setSize');
+    }
+  } else {
+    console.log('FUNC: Skipping healthBar2 logic');
   }
   // Special pips (3 per player) - match main.js create()
   if (scene.specialPips1 && Array.isArray(scene.specialPips1)) {
@@ -119,7 +138,10 @@ function updateSceneLayout(scene) {
       const pip1X = w * 0.25 - pipR * 3 + i * pipR * 3;
       const pip = scene.specialPips1[i];
       if (pip && typeof pip.setPosition === 'function' && typeof pip.setRadius === 'function') {
-        pip.setPosition(pip1X, pipY).setRadius(pipR);
+        console.log('FUNC: Calling pip.setPosition with', pip1X, pipY);
+        pip.setPosition(pip1X, pipY);
+        console.log('FUNC: Calling pip.setRadius with', pipR);
+        pip.setRadius(pipR);
       }
     }
   }
@@ -131,13 +153,17 @@ function updateSceneLayout(scene) {
       const pip2X = w * 0.75 - pipR * 3 + i * pipR * 3;
       const pip = scene.specialPips2[i];
       if (pip && typeof pip.setPosition === 'function' && typeof pip.setRadius === 'function') {
-        pip.setPosition(pip2X, pipY).setRadius(pipR);
+        console.log('FUNC: Calling pip.setPosition with', pip2X, pipY);
+        pip.setPosition(pip2X, pipY);
+        console.log('FUNC: Calling pip.setRadius with', pipR);
+        pip.setRadius(pipR);
       }
     }
   }
 
   // Timer text
   if (scene.timerText && typeof scene.timerText.setPosition === 'function') {
+    console.log('FUNC: Calling timerText.setPosition with', w / 2, h * 0.07);
     scene.timerText.setPosition(w / 2, h * 0.07);
   }
 }
@@ -160,32 +186,8 @@ function applyGameCss() {
  * Game utilities used across different files
  */
 
-// Update scene layout based on screen size
-function updateSceneLayout(scene) {
-  if (!scene || !scene.cameras || !scene.cameras.main) return false;
-  
-  const cam = scene.cameras.main;
-  
-  // Get current screen dimensions
-  const width = cam.width;
-  const height = cam.height;
-  
-  console.log('[GameUtils] Updating scene layout for dimensions:', width, 'x', height);
-  
-  // Set world and camera bounds to match screen size
-  if (scene.physics && scene.physics.world) {
-    scene.physics.world.setBounds(0, 0, width, height);
-  }
-  
-  cam.setBounds(0, 0, width, height);
-  
-  // Update touch controls if they exist
-  if (typeof scene.updateControlPositions === 'function') {
-    scene.updateControlPositions();
-  }
-  
-  return true;
-}
+// Removed duplicate updateSceneLayout function that was causing test issues.
+// The correct version is defined earlier in this file.
 
 // Apply game CSS to the page
 function applyGameCss() {
@@ -213,10 +215,7 @@ function applyGameCss() {
   return true;
 }
 
-module.exports = {
-  updateSceneLayout,
-  applyGameCss
-};
+// Redundant module.exports removed. The main one is at the end of the file.
 function tryAttack(scene, playerIdx, attacker, defender, now, special) {
   // Robustly determine defenderIdx
   let defenderIdx = undefined;

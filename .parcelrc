@@ -3,5 +3,8 @@
   "transformers": {
     "*.{png,jpg,jpeg,gif,svg}": ["@parcel/transformer-raw"],
     "manifest.json": ["@parcel/transformer-webmanifest"]
+  },
+  "optimizers": {
+    "*.js": []
   }
 }

@@ -59,7 +59,7 @@ const mockRectangle = {
 
 const mockAdd = {
   rectangle: jest.fn().mockReturnValue(mockRectangle),
-  text: jest.fn().mockReturnValue(mockText)
+  text: jest.fn()
 };
 
 const mockScene = {
@@ -124,6 +124,11 @@ describe('Game Flow and Navigation', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
+    mockAdd.text.mockImplementation(() => ({
+      setOrigin: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      destroy: jest.fn()
+    }));
     
     // Create instances
     playerSelectScene = new PlayerSelectScene();
@@ -144,8 +149,11 @@ describe('Game Flow and Navigation', () => {
       // Verify that scene.restart was NOT called
       expect(mockScene.restart).not.toHaveBeenCalled();
       
-      // Verify that the win text and button were destroyed
-      expect(mockText.destroy).toHaveBeenCalled();
+      // Get the actual mock text instances returned
+      const winTextInstance = mockAdd.text.mock.results[0].value;
+      const playAgainBtnInstance = mockAdd.text.mock.results[1].value;
+      expect(winTextInstance.destroy).toHaveBeenCalled();
+      expect(playAgainBtnInstance.destroy).toHaveBeenCalled();
     });
   });
 

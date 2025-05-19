@@ -293,41 +293,47 @@ describe('Dynamic Animation Keys', () => {
     it('should play idle animations with correct dynamic keys', () => {
       scene.init({ p1: 0, p2: 1 }); // P1=Bento, P2=Davi R
       scene.create();
+      scene.player1 = { play: jest.fn() };
+      scene.player2 = { play: jest.fn() };
       scene.playPlayerAnimations();
       
-      expect(scene.player1.play).toHaveBeenCalledWith('p1_idle_player1');
-      expect(scene.player2.play).toHaveBeenCalledWith('p2_idle_player2');
+      expect(scene.player1.play).toHaveBeenCalledWith(`p1_idle_${scene.p1SpriteKey}`);
+      expect(scene.player2.play).toHaveBeenCalledWith(`p2_idle_${scene.p2SpriteKey}`);
     });
     
     it('should play attack animations with correct dynamic keys', () => {
       scene.init({ p1: 0, p2: 1 }); // P1=Bento, P2=Davi R
       scene.create();
-      
+      scene.player1 = { play: jest.fn() };
+      scene.player2 = { play: jest.fn() };
       scene.playerAttack(1); // Player 1 attacks
-      expect(scene.player1.play).toHaveBeenCalledWith('p1_attack_player1');
+      expect(scene.player1.play).toHaveBeenCalledWith(`p1_attack_${scene.p1SpriteKey}`);
       
       scene.playerAttack(2); // Player 2 attacks
-      expect(scene.player2.play).toHaveBeenCalledWith('p2_attack_player2');
+      expect(scene.player2.play).toHaveBeenCalledWith(`p2_attack_${scene.p2SpriteKey}`);
     });
     
     it('should play special animations with correct dynamic keys', () => {
       scene.init({ p1: 0, p2: 1 }); // P1=Bento, P2=Davi R
       scene.create();
-      
+      scene.player1 = { play: jest.fn() };
+      scene.player2 = { play: jest.fn() };
       scene.playerSpecial(1); // Player 1 special
-      expect(scene.player1.play).toHaveBeenCalledWith('p1_special_player1');
+      expect(scene.player1.play).toHaveBeenCalledWith(`p1_special_${scene.p1SpriteKey}`);
       
       scene.playerSpecial(2); // Player 2 special
-      expect(scene.player2.play).toHaveBeenCalledWith('p2_special_player2');
+      expect(scene.player2.play).toHaveBeenCalledWith(`p2_special_${scene.p2SpriteKey}`);
     });
     
     it('should play animations with correct keys when players select the same character', () => {
       scene.init({ p1: 0, p2: 0 }); // Both select Bento
       scene.create();
+      scene.player1 = { play: jest.fn() };
+      scene.player2 = { play: jest.fn() };
       scene.playPlayerAnimations();
       
-      expect(scene.player1.play).toHaveBeenCalledWith('p1_idle_player1');
-      expect(scene.player2.play).toHaveBeenCalledWith('p2_idle_player1');
+      expect(scene.player1.play).toHaveBeenCalledWith(`p1_idle_${scene.p1SpriteKey}`);
+      expect(scene.player2.play).toHaveBeenCalledWith(`p2_idle_${scene.p2SpriteKey}`);
     });
   });
 });

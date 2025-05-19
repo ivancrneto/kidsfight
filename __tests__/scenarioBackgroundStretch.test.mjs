@@ -1,4 +1,4 @@
-import KidsFightScene from '../kidsfight_scene.js';
+import KidsFightScene from '../kidsfight_scene';
 import Phaser from 'phaser';
 
 describe('KidsFightScene scenario background stretching', () => {

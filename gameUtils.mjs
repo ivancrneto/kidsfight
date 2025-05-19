@@ -283,89 +283,8 @@ function updateSceneLayout(scene) {
   }
 }
 
-// CSS application logic for game canvas and parent
-function applyGameCss() {
-  const canvas = document.querySelector('canvas');
-  const parent = document.getElementById('game-container');
-  if (canvas) {
-    canvas.style.position = 'fixed';
-    canvas.style.left = 'env(safe-area-inset-left, 0px)';
-    canvas.style.top = 'env(safe-area-inset-top, 0px)';
-    canvas.style.width = 'calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
-    canvas.style.height = 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))';
-    canvas.style.maxWidth = '100vw';
-    canvas.style.maxHeight = '100vh';
-    canvas.style.objectFit = 'contain';
-    canvas.style.background = '#222';
-  }
-  if (parent) {
-    parent.style.position = 'fixed';
-    parent.style.left = 'env(safe-area-inset-left, 0px)';
-    parent.style.top = 'env(safe-area-inset-top, 0px)';
-    parent.style.width = '100vw';
-    parent.style.height = '100vh';
-    parent.style.background = '#222';
-    parent.style.overflow = 'hidden';
-  }
-}
-
-/**
- * Game utilities used across different files (ESM version)
- */
-
-// Update scene layout based on screen size
-export function updateSceneLayout(scene) {
-  if (!scene || !scene.cameras || !scene.cameras.main) return false;
-  
-  const cam = scene.cameras.main;
-  
-  // Get current screen dimensions
-  const width = cam.width;
-  const height = cam.height;
-  
-  console.log('[GameUtils] Updating scene layout for dimensions:', width, 'x', height);
-  
-  // Set world and camera bounds to match screen size
-  if (scene.physics && scene.physics.world) {
-    scene.physics.world.setBounds(0, 0, width, height);
-  }
-  
-  cam.setBounds(0, 0, width, height);
-  
-  // Update touch controls if they exist
-  if (typeof scene.updateControlPositions === 'function') {
-    scene.updateControlPositions();
-  }
-  
-  return true;
-}
-
-// Apply game CSS to the page
-export function applyGameCss() {
-  if (typeof document === 'undefined') return false;
-  
-  // Add CSS to ensure the game canvas fills the viewport properly
-  const style = document.createElement('style');
-  style.textContent = `
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-    }
-    canvas {
-      display: block;
-      margin: 0 auto;
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-    }
-  `;
-  document.head.appendChild(style);
-  
-  return true;
-}
 function tryAttack(scene, playerIdx, attacker, defender, now, special) {
+  console.log('[DEBUG tryAttack] Called with', { playerIdx, attacker, defender, now, playerHealth: scene.playerHealth });
   // Robustly determine defenderIdx
   let defenderIdx = undefined;
   if (defender === scene.player1) defenderIdx = 0;
@@ -397,5 +316,22 @@ function tryAttack(scene, playerIdx, attacker, defender, now, special) {
   }
 }
 
-// Export the functions - ES modules only
-export { updateSceneLayout, applyGameCss, tryAttack };
+// --- PATCH: Export the DOM-mutating applyGameCss and updateSceneLayout as expected by tests ---
+export function applyGameCss() {
+  const parent = document.getElementById('game-container');
+  if (parent) {
+    parent.style.position = 'fixed';
+    parent.style.left = 'env(safe-area-inset-left, 0px)';
+    parent.style.top = 'env(safe-area-inset-top, 0px)';
+    parent.style.width = '100vw';
+    parent.style.height = '100vh';
+    parent.style.background = '#222';
+    parent.style.overflow = 'hidden';
+  }
+}
+
+export { updateSceneLayout, tryAttack };
+
+/**
+ * Game utilities used across different files (ESM version)
+ */

@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-const { applyGameCss, updateSceneLayout } = require('../gameUtils.cjs');
+const { applyGameCss, updateSceneLayout, tryAttack } = require('../gameUtils.mjs');
 // __tests__/main.test.js
 // Basic unit tests for main.js constants and mockable logic
 
@@ -145,6 +145,14 @@ describe('KidsFightScene', () => {
         }
       });
     };
+    global.mockPlayer1 = { setPosition: jest.fn() };
+    global.mockPlayer2 = { setPosition: jest.fn() };
+    global.mockPlatform = { setPosition: jest.fn(), setSize: jest.fn() };
+    try {
+      require('../src/tryAttack');
+    } catch (e) {
+      global.tryAttack = jest.fn();
+    }
   });
 
   test('showSpecialEffect calls specialEffect methods', () => {
@@ -176,79 +184,93 @@ describe('KidsFightScene', () => {
 
   test('updateSceneLayout positions players and platform', () => {
     // Create mock objects that match what updateSceneLayout expects
-    const mockPlayer1 = {
-      setPosition: jest.fn().mockReturnThis(),
-      x: 100,
-      y: 0
-    };
-    
-    const mockPlayer2 = {
-      setPosition: jest.fn().mockReturnThis(),
-      x: 200,
-      y: 0
-    };
-    
-    const mockPlatform = {
-      setPosition: jest.fn().mockReturnThis(),
-      setSize: jest.fn().mockReturnThis(),
-      y: 0
-    };
-    
-    const mockBg = { 
-      setPosition: jest.fn().mockReturnThis(),
-      displayWidth: 0, 
-      displayHeight: 0 
-    };
-    
-    const mockTimer = { 
-      setPosition: jest.fn().mockReturnThis() 
-    };
-    
-    // Create a mock scene with the required properties
+    const mockPlayer1 = { setPosition: jest.fn(), setScale: jest.fn(), setOrigin: jest.fn(), displayWidth: 50, displayHeight: 100, body: { setSize: jest.fn(), setOffset: jest.fn(), updateFromGameObject: jest.fn() } };
+    const mockPlayer2 = { setPosition: jest.fn(), setScale: jest.fn(), setOrigin: jest.fn(), displayWidth: 50, displayHeight: 100, body: { setSize: jest.fn(), setOffset: jest.fn(), updateFromGameObject: jest.fn() } };
+    const mockPlatform = { setPosition: jest.fn(), setSize: jest.fn(), displayWidth: 100, displayHeight: 20 };
+    const mockTimer = { setFontSize: jest.fn(), setPosition: jest.fn() };
+    // Add all required health bar and pip mocks
+    const mockBar = { setPosition: jest.fn().mockReturnThis(), setSize: jest.fn().mockReturnThis() };
+    const mockText = { setPosition: jest.fn().mockReturnThis(), setFontSize: jest.fn().mockReturnThis() };
+    const mockPip = { setPosition: jest.fn().mockReturnThis(), setRadius: jest.fn().mockReturnThis() };
+    // Platform group child must have setDisplaySize
+    const mockPlatformGroupChild = { setDisplaySize: jest.fn(), setPosition: jest.fn(), displayWidth: 100, displayHeight: 20, refreshBody: jest.fn() };
     const mockScene = {
       scale: { width: 500, height: 300 },
       player1: mockPlayer1,
       player2: mockPlayer2,
-      platform: mockPlatform,
+      platform: { getChildren: () => [mockPlatformGroupChild] },
       timerText: mockTimer,
-      children: { 
-        list: [{ texture: { key: 'scenario1' }, setPosition: jest.fn() }] 
+      children: {
+        list: [
+          { texture: { key: 'scenario1' }, setPosition: jest.fn(), displayWidth: 100, displayHeight: 100 },
+          { type: 'Rectangle', fillColor: 0x8B5A2B, setPosition: jest.fn(), setSize: jest.fn(), displayWidth: 100, displayHeight: 20 }
+        ]
       },
-      isReady: true
+      isReady: true,
+      cameras: { main: { setBounds: jest.fn() } },
+      physics: { world: { setBounds: jest.fn(), staticBodies: true } },
+      healthBar1Border: mockBar,
+      healthBar2Border: mockBar,
+      healthBar1: mockBar,
+      healthBar2: mockBar,
+      specialPips1: [mockPip, mockPip, mockPip],
+      specialPips2: [mockPip, mockPip, mockPip],
+      specialReady1: mockPip,
+      specialReadyText1: mockText,
+      specialReady2: mockPip,
+      specialReadyText2: mockText,
+      updateControlPositions: jest.fn(),
     };
-    
     // Call the function being tested
     updateSceneLayout(mockScene);
-    
     // Verify that setPosition was called on both players
-    expect(mockPlayer1.setPosition).toHaveBeenCalled();
-    expect(mockPlayer2.setPosition).toHaveBeenCalled();
-    
-    // Verify that setPosition and setSize were called on the platform
-    expect(mockPlatform.setPosition).toHaveBeenCalled();
-    expect(mockPlatform.setSize).toHaveBeenCalled();
-    
-    // Verify timer position was set
+    expect(mockPlayer1.setScale).toHaveBeenCalled();
+    expect(mockPlayer2.setScale).toHaveBeenCalled();
+    expect(mockPlayer1.setOrigin).toHaveBeenCalled();
+    expect(mockPlayer2.setOrigin).toHaveBeenCalled();
+    // Platform group child
+    expect(mockPlatformGroupChild.setDisplaySize).toHaveBeenCalled();
+    expect(mockPlatformGroupChild.setPosition).toHaveBeenCalled();
+    // Rectangle platform
+    const platformRect = mockScene.children.list.find(obj => obj.type === 'Rectangle');
+    expect(platformRect.setPosition).toHaveBeenCalled();
+    expect(platformRect.setSize).toHaveBeenCalled();
+    // Timer
     expect(mockTimer.setPosition).toHaveBeenCalled();
   });
 
   test('tryAttack deals damage and increments attackCount', () => {
     // Minimal mock for tryAttack logic
+    const player1 = { x: 100, health: 100 };
+    const player2 = { x: 120, health: 100 };
     const scene = {
       lastAttackTime: [0, 0],
       attackCount: [0, 0],
-      player1: { x: 100, health: 100 },
-      player2: { x: 120, health: 100 },
+      player1,
+      player2,
       playerHealth: [100, 100],
       cameras: { main: { shake: jest.fn() } },
       keys: {},
       cursors: {},
       time: { delayedCall: jest.fn() },
       hitFlash: { clear: jest.fn(), fillStyle: jest.fn(), fillCircle: jest.fn(), setVisible: jest.fn() },
-      showSpecialEffect: jest.fn()
+      showSpecialEffect: jest.fn(),
+      getPlayerIndex: (p) => (p === player1 ? 0 : 1),
+      blocking: [false, false],
+      gameOver: false,
+      sameCharacterSelected: false,
+      playerAttackBlocked: [false, false],
+      playerLastAttack: [0, 0]
     };
-    // Ensure defender is exactly scene.player2
-    tryAttack(scene, 0, scene.player1, scene.player2, Date.now(), false);
+    scene.playerHealth[1] = 100;
+    scene.lastAttackTime[0] = 0;
+    scene.attackCount[0] = 0;
+    scene.attackCount[1] = 0;
+    const now = 1000;
+    // Debug log
+    console.log('Before tryAttack: playerHealth[1]=', scene.playerHealth[1]);
+    tryAttack(scene, 0, player1, player2, now, false);
+    console.log('After tryAttack: playerHealth[1]=', scene.playerHealth[1]);
     expect(scene.playerHealth[1]).toBeLessThan(100);
     expect(scene.attackCount[0]).toBe(1);
     expect(scene.cameras.main.shake).toHaveBeenCalled();
