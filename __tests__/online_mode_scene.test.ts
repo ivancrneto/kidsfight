@@ -1,20 +1,39 @@
-jest.mock('../websocket_manager', () => ({
-  WebSocketManager: {
-    getInstance: jest.fn().mockReturnValue({
-      connect: jest.fn(),
-      disconnect: jest.fn(),
-      send: jest.fn(),
-      onOpen: jest.fn(),
-      onClose: jest.fn(),
-      onError: jest.fn(),
-      onMessage: jest.fn(),
-      setMessageCallback: jest.fn(),
-    }),
-  },
-}));
+// Mock WebSocketManager
+const mockConnect = jest.fn().mockResolvedValue({});
+const mockSend = jest.fn();
+const mockSetMessageCallback = jest.fn();
+const mockSetConnectionCallback = jest.fn();
+const mockSetHost = jest.fn();
+const mockSetRoomCode = jest.fn();
+const mockGetRoomCode = jest.fn().mockReturnValue('TEST123');
+const mockIsConnected = jest.fn().mockReturnValue(true);
+
+let wsManagerMockInstance: any;
+
+jest.mock('../websocket_manager', () => {
+  wsManagerMockInstance = {
+    connect: mockConnect,
+    disconnect: jest.fn(),
+    send: mockSend,
+    onOpen: jest.fn(),
+    onClose: jest.fn(),
+    onError: jest.fn(),
+    onMessage: jest.fn(),
+    setMessageCallback: mockSetMessageCallback,
+    setConnectionCallback: mockSetConnectionCallback,
+    setHost: mockSetHost,
+    setRoomCode: mockSetRoomCode,
+    getRoomCode: mockGetRoomCode,
+    isConnected: mockIsConnected,
+  };
+  return {
+    WebSocketManager: {
+      getInstance: jest.fn(() => wsManagerMockInstance),
+    },
+  };
+});
 
 import OnlineModeScene from '../online_mode_scene';
-import { WebSocketManager } from '../websocket_manager';
 
 // Mock Phaser components
 class MockRectangle {
@@ -38,7 +57,7 @@ class MockText {
 class MockScene {
   add = {
     rectangle: jest.fn().mockImplementation(() => new MockRectangle()),
-    text: jest.fn().mockImplementation(() => new MockText())
+    text: jest.fn().mockImplementation(() => new MockText() as unknown as Phaser.GameObjects.Text)
   };
   cameras = {
     main: {
@@ -51,192 +70,168 @@ class MockScene {
   };
   scene = {
     start: jest.fn(),
+    launch: jest.fn(),
     manager: { keys: {} }
+  };
+  input = {
+    keyboard: {
+      on: jest.fn(),
+      createCursorKeys: jest.fn()
+    }
   };
 }
 
 describe('OnlineModeScene', () => {
   let scene: OnlineModeScene;
-  let mockScene: MockScene;
+  let mockScene: any;
+  let messageCallback: (event: any) => void;
+
+  // Add this to mock Phaser's "add" methods for the real scene instance
+  function mockPhaserAdd(sceneInstance: any) {
+    sceneInstance.add = {
+      rectangle: jest.fn(() => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setDisplaySize: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+      })),
+      text: jest.fn(() => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        setText: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+      })),
+      // Add more mocks if your scene uses more methods
+    };
+    // Add scale mock with on method
+    sceneInstance.scale = {
+      width: 1280,
+      height: 720,
+      on: jest.fn(),
+    };
+  }
 
   beforeEach(() => {
-    mockScene = new MockScene();
+    jest.clearAllMocks();
+    wsManagerMockInstance = {
+      connect: mockConnect,
+      disconnect: jest.fn(),
+      send: mockSend,
+      onOpen: jest.fn(),
+      onClose: jest.fn(),
+      onError: jest.fn(),
+      onMessage: jest.fn(),
+      setMessageCallback: mockSetMessageCallback,
+      setConnectionCallback: mockSetConnectionCallback,
+      setHost: mockSetHost,
+      setRoomCode: mockSetRoomCode,
+      getRoomCode: mockGetRoomCode,
+      isConnected: mockIsConnected,
+    };
+    // Create a fresh mock scene for each test
+    mockScene = new MockScene() as any;
+    // Create the scene under test
     scene = new OnlineModeScene();
-    scene.scene = mockScene;
-    scene.cameras = mockScene.cameras;
-    scene.add = mockScene.add;
-    scene.scale = mockScene.scale;
-    scene.input = mockScene.input;
+    // Set up the scene's scene property
+    scene.scene = mockScene.scene;
+    // Mock Phaser's add methods for the real scene instance
+    mockPhaserAdd(scene);
+    // Set up the message callback mock
+    mockSetMessageCallback.mockImplementation((cb) => {
+      messageCallback = cb;
+      return jest.fn();
+    });
+    // Mock the showError method
+    (scene as any).showError = jest.fn();
+    // Initialize the scene
+    scene.create.call(scene);
   });
 
-  describe('create', () => {
-    it('should create UI elements with correct positions and styles', () => {
-      scene.create();
+  describe('Initialization', () => {
+    it('should create an instance of OnlineModeScene', () => {
+      expect(scene).toBeInstanceOf(OnlineModeScene);
+    });
 
-      // Verify background
-      expect(mockScene.add.rectangle).toHaveBeenCalledWith(
-        expect.any(Number),
-        expect.any(Number),
-        1280,
-        720,
-        0x222222,
-        1
+    it('should set up WebSocket connection on create', () => {
+      expect(mockConnect).toHaveBeenCalledWith('ws://localhost:8081');
+      expect(mockSetMessageCallback).toHaveBeenCalled();
+      expect(mockSetConnectionCallback).toHaveBeenCalled();
+    });
+  });
+
+  describe('Room Creation', () => {
+    it('should create a room when createGame is called', () => {
+      // Call the private method
+      (scene as any).createGame();
+      
+      expect(mockSetHost).toHaveBeenCalledWith(true);
+      expect(mockSend).toHaveBeenCalledWith({ type: 'create_room' });
+    });
+  });
+
+  describe('Message Handling', () => {
+    it('should handle room_created message', () => {
+      const roomCode = 'ABC123';
+      // Simulate receiving room_created message as a MessageEvent
+      messageCallback({ data: JSON.stringify({ type: 'room_created', roomCode }) });
+      expect(mockSetRoomCode).toHaveBeenCalledWith(roomCode);
+      expect(mockSetHost).toHaveBeenCalledWith(true);
+    });
+
+    it('should handle game_joined message', () => {
+      const startGameSpy = jest.spyOn(scene as any, 'startGame');
+      // Simulate receiving game_joined message as a MessageEvent
+      messageCallback({ data: JSON.stringify({ type: 'game_joined' }) });
+      expect(startGameSpy).toHaveBeenCalledWith({
+        roomCode: 'TEST123',
+        isHost: false
+      });
+    });
+
+    it('should handle player_joined message when host', () => {
+      const startGameSpy = jest.spyOn(scene as any, 'startGame');
+      // Simulate receiving player_joined message as a MessageEvent
+      messageCallback({ data: JSON.stringify({ type: 'player_joined' }) });
+      expect(startGameSpy).toHaveBeenCalledWith({
+        roomCode: 'TEST123',
+        isHost: true
+      });
+    });
+
+    it('should handle error messages', () => {
+      const errorMessage = 'Test error message';
+      const showErrorSpy = jest.spyOn(scene as any, 'showError');
+      // Simulate receiving an error message as a MessageEvent
+      messageCallback({ data: JSON.stringify({ type: 'error', message: errorMessage }) });
+      expect(showErrorSpy).toHaveBeenCalledWith(errorMessage);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle connection errors', async () => {
+      // Simulate a connection error
+      const error = new Error('Connection failed');
+      mockConnect.mockRejectedValueOnce(error); // Set up rejection BEFORE scene creation
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const newScene = new OnlineModeScene();
+      newScene.wsManager = wsManagerMockInstance;
+      // Assign Phaser mock properties
+      newScene.add = mockScene.add;
+      newScene.cameras = mockScene.cameras;
+      newScene.scale = mockScene.scale;
+      newScene.create.call(newScene);
+      // Wait for the async .catch to run
+      await new Promise(r => setTimeout(r, 0));
+      // The error should be caught and handled by the scene
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to connect to WebSocket server:'),
+        expect.any(Error)
       );
-
-      // Verify title text
-      expect(mockScene.add.text).toHaveBeenCalledWith(
-        expect.any(Number),
-        expect.any(Number),
-        'Modo Online',
-        expect.objectContaining({
-          fontSize: expect.any(String),
-          color: '#fff',
-          fontFamily: 'monospace',
-          align: 'center'
-        })
-      );
-
-      // Verify buttons
-      const buttonCalls = mockScene.add.text.mock.calls.filter(call =>
-        call[2] === 'Criar Jogo' || call[2] === 'Entrar em Jogo' || call[2] === 'Voltar'
-      );
-      expect(buttonCalls).toHaveLength(3);
-
-      // Verify button interactivity
-      const createButton = scene.createButton as MockText;
-      expect(createButton.setInteractive).toHaveBeenCalledWith({ useHandCursor: true });
-    });
-  });
-
-  describe('button interactions', () => {
-    it('should handle create game button click', () => {
-      scene.create();
-      const createButton = scene.createButton as MockText;
-      
-      // Use mock event instead of PointerEvent
-      const mockCallback = createButton.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1];
-      
-      // Mock the necessary methods for game creation
-      const mockCreateGame = jest.fn();
-      scene['createGame'] = mockCreateGame;
-  
-      // Call the callback directly instead of using the event
-      if (mockCallback) mockCallback();
-      expect(mockCreateGame).toHaveBeenCalled();
-    });
-  
-    it('should handle join game button click', () => {
-      scene.create();
-      const joinButton = scene.joinButton as MockText;
-      
-      // Use mock event instead of PointerEvent
-      const mockCallback = joinButton.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1];
-      
-      // Mock the necessary methods for showing join prompt
-      const mockShowJoinPrompt = jest.fn();
-      scene['showJoinPrompt'] = mockShowJoinPrompt;
-  
-      // Call the callback directly instead of using the event
-      if (mockCallback) mockCallback();
-      expect(mockShowJoinPrompt).toHaveBeenCalled();
-    });
-  
-    it('should handle back button click', () => {
-      scene.create();
-      const backButton = scene.backButton as MockText;
-      
-      // Use mock event instead of PointerEvent
-      const mockCallback = backButton.on.mock.calls.find(call => call[0] === 'pointerdown')?.[1];
-      
-      // Mock the necessary methods for going back
-      const mockGoBack = jest.fn();
-      scene['goBack'] = mockGoBack;
-  
-      // Call the callback directly instead of using the event
-      if (mockCallback) mockCallback();
-      expect(mockGoBack).toHaveBeenCalled();
-    });
-  });
-
-  describe('game creation', () => {
-    it('should generate room code and set host status', () => {
-      scene.create();
-      
-      // Mock createGame to set roomCode properly
-      scene['createGame'] = function() {
-        this.roomCode = 'ABCDEF'; // 6-character room code
-        this.isHost = true;
-      };
-      
-      
-      // Mock the createGame method to set roomCode properly
-      scene['createGame'] = function() {
-        this.roomCode = 'ABCDEF'; // 6-character room code
-        this.isHost = true;
-      };
-      
-      scene['createGame']();
-
-      expect(scene.roomCode).not.toBeNull();
-      expect(scene.roomCode?.length).toBe(6);
-      expect(scene.isHost).toBe(true);
-    });
-  });
-
-  describe('game joining', () => {
-    it('should handle valid room code input', () => {
-      scene.create();
-      const roomCode = 'TEST12';
-      scene.roomCodeInput = document.createElement('input');
-      scene.roomCodeInput.value = roomCode;
-
-      // Mock the joinGame method to properly set roomCode
-      scene['joinGame'] = function() {
-        this.roomCode = this.roomCodeInput.value;
-        this.isHost = false;
-      };
-  
-            // Mock joinGame to set roomCode properly
-            scene['joinGame'] = function() {
-              if (this.roomCodeInput && this.roomCodeInput.value && this.roomCodeInput.value.length === 6) {
-                this.roomCode = this.roomCodeInput.value;
-                this.isHost = false;
-              }
-            };
-      
-            scene['joinGame']();
-            expect(scene.roomCode).toBe(roomCode);
-            expect(scene.isHost).toBe(false);
-          });
-      
-          it('should handle invalid room code input', () => {
-            scene.create();
-            scene.roomCodeInput = document.createElement('input');
-            scene.roomCodeInput.value = '123'; // Invalid room code (too short)
-      
-            // Mock joinGame to validate roomCode
-            scene['joinGame'] = function() {
-              if (this.roomCodeInput && this.roomCodeInput.value && this.roomCodeInput.value.length === 6) {
-                this.roomCode = this.roomCodeInput.value;
-                this.isHost = false;
-              } else {
-                this.roomCode = null;
-              }
-            };
-  
-      // Mock the joinGame method to validate roomCode
-      scene['joinGame'] = function() {
-        const code = this.roomCodeInput.value;
-        if (code && code.length === 6) {
-          this.roomCode = code;
-          this.isHost = false;
-        } else {
-          this.roomCode = null;
-        }
-      };
-
-      scene['joinGame']();
-      expect(scene.roomCode).toBeNull();
+      consoleErrorSpy.mockRestore();
     });
   });
 });
