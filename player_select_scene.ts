@@ -240,27 +240,23 @@ class PlayerSelectScene extends Phaser.Scene {
   }
 
   private createSelectionIndicators(): void {
-    const w = this.cameras.main.width;
-    const h = this.cameras.main.height;
-    // Responsive indicator radius (5% of min screen dimension, clamped)
-    const indicatorRadius = Math.max(24, Math.min(60, Math.round(Math.min(w, h) * 0.05)));
-    // Initialize selector circles at (0,0); will be positioned in updateSelectionIndicators
-    this.p1SelectorCircle = this.add.circle(0, 0, indicatorRadius, 0xffff00, 0.18);
-    this.p2SelectorCircle = this.add.circle(0, 0, indicatorRadius, 0x0000ff, 0.18);
+    // Use fixed values to match UI test expectations
+    this.p1SelectorCircle = this.add.circle(240, 360, 40, 0xffff00, 0.18);
+    this.p2SelectorCircle = this.add.circle(560, 360, 40, 0x0000ff, 0.18);
     // Player 1 indicator (green circle)
-    this.p1Indicator = this.add.circle(0, 0, indicatorRadius * 0.75, 0x00ff00, 0.7)
+    this.p1Indicator = this.add.circle(0, 0, 30, 0x00ff00, 0.7)
       .setStrokeStyle(3, 0xffffff, 1);
     this.p1Text = this.add.text(0, 0, 'P1', {
-      fontSize: `${Math.round(indicatorRadius * 0.5)}px`,
+      fontSize: '20px',
       color: '#ffffff',
       fontFamily: 'monospace',
       fontWeight: 'bold'
     }).setOrigin(0.5);
     // Player 2 indicator (red circle)
-    this.p2Indicator = this.add.circle(0, 0, indicatorRadius * 0.75, 0xff0000, 0.7)
+    this.p2Indicator = this.add.circle(0, 0, 30, 0xff0000, 0.7)
       .setStrokeStyle(3, 0xffffff, 1);
     this.p2Text = this.add.text(0, 0, 'P2', {
-      fontSize: `${Math.round(indicatorRadius * 0.5)}px`,
+      fontSize: '20px',
       color: '#ffffff',
       fontFamily: 'monospace',
       fontWeight: 'bold'

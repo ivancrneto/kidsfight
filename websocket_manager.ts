@@ -31,6 +31,7 @@ class WebSocketManager {
   private _onMessageCallback: ((event: MessageEvent) => void) | null = null;
   private _onCloseCallback: ((event: CloseEvent) => void) | null = null;
   private _onErrorCallback: ((event: Event) => void) | null = null;
+  private _onConnectionCallback: ((isConnected: boolean) => void) | null = null;
   private _boundMessageCallback: ((event: MessageEvent) => void) | null = null;
   private _webSocketFactory: (url: string) => WebSocket;
 
@@ -86,6 +87,7 @@ class WebSocketManager {
         // Set up event handlers
         this._ws.onopen = () => {
           console.log(`[WSM] Connected to server [${this._debugInstanceId}]`);
+          this._onConnectionCallback?.(true);
           if (this._onMessageCallback) {
             this._boundMessageCallback = (e: MessageEvent) => {
               try {
@@ -122,6 +124,7 @@ class WebSocketManager {
           if (wasConnected) {
             this._onCloseCallback?.(event);
           }
+          this._onConnectionCallback?.(false);
         };
 
         this._ws.onerror = (error: Event) => {
@@ -292,8 +295,12 @@ class WebSocketManager {
     this._onCloseCallback = callback;
   }
 
-  public onError(callback: (event: Event) => void): void {
+  public setErrorCallback(callback: (event: Event) => void): void {
     this._onErrorCallback = callback;
+  }
+
+  public setConnectionCallback(callback: (isConnected: boolean) => void): void {
+    this._onConnectionCallback = callback;
   }
 
   public sendHealthUpdate(playerIndex: number, health: number): boolean {

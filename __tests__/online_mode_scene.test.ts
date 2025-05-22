@@ -234,4 +234,64 @@ describe('OnlineModeScene', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('UI Layout and Interactions', () => {
+    it('should create all main UI elements with correct visibility and positioning', () => {
+      // Title
+      expect(scene.add.text).toHaveBeenCalledWith(
+        1280/2,
+        720 * 0.3,
+        'Modo Online',
+        expect.objectContaining({ fontSize: expect.any(String), color: '#fff', align: 'center' })
+      );
+      // Buttons
+      expect(scene.add.text).toHaveBeenCalledWith(
+        1280/2,
+        720 * 0.45,
+        'Criar Jogo',
+        expect.any(Object)
+      );
+      expect(scene.add.text).toHaveBeenCalledWith(
+        1280/2,
+        720 * 0.55,
+        'Entrar em Jogo',
+        expect.any(Object)
+      );
+      expect(scene.add.text).toHaveBeenCalledWith(
+        1280/2,
+        720 * 0.8,
+        'Voltar',
+        expect.any(Object)
+      );
+      // Error text, room code display, join prompt, waiting text are created and hidden by default
+      expect(scene.errorText.setVisible).toHaveBeenCalledWith(false);
+      expect(scene.roomCodeDisplay.setVisible).toHaveBeenCalledWith(false);
+      expect(scene.roomCodeText.setVisible).toHaveBeenCalledWith(false);
+      expect(scene.joinPromptText.setVisible).toHaveBeenCalledWith(false);
+      expect(scene.waitingText.setVisible).toHaveBeenCalledWith(false);
+    });
+
+    it('should show join prompt and input when joinButton is clicked', () => {
+      scene.showJoinPrompt();
+      expect(scene.joinPromptText.setVisible).toHaveBeenCalledWith(true);
+      expect(scene.roomCodeInput.style.display).toBe('block');
+      expect(document.activeElement).toBe(scene.roomCodeInput);
+    });
+
+    it('should call createGame when createButton is clicked', () => {
+      const spy = jest.spyOn(scene as any, 'createGame');
+      scene.createButton.emit('pointerdown');
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('should call goBack when backButton is clicked', () => {
+      const spy = jest.spyOn(scene as any, 'goBack');
+      scene.backButton.emit('pointerdown');
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('should set up resize event handler for responsive layout', () => {
+      expect(scene.scale.on).toHaveBeenCalledWith('resize', scene.updateLayout, scene);
+    });
+  });
 });

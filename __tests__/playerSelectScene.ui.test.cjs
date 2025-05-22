@@ -62,15 +62,23 @@ jest.mock('phaser', () => {
         on: jest.fn().mockReturnThis(),
         data: { set: jest.fn() }
       }),
-      sprite: jest.fn().mockReturnValue({
-        setScale: jest.fn().mockReturnThis(),
-        setInteractive: jest.fn().mockReturnThis(),
-        on: jest.fn().mockReturnThis(),
-        setOrigin: jest.fn().mockReturnThis(),
-        setTint: jest.fn().mockReturnThis(),
-        setAlpha: jest.fn().mockReturnThis(),
-        setPosition: jest.fn().mockReturnThis(),
-        data: { set: jest.fn() }
+      sprite: jest.fn().mockImplementation((x, y, key) => {
+        const spriteMock = {
+          x,
+          y,
+          key,
+          setOrigin: jest.fn().mockReturnThis(),
+          setScale: jest.fn().mockReturnThis(),
+          setInteractive: jest.fn().mockReturnThis(),
+          setCrop: jest.fn().mockReturnThis(),
+          setTint: jest.fn().mockReturnThis(),
+          setAlpha: jest.fn().mockReturnThis(),
+          setPosition: jest.fn().mockReturnThis(),
+          setVisible: jest.fn().mockReturnThis(),
+          data: { set: jest.fn() },
+          on: jest.fn().mockReturnThis()
+        };
+        return spriteMock;
       })
     },
     input: {
@@ -138,6 +146,11 @@ jest.mock('phaser', () => {
     VERSION: phaserMockModule.VERSION
   };
 });
+
+// Patch setCrop for Phaser.GameObjects.Sprite in test environment (must come after jest.mock)
+if (typeof Phaser !== 'undefined' && Phaser.GameObjects && Phaser.GameObjects.Sprite) {
+  Phaser.GameObjects.Sprite.prototype.setCrop = function() { return this; };
+}
 
 describe('PlayerSelectScene UI', () => {
   let scene;
