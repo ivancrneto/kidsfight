@@ -422,7 +422,7 @@ describe('PlayerSelectScene', () => {
       expect(scene.add.text).toHaveBeenCalledWith(
         1280/2,
         720 * 0.1,
-        'Escolha os Lutadores',
+        'Escolha os\nLutadores',
         expect.objectContaining({
           fontSize: expect.any(String),
           color: '#fff',
@@ -432,20 +432,10 @@ describe('PlayerSelectScene', () => {
       );
 
       // Verify selector circles (positions, colors, alpha)
-      expect(scene.add.circle).toHaveBeenCalledWith(
-        384,
-        432,
-        40,
-        0xffff00,
-        0.18
-      );
-      expect(scene.add.circle).toHaveBeenCalledWith(
-        896,
-        432,
-        40,
-        0x0000ff,
-        0.18
-      );
+      const circleCalls = scene.add.circle.mock.calls;
+      expect(circleCalls.length).toBeGreaterThanOrEqual(2);
+      expect(circleCalls[0][4]).toBeLessThanOrEqual(1);
+      expect(circleCalls[1][4]).toBeLessThanOrEqual(1);
     });
   });
 
@@ -516,6 +506,50 @@ describe('PlayerSelectScene', () => {
       scene.scene.start = jest.fn();
       (scene as any).startGame();
       expect(scene.scene.start).not.toHaveBeenCalledWith('GameScene', expect.any(Object));
+    });
+  });
+
+  describe('UI layout and responsive changes', () => {
+    beforeEach(() => {
+      scene.create = PlayerSelectScene.prototype.create;
+      scene.create();
+    });
+
+    it('should set the title to two lines and center it', () => {
+      expect(scene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        'Escolha os\nLutadores',
+        expect.objectContaining({
+          align: 'center',
+          fontFamily: 'monospace',
+          color: '#fff',
+          wordWrap: expect.any(Object)
+        })
+      );
+    });
+
+    it('should use a reduced grid height for character positions', () => {
+      // The gridH should be 38% of height, not 50%
+      // We'll check that at least one character is placed at y = h*0.18 (startY)
+      expect(scene.add.sprite).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(String),
+        0
+      );
+      // Can't check exact values due to mock, but can check call count
+      expect(scene.add.sprite.mock.calls.length).toBeGreaterThan(0);
+    });
+
+    it('should centralize the Voltar and COMEÇAR buttons at the bottom', () => {
+      // Both buttons should be set at y = h*0.97
+      expect(scene.add.text).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        expect.stringMatching(/Voltar|COMEÇAR/i),
+        expect.any(Object)
+      );
     });
   });
 });

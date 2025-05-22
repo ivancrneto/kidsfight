@@ -32,6 +32,9 @@ interface CharacterInfo {
   y: number;
   scale: number;
   frame?: number;
+  bgCircle?: Phaser.GameObjects.Circle;
+  nameLabel?: Phaser.GameObjects.Text;
+  bgCircleOffsetY?: number;
 }
 
 class PlayerSelectScene extends Phaser.Scene {
@@ -56,6 +59,7 @@ class PlayerSelectScene extends Phaser.Scene {
   private p1SelectorCircle!: Phaser.GameObjects.Ellipse;
   private p2SelectorCircle!: Phaser.GameObjects.Ellipse;
   private startButtonRect!: Phaser.GameObjects.Rectangle;
+  private title!: Phaser.GameObjects.Text;
 
   /**
    * Optional wsManager injection for testability
@@ -114,16 +118,16 @@ class PlayerSelectScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // Load character sprites
-    this.load.image('player1_raw', player1RawImg);
-    this.load.image('player2_raw', player2RawImg);
-    this.load.image('player3_raw', player3RawImg);
-    this.load.image('player4_raw', player4RawImg);
-    this.load.image('player5_raw', player5RawImg);
-    this.load.image('player6_raw', player6RawImg);
-    this.load.image('player7_raw', player7RawImg);
-    this.load.image('player8_raw', player8RawImg);
-    this.load.image('player9_raw', player9RawImg);
+    // Load character sprites as spritesheets (assuming 96x96 frame size)
+    this.load.spritesheet('player1', player1RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player2', player2RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player3', player3RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player4', player4RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player5', player5RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player6', player6RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player7', player7RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player8', player8RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player9', player9RawImg, { frameWidth: 296, frameHeight: 296 });
     
     // Note: Removed selector.png and will use Phaser shapes instead
     
@@ -135,22 +139,23 @@ class PlayerSelectScene extends Phaser.Scene {
   }
 
   create(): void {
-    const w = 1280;
-    const h = 720;
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
 
     // Add background
     const bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
     
-    // Add title
-    const title = this.add.text(
+    // Add title (always two lines)
+    this.title = this.add.text(
       w/2,
       h * 0.1,
-      'Escolha os Lutadores',
+      'Escolha os\nLutadores',
       {
-        fontSize: `${Math.max(24, Math.round(w * 0.045))}px`,
+        fontSize: `${Math.max(18, Math.round(Math.min(w, h) * 0.06))}px`,
         color: '#fff',
         fontFamily: 'monospace',
-        align: 'center'
+        align: 'center',
+        wordWrap: { width: w * 0.8, useAdvancedWrap: true }
       }
     ).setOrigin(0.5);
 
@@ -175,33 +180,48 @@ class PlayerSelectScene extends Phaser.Scene {
   private setupCharacters(): void {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
-    const gridSize = 3;
-    const spacing = w * 0.2;
-    const startX = w * 0.25;
-    const startY = h * 0.3;
-
+    // --- Responsive character grid setup (centered grid, smaller height section) ---
+    const gridCols = 3;
+    const gridRows = 3;
+    const gridW = w * 0.7; // grid takes 70% of width
+    const gridH = h * 0.38; // grid takes LESS height (38% instead of 50%)
+    const spacingX = gridW / (gridCols - 1);
+    const spacingY = gridH / (gridRows - 1);
+    const startX = w / 2 - gridW / 2;
+    const startY = h * 0.18;
     this.characters = [
       { name: 'Bento', key: 'player1', x: startX, y: startY, scale: 0.5 },
-      { name: 'Davi R', key: 'player2', x: startX + spacing, y: startY, scale: 0.5 },
-      { name: 'José', key: 'player3', x: startX + spacing * 2, y: startY, scale: 0.5 },
-      { name: 'Davis', key: 'player4', x: startX, y: startY + spacing, scale: 0.5 },
-      { name: 'Carol', key: 'player5', x: startX + spacing, y: startY + spacing, scale: 0.5 },
-      { name: 'Roni', key: 'player6', x: startX + spacing * 2, y: startY + spacing, scale: 0.5 },
-      { name: 'Jacqueline', key: 'player7', x: startX, y: startY + spacing * 2, scale: 0.5 },
-      { name: 'Ivan', key: 'player8', x: startX + spacing, y: startY + spacing * 2, scale: 0.5 },
-      { name: 'D. Isa', key: 'player9', x: startX + spacing * 2, y: startY + spacing * 2, scale: 0.5 }
+      { name: 'Davi R', key: 'player2', x: startX + spacingX, y: startY, scale: 0.5 },
+      { name: 'José', key: 'player3', x: startX + spacingX * 2, y: startY, scale: 0.5 },
+      { name: 'Davis', key: 'player4', x: startX, y: startY + spacingY, scale: 0.5 },
+      { name: 'Carol', key: 'player5', x: startX + spacingX, y: startY + spacingY, scale: 0.5 },
+      { name: 'Roni', key: 'player6', x: startX + spacingX * 2, y: startY + spacingY, scale: 0.5 },
+      { name: 'Jacqueline', key: 'player7', x: startX, y: startY + spacingY * 2, scale: 0.5 },
+      { name: 'Ivan', key: 'player8', x: startX + spacingX, y: startY + spacingY * 2, scale: 0.5 },
+      { name: 'D. Isa', key: 'player9', x: startX + spacingX * 2, y: startY + spacingY * 2, scale: 0.5 }
     ];
-
-    // Create character sprites
+    // --- END Responsive centered grid ---
+    // Create character sprites with background circles
     this.characters.forEach((char, index) => {
-      const sprite = this.add.sprite(char.x, char.y, `${char.key}_raw`);
-      sprite.setScale(char.scale);
+      // When creating the background circle, store the original offset for later use
+      const bgCircleOffsetY = 100; // move bgCircle 100px down from char.y
+      const bgCircle = this.add.circle(char.x, char.y + bgCircleOffsetY, 60, 0x222222, 1);
+      char.bgCircle = bgCircle;
+      char.bgCircleOffsetY = bgCircleOffsetY;
+      // Show only frame 0 and crop to head+shoulders area (classic style)
+      const sprite = this.add.sprite(char.x, char.y + 40, char.key, 0);
+      // Responsive scale: base scale for 296x296, shrink to 0.4 for default 1280x720, scale with min(screenW,screenH)
+      const baseSize = 296;
+      const screenW = this.sys.game.config.width as number;
+      const screenH = this.sys.game.config.height as number;
+      const scale = 0.4 * Math.min(screenW, screenH) / 720; // 0.4 at 720p, smaller for smaller screens
+      sprite.setScale(scale);
       sprite.setInteractive({ useHandCursor: true });
-      
+      sprite.setCrop(0, 0, 296, 296); // crop to square head+shoulders for new frame size
+      sprite.setOrigin(0.5, 0.4);
       // Store sprite reference
       this.characterSprites[char.key] = sprite;
-
-      // Add name label
+      // Add name label and keep reference
       const label = this.add.text(
         char.x,
         char.y + 100,
@@ -213,7 +233,7 @@ class PlayerSelectScene extends Phaser.Scene {
           align: 'center'
         }
       ).setOrigin(0.5);
-
+      char.nameLabel = label;
       // Click handler
       sprite.on('pointerdown', () => this.handleCharacterSelect(index));
     });
@@ -222,39 +242,29 @@ class PlayerSelectScene extends Phaser.Scene {
   private createSelectionIndicators(): void {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
-    
-    // Player 1 selector circle (yellow)
-    this.p1SelectorCircle = this.add.circle(w * 0.3, h * 0.6, 40, 0xffff00, 0.18);
-    
-    // Player 2 selector circle (blue)
-    this.p2SelectorCircle = this.add.circle(w * 0.7, h * 0.6, 40, 0x0000ff, 0.18);
-
-    // Create circular indicators using Phaser shapes instead of sprites
-    const indicatorRadius = 30;
-    
+    // Responsive indicator radius (5% of min screen dimension, clamped)
+    const indicatorRadius = Math.max(24, Math.min(60, Math.round(Math.min(w, h) * 0.05)));
+    // Initialize selector circles at (0,0); will be positioned in updateSelectionIndicators
+    this.p1SelectorCircle = this.add.circle(0, 0, indicatorRadius, 0xffff00, 0.18);
+    this.p2SelectorCircle = this.add.circle(0, 0, indicatorRadius, 0x0000ff, 0.18);
     // Player 1 indicator (green circle)
-    this.p1Indicator = this.add.circle(0, 0, indicatorRadius, 0x00ff00, 0.7)
+    this.p1Indicator = this.add.circle(0, 0, indicatorRadius * 0.75, 0x00ff00, 0.7)
       .setStrokeStyle(3, 0xffffff, 1);
-      
     this.p1Text = this.add.text(0, 0, 'P1', {
-      fontSize: '24px',
+      fontSize: `${Math.round(indicatorRadius * 0.5)}px`,
       color: '#ffffff',
       fontFamily: 'monospace',
       fontWeight: 'bold'
     }).setOrigin(0.5);
-
     // Player 2 indicator (red circle)
-    this.p2Indicator = this.add.circle(0, 0, indicatorRadius, 0xff0000, 0.7)
+    this.p2Indicator = this.add.circle(0, 0, indicatorRadius * 0.75, 0xff0000, 0.7)
       .setStrokeStyle(3, 0xffffff, 1);
-      
     this.p2Text = this.add.text(0, 0, 'P2', {
-      fontSize: '24px',
+      fontSize: `${Math.round(indicatorRadius * 0.5)}px`,
       color: '#ffffff',
       fontFamily: 'monospace',
       fontWeight: 'bold'
     }).setOrigin(0.5);
-
-    this.updateSelectionIndicators();
   }
 
   private createUIButtons(): void {
@@ -354,17 +364,23 @@ class PlayerSelectScene extends Phaser.Scene {
   }
 
   private updateSelectionIndicators(): void {
-    const p1Sprite = this.characterSprites[this.selected.p1];
-    const p2Sprite = this.characterSprites[this.selected.p2];
-
-    if (p1Sprite) {
-      this.p1Indicator.setPosition(p1Sprite.x, p1Sprite.y - 80);
-      this.p1Text.setPosition(p1Sprite.x, p1Sprite.y - 80);
+    // Move selector circles to selected character positions
+    const p1Char = this.characters[this.selectedP1Index];
+    const p2Char = this.characters[this.selectedP2Index];
+    if (p1Char && this.p1SelectorCircle) {
+      this.p1SelectorCircle.setPosition(p1Char.x, p1Char.y);
     }
-
-    if (p2Sprite) {
-      this.p2Indicator.setPosition(p2Sprite.x, p2Sprite.y - 80);
-      this.p2Text.setPosition(p2Sprite.x, p2Sprite.y - 80);
+    if (p2Char && this.p2SelectorCircle) {
+      this.p2SelectorCircle.setPosition(p2Char.x, p2Char.y);
+    }
+    // Move indicator circles and text as before
+    if (p1Char && this.p1Indicator && this.p1Text) {
+      this.p1Indicator.setPosition(p1Char.x, p1Char.y - 80);
+      this.p1Text.setPosition(p1Char.x, p1Char.y - 80);
+    }
+    if (p2Char && this.p2Indicator && this.p2Text) {
+      this.p2Indicator.setPosition(p2Char.x, p2Char.y - 80);
+      this.p2Text.setPosition(p2Char.x, p2Char.y - 80);
     }
   }
 
@@ -422,47 +438,87 @@ class PlayerSelectScene extends Phaser.Scene {
   private updateLayout(gameSize: Phaser.Structs.Size): void {
     const w = gameSize.width;
     const h = gameSize.height;
-
-    // Update character positions
-    const spacing = w * 0.2;
-    const startX = w * 0.25;
-    const startY = h * 0.3;
-
+    // Responsive title position and font size
+    if (this.title) {
+      // Always break title into two lines
+      this.title.setText('Escolha os\nLutadores');
+      const vw = w / 100;
+      const vh = h / 100;
+      const titleFontSize = Math.max(14, Math.round(Math.min(vw, vh) * 6)); // 6vw/vh, min 14px
+      this.title.setFontSize(titleFontSize);
+      this.title.setWordWrapWidth(w * 0.8, true);
+      this.title.setAlign('center');
+      this.title.setPosition(w / 2, vh * 10); // 10vh from top
+      this.title.setOrigin(0.5, 0.5);
+    }
+    // Responsive character positions (centered grid, smaller height section)
+    const gridCols = 3;
+    const gridRows = 3;
+    const gridW = w * 0.7;
+    const gridH = h * 0.38;
+    const spacingX = gridW / (gridCols - 1);
+    const spacingY = gridH / (gridRows - 1);
+    const startX = w / 2 - gridW / 2;
+    const startY = h * 0.18;
     this.characters.forEach((char, index) => {
       const row = Math.floor(index / 3);
       const col = index % 3;
-      char.x = startX + col * spacing;
-      char.y = startY + row * spacing;
-
+      char.x = startX + col * spacingX;
+      char.y = startY + row * spacingY;
+      // Move background circle to its intended offset from char.y (not sprite)
+      if (char.bgCircle) {
+        const bgCircleOffsetY = char.bgCircleOffsetY || 100;
+        char.bgCircle.setPosition(char.x, char.y + bgCircleOffsetY);
+        char.bgCircle.setScale(scale);
+        char.bgCircle.setDepth(sprite.depth - 1);
+      }
+      // Move and scale sprite
       const sprite = this.characterSprites[char.key];
       if (sprite) {
-        sprite.setPosition(char.x, char.y);
-        
-        // Update name label
-        const label = this.children.list.find((child: any) => 
-          child instanceof Phaser.GameObjects.Text &&
-          child.text === char.name
-        ) as Phaser.GameObjects.Text;
-        
-        if (label) {
-          label.setPosition(char.x, char.y + 100);
-        }
+        sprite.setPosition(char.x, char.y + 40); // move sprite 40px further down
+        sprite.setScale(scale);
+      }
+      // Update name label
+      if (char.nameLabel) {
+        const nameOffset = (baseSize * scale) / 2 + 24 + 40;
+        char.nameLabel.setPosition(char.x, char.y + nameOffset);
       }
     });
 
-    // Update selection indicators
-    this.updateSelectionIndicators();
-
-    // Update UI buttons
-    if (this.readyButton) {
-      this.readyButton.setPosition(w * 0.7, h * 0.85);
-    }
-    if (this.backButton) {
-      this.backButton.setPosition(w * 0.3, h * 0.85);
+    // Centralize the buttons at the bottom using edge alignment
+    const buttonY = h * 0.97;
+    const buttonSpacing = Math.max(24, w * 0.04);
+    if (this.readyButton && this.backButton) {
+      this.readyButton.setFontSize(Math.max(14, Math.round(h * 0.035)));
+      this.backButton.setFontSize(Math.max(14, Math.round(h * 0.035)));
+      if (this.readyButton.updateText) this.readyButton.updateText();
+      if (this.backButton.updateText) this.backButton.updateText();
+      const readyWidth = this.readyButton.width;
+      const backWidth = this.backButton.width;
+      const totalWidth = readyWidth + backWidth + buttonSpacing;
+      const centerX = w / 2;
+      // Set origins so that their inner edges meet at center
+      this.backButton.setOrigin(1, 0.5); // right edge
+      this.readyButton.setOrigin(0, 0.5); // left edge
+      this.backButton.setPosition(centerX - buttonSpacing / 2, buttonY);
+      this.readyButton.setPosition(centerX + buttonSpacing / 2, buttonY);
     }
     if (this.waitingText) {
-      this.waitingText.setPosition(w/2, h * 0.7);
+      this.waitingText.setFontSize(Math.max(12, Math.round(h * 0.03)));
+      this.waitingText.setPosition(w/2, h * 0.87);
+      this.waitingText.setOrigin(0.5);
     }
+
+    // Responsive selectors (start at correct positions)
+    if (this.p1SelectorCircle) {
+      this.p1SelectorCircle.setPosition(this.characters[0].x, this.characters[0].y);
+    }
+    if (this.p2SelectorCircle) {
+      this.p2SelectorCircle.setPosition(this.characters[this.characters.length-1].x, this.characters[this.characters.length-1].y);
+    }
+
+    // Update selection indicators
+    this.updateSelectionIndicators();
   }
 
   /**
