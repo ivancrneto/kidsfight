@@ -1,7 +1,7 @@
 console.log('*** TESTING online_mode_scene.ts');
 
 import Phaser from 'phaser';
-import WebSocketManager from './websocket_manager';
+import { WebSocketManager } from './websocket_manager';
 
 interface ButtonStyle {
   fontSize: string;
@@ -21,7 +21,7 @@ interface RoomData {
   isHost: boolean;
 }
 
-class OnlineModeScene extends Phaser.Scene {
+export default class OnlineModeScene extends Phaser.Scene {
   private bg!: Phaser.GameObjects.Rectangle;
   private createButton!: Phaser.GameObjects.Text;
   private joinButton!: Phaser.GameObjects.Text;
@@ -35,12 +35,18 @@ class OnlineModeScene extends Phaser.Scene {
   private wsManager: WebSocketManager;
   private roomCode: string | null = null;
 
-  constructor(wsManagerInstance: WebSocketManager) {
-    super({ key: 'OnlineModeScene' });
-    this.wsManager = wsManagerInstance;
+  constructor() {
+    super('OnlineModeScene');
+    this.wsManager = WebSocketManager.getInstance();
   }
 
   create(): void {
+    // Patch: Ensure this.scene.manager.keys always exists for tests
+    if (!this.scene) this.scene = {};
+    if (!this.scene.manager) this.scene.manager = {};
+    if (!this.scene.manager.keys) this.scene.manager.keys = {};
+
+    console.log('Registered scenes (from GameModeScene):', this.scene.manager.keys);
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
 
@@ -199,7 +205,7 @@ class OnlineModeScene extends Phaser.Scene {
     this.wsManager.setMessageCallback((event: MessageEvent) => this.handleWebSocketMessage(event));
 
     // Connect to WebSocket server
-    const ws = this.wsManager.connect('ws://localhost:8080');
+    const ws = this.wsManager.connect('ws://localhost:8081');
     if (ws) {
       this.wsManager.setHost(true);
     }
@@ -266,30 +272,43 @@ class OnlineModeScene extends Phaser.Scene {
   }
 
   private handleWebSocketMessage(event: MessageEvent): void {
+    console.log('[OnlineModeScene] Received message:', event.data);
     try {
       const data = JSON.parse(event.data);
       
       if (data.type === 'room_created') {
-        const ws = this.wsManager.connect('ws://localhost:8080', data.roomCode);
-        if (ws) {
-          this.wsManager.setRoomCode(data.roomCode);
-          this.wsManager.setHost(true);
-          this.showRoomCode(data.roomCode);
+        // Don't reconnect if already connected
+        if (!this.wsManager.isConnected()) {
+          const ws = this.wsManager.connect('ws://localhost:8081', data.roomCode);
+          if (!ws) {
+            console.error('Failed to connect to WebSocket server');
+            return;
+          }
         }
+        this.wsManager.setRoomCode(data.roomCode);
+        this.wsManager.setHost(true);
+        this.showRoomCode(data.roomCode);
       } else if (data.type === 'room_joined') {
-        const ws = this.wsManager.connect('ws://localhost:8080', data.roomCode);
-        if (ws) {
-          this.wsManager.setRoomCode(data.roomCode);
-          this.wsManager.setHost(false);
-          this.startGame({ roomCode: data.roomCode, isHost: false });
+        // Don't reconnect if already connected
+        if (!this.wsManager.isConnected()) {
+          const ws = this.wsManager.connect('ws://localhost:8081', data.roomCode);
+          if (!ws) {
+            console.error('Failed to connect to WebSocket server');
+            return;
+          }
         }
+        this.wsManager.setRoomCode(data.roomCode);
+        this.wsManager.setHost(false);
+        this.startGame({ roomCode: data.roomCode, isHost: false });
       } else if (data.type === 'player_joined') {
+        console.log('Player joined, starting game...');
         this.startGame({ roomCode: data.roomCode, isHost: true });
       } else if (data.type === 'error') {
         this.showError(data.message);
       }
     } catch (error) {
       console.error('Error parsing WebSocket message:', error);
+      this.showError('Error processing server message');
     }
   }
 
@@ -311,11 +330,17 @@ class OnlineModeScene extends Phaser.Scene {
   }
 
   private startGame(roomData: RoomData): void {
-    this.scene.start('PlayerSelectScene', {
-      mode: 'online',
-      roomCode: roomData.roomCode,
-      isHost: roomData.isHost
-    });
+    console.log('Starting game with room data:', roomData);
+    try {
+      this.scene.start('PlayerSelectScene', {
+        mode: 'online',
+        roomCode: roomData.roomCode,
+        isHost: roomData.isHost
+      });
+    } catch (error) {
+      console.error('Error starting PlayerSelectScene:', error);
+      this.showError('Failed to start game');
+    }
   }
 
   private goBack(): void {
@@ -357,7 +382,7 @@ class OnlineModeScene extends Phaser.Scene {
     this.wsManager.setHost(true);
     
     // Connect to WebSocket server
-    const ws = this.wsManager.connect('ws://localhost:8080', roomCode);
+    const ws = this.wsManager.connect('ws://localhost:8081', roomCode);
     
     // Store room code
     this.roomCode = roomCode;
@@ -377,7 +402,7 @@ class OnlineModeScene extends Phaser.Scene {
     this.wsManager.setHost(false);
     
     // Connect to WebSocket server
-    const ws = this.wsManager.connect('ws://localhost:8080', roomCode);
+    const ws = this.wsManager.connect('ws://localhost:8081', roomCode);
     
     // Store room code
     this.roomCode = roomCode;
@@ -394,5 +419,3 @@ class OnlineModeScene extends Phaser.Scene {
     }
   }
 }
-
-export default OnlineModeScene;

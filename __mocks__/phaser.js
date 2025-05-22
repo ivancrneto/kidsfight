@@ -1,262 +1,224 @@
-// __mocks__/phaser.js
-console.log('<<<<< UNIQUE MOCK PHASER.JS LOADED >>>>>');
-
-// Mock CanvasFeatures to prevent initialization errors
-const CanvasFeatures = {
-  checkInverseAlpha: jest.fn(),
-  get: jest.fn()
-};
-
-// Mock device features
-const Device = {
-  canvasFeatures: CanvasFeatures,
-  canvas: true,
-  webGL: true,
-  fullscreen: {
-    available: true,
-    active: false
+// Minimal Phaser mock for Jest
+module.exports = {
+  Scene: class {},
+  GameObjects: {
+    Rectangle: class {},
+    Circle: class {},
+    Text: class {}
+  },
+  Math: {},
+  Structs: {
+    Size: class {}
   }
 };
-
-// Mock physics body
-const mockBody = {
-  setAllowGravity: jest.fn(),
-  setGravityY: jest.fn(),
-  setMaxVelocity: jest.fn(),
-  setCollideWorldBounds: jest.fn(),
-  setBounce: jest.fn(),
-  setImmovable: jest.fn(),
-  velocity: { x: 0, y: 0 },
-  allowGravity: true,
-  gravity: { x: 0, y: 0 }
-};
-
-// Minimal stub for Phaser classes and methods used in KidsFightScene tests
-class Scene {
-  constructor() {
-    this.cameras = {
-      main: {
-        width: 800,
-        height: 600,
-        setBounds: jest.fn(),
-        startFollow: jest.fn(),
-        setZoom: jest.fn(),
-        setRoundPixels: jest.fn(),
+// Mocked Phaser implementation
+class MockScene {
+  constructor(config) {
+    Object.assign(this, config);
+    this.sys = {
+      game: { config: { width: 800, height: 600 } },
+      settings: { 
+        physics: {
+          arcade: { gravity: { y: 1000 }, debug: false }
+        } 
+      },
+      events: { 
+        on: jest.fn(), 
+        once: jest.fn(),
+        emit: jest.fn()
       }
     };
-    this.add = {
-      sprite: jest.fn().mockReturnValue({
-        setCollideWorldBounds: jest.fn(),
-        setBounce: jest.fn(),
-        setDepth: jest.fn(),
-        setOrigin: jest.fn(),
-        setScale: jest.fn(),
-        play: jest.fn(),
-        setImmovable: jest.fn(),
-        setVelocity: jest.fn(),
-        setSize: jest.fn(),
-        setOffset: jest.fn(),
-        setInteractive: jest.fn(),
-        on: jest.fn(),
-        destroy: jest.fn(),
-        body: mockBody,
-        x: 0,
-        y: 0,
-        width: 50,
-        height: 100,
-        flipX: false,
-        setFlipX: jest.fn(function(flip) { this.flipX = flip; return this; }),
-        setPosition: jest.fn(function(x, y) { this.x = x; this.y = y; return this; })
-      }),
-      graphics: jest.fn().mockReturnValue({
-        fillRect: jest.fn(),
-        fillStyle: jest.fn(),
-        clear: jest.fn(),
-        lineStyle: jest.fn(),
-        strokeRect: jest.fn(),
-        destroy: jest.fn(),
-        fillCircle: jest.fn(),
-        setAlpha: jest.fn()
-      }),
-      text: jest.fn().mockReturnValue({
-        setOrigin: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
-        setStyle: jest.fn().mockReturnThis(),
-        setText: jest.fn().mockReturnThis(),
-        setInteractive: jest.fn().mockReturnThis(),
-        on: jest.fn().mockReturnThis(),
-        destroy: jest.fn().mockReturnThis(),
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        text: ''
-      }),
-      rectangle: jest.fn().mockReturnValue({
-        setDisplaySize: jest.fn().mockReturnThis(),
-        setFillStyle: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
-        setOrigin: jest.fn().mockReturnThis(),
-        setPosition: jest.fn().mockReturnThis(),
-        setSize: jest.fn().mockReturnThis(),
-        setStrokeStyle: jest.fn().mockReturnThis(),
-        setInteractive: jest.fn().mockReturnThis(),
-        setAlpha: jest.fn().mockReturnThis(),
-        setScrollFactor: jest.fn().mockReturnThis(),
-        on: jest.fn().mockReturnThis(),
-        destroy: jest.fn()
-      }),
-      circle: jest.fn().mockReturnValue({
-        setStrokeStyle: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
-        setVisible: jest.fn().mockReturnThis(),
-      }),
+    this.scene = { 
+      start: jest.fn(),
+      launch: jest.fn(),
+      pause: jest.fn(),
+      resume: jest.fn(),
+      stop: jest.fn(),
+      manager: { keys: {} }
     };
     this.physics = {
       add: {
         sprite: jest.fn().mockReturnValue({
-          setCollideWorldBounds: jest.fn(),
-          setBounce: jest.fn(),
-          setDepth: jest.fn(),
-          setOrigin: jest.fn(),
-          setScale: jest.fn(),
-          play: jest.fn(),
-          setImmovable: jest.fn(),
-          setVelocity: jest.fn(),
-          setSize: jest.fn(),
-          setOffset: jest.fn(),
-          setInteractive: jest.fn(),
-          on: jest.fn(),
-          destroy: jest.fn(),
-          body: mockBody
+          setCollideWorldBounds: jest.fn().mockReturnThis(),
+          setBounce: jest.fn().mockReturnThis(),
+          setGravityY: jest.fn().mockReturnThis(),
+          setScale: jest.fn().mockReturnThis(),
+          setOrigin: jest.fn().mockReturnThis(),
+          setVelocity: jest.fn().mockReturnThis(),
+          setDrag: jest.fn().mockReturnThis(),
+          setDepth: jest.fn().mockReturnThis(),
+          setPosition: jest.fn().mockReturnThis(),
+          setImmovable: jest.fn().mockReturnThis(),
+          setInteractive: jest.fn().mockReturnThis(),
+          anims: { play: jest.fn().mockReturnThis() },
+          body: { onFloor: jest.fn().mockReturnValue(true) }
         })
+      },
+      world: {
+        setBounds: jest.fn(),
+        on: jest.fn()
       }
     };
     this.anims = {
       create: jest.fn(),
-      generateFrameNumbers: jest.fn(),
-      play: jest.fn(),
+      generateFrameNumbers: jest.fn().mockReturnValue([]),
+      generateFrameNames: jest.fn().mockReturnValue([])
+    };
+    this.add = {
+      sprite: jest.fn().mockReturnValue({
+        setScale: jest.fn().mockReturnThis(),
+        setOrigin: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setPosition: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        setFrame: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis(),
+        anims: { play: jest.fn().mockReturnThis() }
+      }),
+      image: jest.fn().mockReturnValue({
+        setScale: jest.fn().mockReturnThis(),
+        setOrigin: jest.fn().mockReturnThis(),
+        setPosition: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis()
+      }),
+      text: jest.fn().mockReturnValue({
+        setOrigin: jest.fn().mockReturnThis(),
+        setPosition: jest.fn().mockReturnThis(),
+        setText: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis()
+      }),
+      tileSprite: jest.fn().mockReturnValue({
+        setScale: jest.fn().mockReturnThis(),
+        setOrigin: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis()
+      }),
+      particles: jest.fn().mockReturnValue({
+        createEmitter: jest.fn().mockReturnValue({
+          setPosition: jest.fn().mockReturnThis(),
+          setScale: jest.fn().mockReturnThis(),
+          setSpeed: jest.fn().mockReturnThis(),
+          setBlendMode: jest.fn().mockReturnThis()
+        })
+      })
+    };
+    this.cameras = {
+      main: { 
+        width: 800, 
+        height: 600,
+        setBounds: jest.fn(),
+        startFollow: jest.fn()
+      }
     };
     this.input = {
       keyboard: {
-        addKey: jest.fn().mockReturnValue({
-          isDown: false,
-          reset: jest.fn(),
-        }),
         createCursorKeys: jest.fn().mockReturnValue({
-          up: {}, down: {}, left: {}, right: {}
+          up: { isDown: false },
+          down: { isDown: false },
+          left: { isDown: false },
+          right: { isDown: false }
         }),
+        addKey: jest.fn().mockReturnValue({ isDown: false })
       },
-      on: jest.fn(),
+      on: jest.fn()
     };
-    this.sound = {
-      add: jest.fn().mockReturnValue({ play: jest.fn() })
+    this.tweens = {
+      add: jest.fn().mockReturnValue({
+        on: jest.fn()
+      })
     };
     this.time = {
-      addEvent: jest.fn()
+      delayedCall: jest.fn().mockReturnValue({
+        destroy: jest.fn()
+      }),
+      addEvent: jest.fn().mockReturnValue({
+        destroy: jest.fn()
+      })
     };
-    this.registry = {
+    this.sound = {
+      add: jest.fn().mockReturnValue({
+        play: jest.fn()
+      })
+    };
+    this.data = {
       set: jest.fn(),
       get: jest.fn()
     };
-    this.cache = {
-      json: {
-        get: jest.fn()
-      }
-    };
-    this.sys = {
-      events: {
-        on: jest.fn(),
-        off: jest.fn()
-      }
+    this.load = {
+      image: jest.fn(),
+      spritesheet: jest.fn(),
+      atlas: jest.fn(),
+      audio: jest.fn(),
+      tilemapTiledJSON: jest.fn()
     };
   }
+
+  create() {}
+  update() {}
+  preload() {}
+  init() {}
 }
 
-// Mock GameObjects
-const GameObjects = {
-  Sprite: class {},
-  Text: class {},
-  Graphics: class {},
-  Container: class {},
-  Image: class {},
-  Zone: class {}
-};
-
-// Mock Physics
-const Physics = {
-  Arcade: {
-    ArcadePhysics: class {},
-    StaticBody: class {},
-    Collider: class {},
-    Body: class {}
-  }
-};
-
-// Mock Input
-const Input = {
-  Keyboard: {
-    createCursorKeys: jest.fn()
-  }
-};
-
-// Mock Time
-const Time = {
-  addEvent: jest.fn(),
-  delayedCall: jest.fn()
-};
-
-// Mock Loader
-const Loader = {
-  image: jest.fn(),
-  spritesheet: jest.fn()
-};
-
-// Mock Scale Manager
-const Scale = {
-  RESIZE: 'RESIZE',
-  scaleManager: {
-    on: jest.fn()
-  }
-};
-
-// Mock Cameras
-const Cameras = {
-  Scene2D: {
-    Camera: class {}
-  }
-};
-
-// Mock Events
-const Events = {
-  EventEmitter: class {}
-};
-
-// Main Phaser mock
-const Phaser = {
-  Scene,
-  GameObjects,
-  Physics,
-  Input,
-  Time,
-  Loader,
-  Scale,
-  Cameras,
-  Events,
-  Device,
-  Math: {
-    Between: jest.fn()
+// Mock Phaser module
+const phaser = {
+  Game: jest.fn().mockImplementation(() => ({
+    destroy: jest.fn()
+  })),
+  Scene: MockScene,
+  GameObjects: {
+    Sprite: jest.fn(),
+    Image: jest.fn(),
+    Text: jest.fn(),
+    TileSprite: jest.fn(),
+    Graphics: jest.fn().mockImplementation(() => ({
+      fillStyle: jest.fn().mockReturnThis(),
+      fillRect: jest.fn().mockReturnThis(),
+      lineStyle: jest.fn().mockReturnThis(),
+      strokeRect: jest.fn().mockReturnThis(),
+      lineBetween: jest.fn().mockReturnThis(),
+      clear: jest.fn().mockReturnThis()
+    }))
   },
-  Display: {
-    Color: {
-      RGBToColor: jest.fn()
+  Physics: {
+    Arcade: {
+      Sprite: jest.fn(),
+      World: jest.fn(),
+      Group: jest.fn().mockImplementation(() => ({
+        add: jest.fn()
+      }))
     }
   },
-  Game: class {}
+  Input: {
+    Keyboard: {
+      KeyCodes: {
+        W: 87,
+        A: 65,
+        S: 83,
+        D: 68,
+        SPACE: 32,
+        ENTER: 13,
+        UP: 38,
+        DOWN: 40,
+        LEFT: 37,
+        RIGHT: 39
+      }
+    }
+  },
+  AUTO: 0,
+  CANVAS: 1,
+  WEBGL: 2,
+  Scale: {
+    FIT: 'FIT',
+    NONE: 'NONE'
+  },
+  BlendModes: {
+    NORMAL: 0,
+    ADD: 1
+  }
 };
 
-// Set up the module exports
-module.exports = {
-  Scene,
-  default: { Scene }
-};
+module.exports = phaser;
+module.exports.default = phaser;

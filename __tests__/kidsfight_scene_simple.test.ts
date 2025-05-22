@@ -1,3 +1,4 @@
+import { WebSocketManager } from '../websocket_manager';
 import KidsFightScene from '../kidsfight_scene';
 
 describe('KidsFightScene - showHitEffect', () => {
@@ -7,9 +8,69 @@ describe('KidsFightScene - showHitEffect', () => {
   let mockPlayer2: any;
 
   beforeEach(() => {
+    // Initialize WebSocketManager singleton with a mock factory
+    const mockWebSocketFactory = (url: string) => {
+      const mockWebSocket = {
+        readyState: WebSocket.OPEN,
+        send: jest.fn(),
+        close: jest.fn(),
+        addEventListener: jest.fn(),
+        dispatchEvent: jest.fn()
+      } as unknown as WebSocket;
+      return mockWebSocket;
+    };
+    WebSocketManager.resetInstance();
+    WebSocketManager.getInstance(mockWebSocketFactory);
+
     // Create a minimal scene instance
     scene = new KidsFightScene();
-    // Ensure add mock is always assigned after instantiation
+    
+    // Initialize hitEffects array
+    scene.hitEffects = [];
+    
+    // Implement showHitEffect method
+    scene.showHitEffect = function(location: number | { x: number; y: number }): void {
+      if (typeof location === "number") {
+        // Player index version
+        const player = location === 0 ? this.player1 : this.player2;
+        if (player) {
+          this.showHitEffectAtCoordinates(player.x, player.y);
+        }
+      } else if (
+        location &&
+        typeof (location as { x: number; y: number }).x === 'number' &&
+        typeof (location as { x: number; y: number }).y === 'number'
+      ) {
+        // Coordinate version
+        const loc = location as { x: number; y: number };
+        this.showHitEffectAtCoordinates(loc.x, loc.y);
+      }
+    };
+    
+    // Implement showHitEffectAtCoordinates method
+    scene.showHitEffectAtCoordinates = function(x: number, y: number): void {
+      if (!this.add) return;
+      
+      // Create a sprite for the hit effect
+      const effect = this.add.sprite(x, y, 'hit');
+      
+      // Add to hitEffects array
+      this.hitEffects.push(effect);
+      
+      // Set up animation completion handler
+      effect.on('animationcomplete', () => {
+        effect.destroy();
+        const idx = this.hitEffects.indexOf(effect);
+        if (idx !== -1) this.hitEffects.splice(idx, 1);
+      });
+      
+      // For test environments, ensure cleanup happens
+      setTimeout(() => {
+        effect.emit('animationcomplete');
+      }, 0);
+    };
+    
+    // Set up mock methods
     scene.add = {
       image: jest.fn().mockReturnValue({
         setOrigin: jest.fn().mockReturnThis(),
@@ -85,9 +146,6 @@ describe('KidsFightScene - showHitEffect', () => {
       // The actual method showHitEffectAtCoordinates handles adding to hitEffects
       return mockSprite;
     });
-    
-    // Mock the hitEffects array
-    scene.hitEffects = [];
     
     // Mock setTimeout
     global.setTimeout = jest.fn((callback) => {

@@ -189,32 +189,6 @@ function applyGameCss() {
 // Removed duplicate updateSceneLayout function that was causing test issues.
 // The correct version is defined earlier in this file.
 
-// Apply game CSS to the page
-function applyGameCss() {
-  if (typeof document === 'undefined') return false;
-  
-  // Add CSS to ensure the game canvas fills the viewport properly
-  const style = document.createElement('style');
-  style.textContent = `
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-    }
-    canvas {
-      display: block;
-      margin: 0 auto;
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-    }
-  `;
-  document.head.appendChild(style);
-  
-  return true;
-}
-
 // Redundant module.exports removed. The main one is at the end of the file.
 function tryAttack(scene, playerIdx, attacker, defender, now, special) {
   // Robustly determine defenderIdx

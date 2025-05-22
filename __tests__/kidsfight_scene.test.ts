@@ -1,13 +1,40 @@
 // Create mock WebSocketManager
 // Import from the correct path based on your project structure
+
+// --- Move mockWebSocketManager definition before jest.mock ---
+const mockWebSocketManager = {
+  connect: jest.fn().mockResolvedValue(undefined),
+  on: jest.fn(),
+  send: jest.fn(),
+  disconnect: jest.fn(),
+  close: jest.fn(),
+  isConnected: jest.fn().mockReturnValue(true),
+  setMessageCallback: jest.fn(),
+  getInstance: jest.fn().mockImplementation(() => mockWebSocketManager),
+  setHost: jest.fn(),
+  setRoomCode: jest.fn(),
+  sendGameAction: jest.fn(),
+  sendChatMessage: jest.fn(),
+  sendGameStart: jest.fn(),
+  sendPlayerReady: jest.fn(),
+  sendPlayerSelection: jest.fn(),
+  sendPlayerPosition: jest.fn(),
+  sendPlayerAttack: jest.fn(),
+  sendPlayerDamage: jest.fn()
+};
+
 import KidsFightScene from '../kidsfight_scene';
 
 // --- Ensure WebSocketManager is mocked at the module level ---
-import mockWebSocketManager from '../websocket_manager';
 jest.mock('../websocket_manager', () => ({
   __esModule: true,
   default: mockWebSocketManager,
-  WebSocketManager: jest.fn(() => mockWebSocketManager)
+  WebSocketManager: Object.assign(
+    jest.fn(() => mockWebSocketManager),
+    {
+      getInstance: jest.fn(() => mockWebSocketManager)
+    }
+  )
 }));
 
 // Define WebSocketManager interface for testing
@@ -31,28 +58,6 @@ interface WebSocketManager {
   sendPlayerAttack: (attack: any) => void;
   sendPlayerDamage: (damage: any) => void;
 }
-
-// Create a mock WebSocketManager instance for testing
-const mockWebSocketManager = {
-  connect: jest.fn().mockResolvedValue(undefined),
-  on: jest.fn(),
-  send: jest.fn(),
-  disconnect: jest.fn(),
-  close: jest.fn(),
-  isConnected: jest.fn().mockReturnValue(true),
-  setMessageCallback: jest.fn(),
-  getInstance: jest.fn().mockImplementation(() => mockWebSocketManager), // Changed to mockImplementation
-  setHost: jest.fn(),
-  setRoomCode: jest.fn(),
-  sendGameAction: jest.fn(),
-  sendChatMessage: jest.fn(),
-  sendGameStart: jest.fn(),
-  sendPlayerReady: jest.fn(),
-  sendPlayerSelection: jest.fn(),
-  sendPlayerPosition: jest.fn(),
-  sendPlayerAttack: jest.fn(),
-  sendPlayerDamage: jest.fn()
-};
 
 // Mock Phaser methods
 const mockAdd = {

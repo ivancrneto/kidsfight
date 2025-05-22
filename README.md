@@ -8,7 +8,7 @@ A cartoon-style fighting game inspired by Street Fighter, built with Phaser JS.
    npm install
 2. Start a local server:
    npm start
-3. Open `http://localhost:8080` in your browser.
+3. Open `http://localhost:8081` in your browser.
 
 ## Controls
 - **Player 1:** WASD to move, F/G/H to attack/jump/block

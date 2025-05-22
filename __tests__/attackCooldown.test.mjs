@@ -1,8 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-const { tryAttack } = require('../gameUtils.cjs');
-
+import { tryAttack } from '../gameUtils.cjs';
 
 describe('Attack Cooldown Logic', () => {
   let scene;

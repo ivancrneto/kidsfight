@@ -1,8 +1,12 @@
 import Phaser from 'phaser';
-import KidsFightScene from './kidsfight_scene';
-import PlayerSelectScene from './player_select_scene';
 import GameModeScene from './game_mode_scene';
+import PlayerSelectScene from './player_select_scene';
 import OnlineModeScene from './online_mode_scene';
+import KidsFightScene from './kidsfight_scene';
+import ScenarioSelectScene from './scenario_select_scene';
+import RotatePromptScene from './rotate_prompt_scene';
+
+console.log('*** FULL SCENE REGISTRATION: All main scenes included ***');
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -10,7 +14,14 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 600,
   parent: 'game-container',
   backgroundColor: '#222222',
-  scene: [GameModeScene, PlayerSelectScene, OnlineModeScene, KidsFightScene],
+  scene: [
+    RotatePromptScene,
+    GameModeScene,
+    PlayerSelectScene,
+    ScenarioSelectScene,
+    KidsFightScene,
+    OnlineModeScene
+  ],
   physics: {
     default: 'arcade',
     arcade: {
@@ -21,5 +32,5 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 window.addEventListener('DOMContentLoaded', () => {
-  new Phaser.Game(config);
+  const game = new Phaser.Game(config);
 });

@@ -1,42 +1,45 @@
+// Enable ES modules support
 module.exports = {
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'jsdom',
+  extensionsToTreatAsEsm: ['.ts', '.jsx', '.tsx', '.json'],
   moduleNameMapper: {
-    '\\.(png|jpg|jpeg|gif|svg)$': '<rootDir>/__mocks__/fileMock.js',
-    '^@/websocket_manager$': '<rootDir>/__mocks__/websocket_manager',
-    '^websocket_manager$': '<rootDir>/__mocks__/websocket_manager',
-    '^\.\/websocket_manager$': '<rootDir>/__mocks__/websocket_manager',
-    '^\.\/websocket_manager.ts$': '<rootDir>/__mocks__/websocket_manager.ts',
-    '^websocket-manager$': '<rootDir>/__mocks__/websocket_manager.ts',
+    // Handle image imports
+    '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$': '<rootDir>/__mocks__/fileMock.js',
+    '^@/(.*)$': '<rootDir>/src/$1',
     '^phaser$': '<rootDir>/__mocks__/phaser.js',
+    '^websocket_manager$': '<rootDir>/__mocks__/websocket_manager',
   },
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
-    '^.+\\.mjs$': 'babel-jest',
+    '^.+\\.(t|j)sx?$': ['ts-jest', {
+      useESM: true,
+      tsconfig: 'tsconfig.json',
+    }],
+    '^.+\\.mjs$': ['babel-jest', { configFile: './babel.config.js' }]
   },
   testMatch: [
-    '**/__tests__/**/*.[jt]s?(x)',
-    '**/?(*.)+(spec|test).[jt]s?(x)',
-    '**/__tests__/**/*.test.mjs',
-    '**/__tests__/**/*.test.cjs',
+    '**/__tests__/**/*.test.{js,jsx,ts,tsx,mjs,cjs}'
   ],
-  // Automatically clear mock calls and instances between every test
-  clearMocks: true,
-  // Reset the module registry before running each individual test
-  resetModules: true,
-  // Automatically reset mock state between all tests
-  resetMocks: true,
-  // Automatically restore mock state between all tests
-  restoreMocks: true,
-  // The directory where Jest should output its coverage files
-  coverageDirectory: 'coverage',
-  // An array of file extensions your modules use
-  moduleFileExtensions: ['js', 'jsx', 'ts', 'tsx', 'json', 'node', 'mjs', 'cjs'],
-  // A list of paths to directories that Jest should use to search for files in
-  roots: ['<rootDir>/src', '<rootDir>/__tests__', '<rootDir>/__mocks__'],
-  // Setup files to run before each test
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  // Ignore node_modules for transforms
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/'
+  ],
   transformIgnorePatterns: [
     '/node_modules/(?!(phaser|@phaser)/)',
   ],
+  setupFilesAfterEnv: ['<rootDir>/__tests__/setup.ts'],
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx,js,jsx,mjs}',
+    '!**/node_modules/**',
+    '!**/vendor/**',
+  ],
+  moduleFileExtensions: ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'json', 'node'],
+  // Handle ES modules in node_modules
+  transformIgnorePatterns: [
+    'node_modules/(?!(phaser|@phaser)/)',
+  ],
+  // Setup global mocks
+  setupFiles: ['<rootDir>/__mocks__/setupJest.js'],
 };

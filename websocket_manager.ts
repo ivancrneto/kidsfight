@@ -22,7 +22,7 @@ export interface WebSocketMessage {
 
 export type WebSocketFactory = (url: string) => WebSocket;
 
-export default class WebSocketManager {
+class WebSocketManager {
   private static instance: WebSocketManager | null = null;
   private _ws: WebSocket | null = null;
   private _isHost: boolean = false;
@@ -49,55 +49,92 @@ export default class WebSocketManager {
   public static resetInstance(): void {
     if (WebSocketManager.instance) {
       WebSocketManager.instance.disconnect();
+      // Reset all relevant state to ensure a clean singleton for tests
+      WebSocketManager.instance._isHost = false;
+      WebSocketManager.instance._roomCode = null;
+      WebSocketManager.instance._onMessageCallback = null;
+      WebSocketManager.instance._onCloseCallback = null;
+      WebSocketManager.instance._onErrorCallback = null;
+      WebSocketManager.instance._boundMessageCallback = null;
+      // Defensive: ensure _ws is null
+      WebSocketManager.instance._ws = null;
       WebSocketManager.instance = null;
     }
   }
 
   public setHost(isHost: boolean): void {
     this._isHost = isHost;
+    this.send({ type: 'host_status', isHost });
   }
 
   public setRoomCode(roomCode: string): void {
     this._roomCode = roomCode;
+    this.send({ type: 'room_code', roomCode });
   }
 
-  public connect(url?: string, roomCode?: string): WebSocket | null {
+  public async connect(url?: string, roomCode?: string): Promise<WebSocket> {
     if (this._ws) {
       console.warn(`[WSM] WebSocket already connected [${this._debugInstanceId}]`);
-      return this._ws;
+      return Promise.resolve(this._ws);
     }
+    
+    return new Promise((resolve, reject) => {
+      try {
+        this._isHost = false;
+        this._ws = this._webSocketFactory(url!);
+        
+        // Set up event handlers
+        this._ws.onopen = () => {
+          console.log(`[WSM] Connected to server [${this._debugInstanceId}]`);
+          if (this._onMessageCallback) {
+            this._boundMessageCallback = (e: MessageEvent) => {
+              try {
+                // Parse the message data if it's a string
+                let parsedData = e.data;
+                if (typeof e.data === 'string') {
+                  try {
+                    parsedData = JSON.parse(e.data);
+                  } catch (parseError) {
+                    // If it's not JSON, keep it as is
+                    parsedData = e.data;
+                  }
+                }
+                this._onMessageCallback?.({ ...e, data: parsedData });
+              } catch (error) {
+                console.error('[WSM] Error processing message:', error);
+              }
+            };
+            this._ws?.addEventListener('message', this._boundMessageCallback);
+          }
+          resolve(this._ws!);
+        };
 
-    try {
-      this._isHost = false;
-      this._ws = this._webSocketFactory(url!);
+        this._ws.onclose = (event: CloseEvent) => {
+          console.log(`[WSM] Disconnected from server [${this._debugInstanceId}]`, event);
+          if (this._boundMessageCallback) {
+            this._ws?.removeEventListener('message', this._boundMessageCallback);
+            this._boundMessageCallback = null;
+          }
+          // Only null out after cleanup to ensure isConnected() works during cleanup
+          const wasConnected = this.isConnected();
+          this._ws = null;
+          // Only trigger close callback if we were actually connected
+          if (wasConnected) {
+            this._onCloseCallback?.(event);
+          }
+        };
 
-      this._ws.onopen = () => {
-        console.log(`[WSM] Connected to server [${this._debugInstanceId}]`);
-        if (this._onMessageCallback) {
-          this._boundMessageCallback = (e: MessageEvent) => this._onMessageCallback?.(e);
-          this._ws?.addEventListener('message', this._boundMessageCallback);
-        }
-      };
-
-      this._ws.onclose = (event: CloseEvent) => {
-        console.log(`[WSM] Disconnected from server [${this._debugInstanceId}]`, event);
-        if (this._boundMessageCallback) {
-          this._ws?.removeEventListener('message', this._boundMessageCallback);
-          this._boundMessageCallback = null;
-        }
-        this._ws = null;
-        this._onCloseCallback?.(event);
-      };
-
-      this._ws.onerror = (error: Event) => {
-        console.error(`[WSM] WebSocket error [${this._debugInstanceId}]:`, error);
-        this._onErrorCallback?.(error);
-      };
-    } catch (error) {
-      console.error(`[WSM] Failed to connect to ${url}:`, error);
-      this._onErrorCallback?.(error as Event);
-    }
-    return this._ws;
+        this._ws.onerror = (error: Event) => {
+          console.error(`[WSM] WebSocket error [${this._debugInstanceId}]:`, error);
+          this._onErrorCallback?.(error);
+          reject(error);
+        };
+      } catch (error) {
+        console.error(`[WSM] Failed to connect to ${url}:`, error);
+        this._onErrorCallback?.(error as Event);
+        reject(error);
+      }
+    });
   }
 
   public disconnect(code?: number, reason?: string): void {
@@ -117,19 +154,27 @@ export default class WebSocketManager {
   }
 
   public isConnected(): boolean {
-    return this._ws?.readyState === WebSocket.OPEN;
+    return !!this._ws && this._ws.readyState === WebSocket.OPEN;
   }
 
   public send(message: WebSocketMessage): boolean {
-    if (!this.isConnected()) {
+    if (!this.isConnected() || !this._ws) {
       console.error('[WSM] Cannot send message - not connected');
       return false;
     }
 
     try {
-      const messageString = JSON.stringify(message);
-      this._ws!.send(messageString);
-      console.log(`[WSM] Message sent:`, message);
+      // Create a clean message object to avoid modifying the original
+      const cleanMessage = { ...message };
+      
+      // Ensure timestamp is a number if it exists
+      if ('timestamp' in cleanMessage && typeof cleanMessage.timestamp !== 'number') {
+        cleanMessage.timestamp = Date.now();
+      }
+      
+      const messageString = JSON.stringify(cleanMessage);
+      this._ws.send(messageString);
+      console.log(`[WSM] Message sent:`, cleanMessage);
       return true;
     } catch (error) {
       console.error('[WSM] Error sending message:', error);
@@ -137,24 +182,29 @@ export default class WebSocketManager {
     }
   }
 
-  public sendGameAction(action: string, data?: Record<string, any>): boolean {
+  public sendGameAction(action: string, data: Record<string, any> = {}): boolean {
     if (!this.isConnected()) {
       console.error('[WSM] Cannot send game action - not connected');
       return false;
     }
-
+    
     try {
+      // Create a clean data object to avoid modifying the original
+      const cleanData = { ...data };
+      
+      // Ensure x and y are numbers if they exist
+      if ('x' in cleanData) cleanData.x = Number(cleanData.x);
+      if ('y' in cleanData) cleanData.y = Number(cleanData.y);
+      
       const message: WebSocketMessage = {
         type: 'game_action',
         action,
-        ...data, // Spread any additional data
+        ...cleanData,
         timestamp: Date.now()
       };
       
-      const messageString = JSON.stringify(message);
-      this._ws!.send(messageString);
       console.log('[WSM] Sent game action:', message);
-      return true;
+      return this.send(message);
     } catch (error) {
       console.error('[WSM] Error sending game action:', error);
       return false;
@@ -230,6 +280,14 @@ export default class WebSocketManager {
     }
   }
 
+  public setMessageCallback(callback: ((event: MessageEvent) => void) | null): void {
+    this._onMessageCallback = callback;
+    if (this._ws && this.isConnected()) {
+      this._boundMessageCallback = (e: MessageEvent) => this._onMessageCallback?.(e);
+      this._ws.addEventListener('message', this._boundMessageCallback);
+    }
+  }
+
   public onClose(callback: (event: CloseEvent) => void): void {
     this._onCloseCallback = callback;
   }
@@ -290,11 +348,6 @@ export default class WebSocketManager {
     }
   }
 
-  // --- PATCH: Add missing methods for compatibility ---
-  public setMessageCallback(callback: (event: MessageEvent) => void): void {
-    this.onMessage(callback);
-  }
-
   public on(event: 'message' | 'close' | 'error', callback: (event: any) => void): void {
     switch (event) {
       case 'message':
@@ -312,7 +365,6 @@ export default class WebSocketManager {
   }
 }
 
-// Create and export the singleton instance
-const wsManager = WebSocketManager.getInstance();
-
+// Export the WebSocketManager class and singleton instance
+// export const wsManager = WebSocketManager.getInstance();
 export { WebSocketManager };

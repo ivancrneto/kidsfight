@@ -71,24 +71,25 @@ class KidsFightScene extends mockPhaser.Scene {
     this.player1State = 'idle';
     this.player2State = 'idle';
     this.gameOver = false;
+    this.selected = { p1: 0, p2: 1 }; // Default values
+    this.p1SpriteKey = 'player1';
+    this.p2SpriteKey = 'player2';
   }
   
   init(data) {
-    this.selected = data;
+    this.selected = data || this.selected;
+    // Update sprite keys based on selected indices
+    if (this.selected && typeof this.selected.p1 === 'number' && typeof this.selected.p2 === 'number') {
+      this.p1SpriteKey = this.selected.p1 === 0 ? 'player1' : 'player2';
+      this.p2SpriteKey = this.selected.p2 === 0 ? 'player1' : 'player2';
+    }
   }
   
   create() {
     // Simplified create method for testing
-    const playerSpritesSafe = ['player1', 'player2'];
-    const selectedSafe = (this.selected && typeof this.selected.p1 === 'number' && 
-                         typeof this.selected.p2 === 'number') ? 
-                         this.selected : { p1: 0, p2: 1 };
-    
-    const p1Key = selectedSafe.p1 === 0 ? 'player1' : 'player2';
-    const p2Key = selectedSafe.p2 === 0 ? 'player1' : 'player2';
-    
-    this.p1SpriteKey = p1Key;
-    this.p2SpriteKey = p2Key;
+    // Sprite keys are already set in init()
+    const p1Key = this.p1SpriteKey;
+    const p2Key = this.p2SpriteKey;
     
     this.sameCharacterSelected = p1Key === p2Key;
     

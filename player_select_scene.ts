@@ -10,7 +10,7 @@ import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
 import player9RawImg from './sprites-d_isa.png';
 import gameLogoImg from './android-chrome-192x192.png';
-import WebSocketManager from './websocket_manager';
+import { WebSocketManager } from './websocket_manager';
 import { DEV } from './globals';
 
 interface PlayerSelections {
@@ -41,8 +41,8 @@ class PlayerSelectScene extends Phaser.Scene {
   private mode: 'local' | 'online';
   private roomCode: string | null;
   private isHost: boolean;
-  private p1Indicator!: Phaser.GameObjects.Sprite;
-  private p2Indicator!: Phaser.GameObjects.Sprite;
+  private p1Indicator!: Phaser.GameObjects.Arc;
+  private p2Indicator!: Phaser.GameObjects.Arc;
   private p1Text!: Phaser.GameObjects.Text;
   private p2Text!: Phaser.GameObjects.Text;
   private readyButton!: Phaser.GameObjects.Text;
@@ -125,8 +125,7 @@ class PlayerSelectScene extends Phaser.Scene {
     this.load.image('player8_raw', player8RawImg);
     this.load.image('player9_raw', player9RawImg);
     
-    // Load selection indicator
-    this.load.image('selector', 'selector.png');
+    // Note: Removed selector.png and will use Phaser shapes instead
     
     // Load background
     this.load.image('scenario', scenarioImg);
@@ -136,12 +135,12 @@ class PlayerSelectScene extends Phaser.Scene {
   }
 
   create(): void {
-    const w = this.cameras.main.width;
-    const h = this.cameras.main.height;
+    const w = 1280;
+    const h = 720;
 
     // Add background
-    const bg = this.add.rectangle(w/2, h/2, w, h, 0x222222);
-
+    const bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
+    
     // Add title
     const title = this.add.text(
       w/2,
@@ -221,28 +220,38 @@ class PlayerSelectScene extends Phaser.Scene {
   }
 
   private createSelectionIndicators(): void {
-    // Test expects selector circles with specific colors and alpha
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
+    
     // Player 1 selector circle (yellow)
     this.p1SelectorCircle = this.add.circle(w * 0.3, h * 0.6, 40, 0xffff00, 0.18);
+    
     // Player 2 selector circle (blue)
     this.p2SelectorCircle = this.add.circle(w * 0.7, h * 0.6, 40, 0x0000ff, 0.18);
 
-    // Player 1 indicator
-    this.p1Indicator = this.add.sprite(0, 0, 'selector').setTint(0x00ff00).setAlpha(0.7);
+    // Create circular indicators using Phaser shapes instead of sprites
+    const indicatorRadius = 30;
+    
+    // Player 1 indicator (green circle)
+    this.p1Indicator = this.add.circle(0, 0, indicatorRadius, 0x00ff00, 0.7)
+      .setStrokeStyle(3, 0xffffff, 1);
+      
     this.p1Text = this.add.text(0, 0, 'P1', {
       fontSize: '24px',
-      color: '#00ff00',
-      fontFamily: 'monospace'
+      color: '#ffffff',
+      fontFamily: 'monospace',
+      fontWeight: 'bold'
     }).setOrigin(0.5);
 
-    // Player 2 indicator
-    this.p2Indicator = this.add.sprite(0, 0, 'selector').setTint(0xff0000).setAlpha(0.7);
+    // Player 2 indicator (red circle)
+    this.p2Indicator = this.add.circle(0, 0, indicatorRadius, 0xff0000, 0.7)
+      .setStrokeStyle(3, 0xffffff, 1);
+      
     this.p2Text = this.add.text(0, 0, 'P2', {
       fontSize: '24px',
-      color: '#ff0000',
-      fontFamily: 'monospace'
+      color: '#ffffff',
+      fontFamily: 'monospace',
+      fontWeight: 'bold'
     }).setOrigin(0.5);
 
     this.updateSelectionIndicators();
@@ -401,12 +410,13 @@ class PlayerSelectScene extends Phaser.Scene {
   }
 
   private startGame(): void {
-    this.scene.start('ScenarioSelectScene', {
-      mode: this.mode,
-      selected: this.selected,
-      roomCode: this.roomCode,
-      isHost: this.isHost
-    });
+    if ((this as any).player1Ready && (this as any).player2Ready) {
+      this.scene.start('GameScene', {
+        player1Character: this.selected.p1,
+        player2Character: this.selected.p2,
+        mode: 'local'
+      });
+    }
   }
 
   private updateLayout(gameSize: Phaser.Structs.Size): void {

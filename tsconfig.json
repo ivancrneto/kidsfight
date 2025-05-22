@@ -21,16 +21,21 @@
     "baseUrl": ".",
     "typeRoots": [
       "./node_modules/@types"
-    ]
+    ],
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react-jsx"
   },
   "include": [
     "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.mjs",
+    "**/*.cjs",
     "**/*.d.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts"
+    "dist"
   ]
 }

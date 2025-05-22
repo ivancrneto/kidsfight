@@ -2,7 +2,7 @@
 import KidsFightScene from '../kidsfight_scene';
 
 // Enable fake timers for testing timeouts
-jest.useFakeTimers();
+// jest.useFakeTimers();
 
 // Type definitions for our mock scene
 interface MockPlayer {

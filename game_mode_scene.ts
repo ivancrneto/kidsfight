@@ -26,6 +26,8 @@ class GameModeScene extends Phaser.Scene {
   }
 
   create(): void {
+    console.log('GameModeScene create called');
+    console.log('Registered scenes (from GameModeScene):', this.scene.manager.keys);
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
 

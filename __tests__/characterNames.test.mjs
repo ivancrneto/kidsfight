@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-const { KidsFightScene } = require('../gameUtils.cjs');
+import { KidsFightScene } from '../gameUtils.cjs';
 
 // Mock Phaser
 global.Phaser = {
