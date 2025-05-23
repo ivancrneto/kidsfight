@@ -73,6 +73,10 @@ class WebSocketManager {
     this.send({ type: 'room_code', roomCode });
   }
 
+  public getRoomCode(): string | null {
+    return this._roomCode;
+  }
+
   public async connect(url?: string, roomCode?: string): Promise<WebSocket> {
     if (this._ws) {
       console.warn(`[WSM] WebSocket already connected [${this._debugInstanceId}]`);
@@ -262,10 +266,6 @@ class WebSocketManager {
       console.error('[WSM] Error sending replay response:', error);
       return false;
     }
-  }
-
-  public getRoomCode(): string | null {
-    return this._roomCode;
   }
 
   public onMessage(callback: (event: MessageEvent) => void): void {

@@ -66,29 +66,41 @@ server.on('connection', (ws) => {
           console.log(`Player joined room: ${roomCode}`);
           break;
 
-        case 'character_selected':
-          const charRoom = gameRooms.get(roomCode);
-          if (!charRoom) return;
-          
-          // Convert character index to key
-          const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
-          const characterKey = CHARACTER_KEYS[parseInt(data.character)];
-          if (isHost) {
-            charRoom.gameState.p1.character = characterKey;
-          } else {
-            charRoom.gameState.p2.character = characterKey;
-          }
-          
-          // Forward character selection to the other player
-          const charTarget = isHost ? charRoom.client : charRoom.host;
-          if (charTarget) {
-            charTarget.send(JSON.stringify({
-              type: 'character_selected',
-              character: data.character,
-              playerNum: isHost ? 1 : 2
+        case 'player_selected':
+          const selRoom = gameRooms.get(roomCode);
+          if (!selRoom) return;
+          // Forward selection to the other player
+          const selTarget = isHost ? selRoom.client : selRoom.host;
+          if (selTarget) {
+            selTarget.send(JSON.stringify({
+            type: 'player_selected',
+              data: data.data // forward the player and character fields as-is
             }));
           }
           break;
+        // case 'player_selected':
+        //   const charRoom = gameRooms.get(roomCode);
+        //   if (!charRoom) return;
+        //
+        //   // Convert character index to key
+        //   const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
+        //   const characterKey = CHARACTER_KEYS[parseInt(data.character)];
+        //   if (isHost) {
+        //     charRoom.gameState.p1.character = characterKey;
+        //   } else {
+        //     charRoom.gameState.p2.character = characterKey;
+        //   }
+        //
+        //   // Forward character selection to the other player
+        //   const charTarget = isHost ? charRoom.client : charRoom.host;
+        //   if (charTarget) {
+        //     charTarget.send(JSON.stringify({
+        //       type: 'playerer_selected',
+        //       character: data.character,
+        //       playerNum: isHost ? 1 : 2
+        //     }));
+        //   }
+        //   break;
           
         case 'game_action':
           const currentRoom = gameRooms.get(roomCode);

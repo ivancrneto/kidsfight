@@ -379,6 +379,12 @@ export default class OnlineModeScene extends Phaser.Scene {
   private startGame(roomData: RoomData): void {
     console.log('Starting game with room data:', roomData);
     try {
+      // Set the room code in the WebSocket manager
+      this.wsManager.setRoomCode(roomData.roomCode);
+      // Set host status in the WebSocket manager
+      this.wsManager.setHost(roomData.isHost);
+      
+      // Start the PlayerSelectScene with the room data
       this.scene.start('PlayerSelectScene', {
         mode: 'online',
         roomCode: roomData.roomCode,

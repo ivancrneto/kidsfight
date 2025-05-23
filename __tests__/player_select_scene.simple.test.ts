@@ -34,14 +34,14 @@ describe('PlayerSelectScene', () => {
 
   describe('initialization', () => {
     it('should initialize with default character selections', () => {
-      expect(scene.selected.p1).toBe('player1');
-      expect(scene.selected.p2).toBe('player2');
+      expect(scene.selected.p1).toBe('bento');
+      expect(scene.selected.p2).toBe('davir');
     });
 
     it('should have all character keys defined', () => {
       expect(scene.CHARACTER_KEYS).toEqual([
-        'player1', 'player2', 'player3', 'player4', 
-        'player5', 'player6', 'player7', 'player8', 'player9'
+        'bento', 'davir', 'jose', 'davis', 
+        'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'
       ]);
     });
   });
