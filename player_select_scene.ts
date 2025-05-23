@@ -18,6 +18,25 @@ interface PlayerSelections {
   p2: string;
 }
 
+interface PlayerSelectWebSocketMessage {
+  type: 'playerReady' | 'gameStart' | 'playerSelected' | 'roomInfo';
+  player?: string;
+  character?: string;
+  player1Ready?: boolean;
+  player2Ready?: boolean;
+  p1Char?: string;
+  p2Char?: string;
+  roomCode?: string;
+  isHost?: boolean;
+}
+
+interface GameStartWebSocketMessage extends PlayerSelectWebSocketMessage {
+  type: 'gameStart';
+  p1Char: string;
+  p2Char: string;
+  roomCode: string;
+}
+
 interface SceneData {
   mode?: 'local' | 'online';
   fromGameMode?: boolean;
@@ -32,61 +51,70 @@ interface CharacterInfo {
   y: number;
   scale: number;
   frame?: number;
-  bgCircle?: Phaser.GameObjects.Circle;
+  bgCircle?: Phaser.GameObjects.Arc;
   nameLabel?: Phaser.GameObjects.Text;
   bgCircleOffsetY?: number;
 }
 
-class PlayerSelectScene extends Phaser.Scene {
+export class PlayerSelectScene extends Phaser.Scene {
   // Properties made public for testability
-  public CHARACTER_KEYS: string[];
+  public CHARACTER_KEYS: string[] = [];
+  public p1Index = 0;
+  public p2Index = 0;
+  public selectedP1Index = 0;
+  public selectedP2Index = 0;
+  public characterSprites: { [key: string]: Phaser.GameObjects.Sprite } = {};
+  public p1SelectorCircle!: Phaser.GameObjects.Ellipse;
+  public p2SelectorCircle!: Phaser.GameObjects.Ellipse;
+  public characters: CharacterInfo[] = [];
   public selected: PlayerSelections;
-  private mode: 'local' | 'online';
-  private roomCode: string | null;
-  private isHost: boolean;
-  private p1Indicator!: Phaser.GameObjects.Arc;
-  private p2Indicator!: Phaser.GameObjects.Arc;
-  private p1Text!: Phaser.GameObjects.Text;
-  private p2Text!: Phaser.GameObjects.Text;
-  private readyButton!: Phaser.GameObjects.Text;
-  private backButton!: Phaser.GameObjects.Text;
-  public waitingText!: Phaser.GameObjects.Text; // public for test injection
-  private characters: CharacterInfo[];
-  public wsManager: WebSocketManager;
-  private characterSprites: { [key: string]: Phaser.GameObjects.Sprite };
-  private selectedP1Index: number;
-  private selectedP2Index: number;
-  private p1SelectorCircle!: Phaser.GameObjects.Ellipse;
-  private p2SelectorCircle!: Phaser.GameObjects.Ellipse;
-  private startButtonRect!: Phaser.GameObjects.Rectangle;
-  private title!: Phaser.GameObjects.Text;
+  public player1Ready = false;
+  public player2Ready = false;
+  public isHost = false;
+  public mode: 'local' | 'online' = 'local';
+  public wsManager: WebSocketManager | null;
+  private wsHandlers: {
+    messageHandler: (event: MessageEvent) => void;
+    errorHandler: (event: Event) => void;
+    closeHandler: (event: CloseEvent) => void;
+  } | null = null;
+  private reconnectButton: Phaser.GameObjects.Text | null = null;
+  private isInitialized = false;
+  public startButton!: Phaser.GameObjects.Text;
+  public backButton!: Phaser.GameObjects.Text;
+  public readyButton!: Phaser.GameObjects.Text;
+  public player1ReadyText!: Phaser.GameObjects.Text;
+  public player2ReadyText!: Phaser.GameObjects.Text;
+  public roomCodeText!: Phaser.GameObjects.Text;
+  public roomCode: string | null = null;
+  public waitingText: Phaser.GameObjects.Text | null = null;
+  public title!: Phaser.GameObjects.Text;
+  public p1Indicator!: Phaser.GameObjects.Arc;
+  public p2Indicator!: Phaser.GameObjects.Arc;
+  public p1Text!: Phaser.GameObjects.Text;
+  public p2Text!: Phaser.GameObjects.Text;
+  public startButtonRect!: Phaser.GameObjects.Rectangle;
+  public p1Char: string | null = null;
+  public p1Sprite: Phaser.GameObjects.Sprite | null = null;
 
-  /**
-   * Optional wsManager injection for testability
-   */
-  constructor(wsManagerInstance: WebSocketManager = WebSocketManager.getInstance()) {
+  constructor(wsManager?: WebSocketManager | null) {
     super({ key: 'PlayerSelectScene' });
-    if (DEV) console.log('PlayerSelectScene constructor called');
-    
-    this.CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8', 'player9'];
-    this.selected = { p1: 'player1', p2: 'player2' };
-    this.wsManager = wsManagerInstance;
-
-    this.mode = 'local';
-    this.roomCode = null;
-    this.isHost = false;
-    this.characters = [];
-    this.characterSprites = {};
-    this.selectedP1Index = 0;
-    this.selectedP2Index = 1;
+    this.CHARACTER_KEYS = [
+      'bento', 'davir', 'jose', 'davis', 
+      'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'
+    ];
+    this.selected = { p1: 'bento', p2: 'davir' };
+    this.wsManager = wsManager ?? null;
   }
 
   init(data: SceneData): void {
+    console.log('[PlayerSelectScene] Initializing with data:', data);
     // ORIENTATION CHANGE PROTECTION: Check if this scene was triggered by an orientation change
     const now = Date.now();
     const lastOrientationTime = (window as any).lastOrientationChangeTime || 0;
     const fromGameMode = data && data.fromGameMode === true;
     const timeSinceOrientation = now - lastOrientationTime;
+    console.log(`[PlayerSelectScene] Room code from init data: ${data?.roomCode}, isHost: ${data?.isHost}`);
     
     // If scene was launched within 2 seconds of orientation change and not explicitly from GameMode
     if (timeSinceOrientation < 2000 && !fromGameMode) {
@@ -103,12 +131,20 @@ class PlayerSelectScene extends Phaser.Scene {
     // Reset selections when scene is restarted
     if (DEV) console.log('[PlayerSelectScene] Init called, resetting selections');
     
-    // For online mode, always set Bento (player1) as the initial player for both players
+    // Always set roomCode in online mode
     if (data && data.mode === 'online') {
       this.mode = 'online';
-      this.roomCode = data.roomCode || null;
+      this.roomCode = data.roomCode || this.roomCode || null;
       this.isHost = data.isHost || false;
       this.selected = { p1: 'player1', p2: 'player1' };
+      
+      // Ensure WebSocket manager has the latest room code and host status
+      if (this.roomCode) {
+        this.wsManager = WebSocketManager.getInstance();
+        this.wsManager.setRoomCode(this.roomCode);
+        this.wsManager.setHost(this.isHost);
+        if (DEV) console.log(`[PlayerSelectScene] Set WebSocket room code: ${this.roomCode}, isHost: ${this.isHost}`);
+      }
     } else {
       this.mode = 'local';
       this.roomCode = null;
@@ -234,8 +270,8 @@ class PlayerSelectScene extends Phaser.Scene {
         }
       ).setOrigin(0.5);
       char.nameLabel = label;
-      // Click handler
-      sprite.on('pointerdown', () => this.handleCharacterSelect(index));
+      // Click handler - pass both player (1 for P1) and index
+      sprite.on('pointerdown', () => this.handleCharacterSelect(1, 1)); // 1 for next character
     });
   }
 
@@ -297,310 +333,305 @@ class PlayerSelectScene extends Phaser.Scene {
 
     // Button hover effects
     [this.readyButton, this.backButton].forEach(button => {
-      button.on('pointerover', () => button.setBackgroundColor('#666666'));
-      button.on('pointerout', () => button.setBackgroundColor('#4a4a4a'));
+      button.on('pointerover', () => {
+        button.setStyle({ backgroundColor: '#666' });
+      });
+      button.on('pointerout', () => {
+        button.setStyle({ backgroundColor: '#4a4a4a' });
+      });
     });
-
-    // Button click handlers
-    this.readyButton.on('pointerdown', () => this.handleReady());
-    this.backButton.on('pointerdown', () => this.handleBack());
-
-    // Waiting text (hidden by default)
-    this.waitingText = this.add.text(
-      w/2,
-      h * 0.7,
-      'Aguardando outro jogador...',
-      {
-        fontSize: '20px',
-        color: '#fff',
-        fontFamily: 'monospace'
-      }
-    ).setOrigin(0.5).setVisible(false);
-  }
-
-  private handleCharacterSelect(index: number): void {
-    if (this.mode === 'online') {
-      // In online mode, host controls P1, client controls P2
-      if (this.isHost) {
-        this.selected.p1 = this.CHARACTER_KEYS[index];
-        this.selectedP1Index = index;
-        // Send selection to other player
-        this.wsManager.send({
-          type: 'player_selected',
-          data: { player: 'p1', character: this.selected.p1 }
-        });
-      } else {
-        this.selected.p2 = this.CHARACTER_KEYS[index];
-        this.selectedP2Index = index;
-        // Send selection to other player
-        this.wsManager.send({
-          type: 'player_selected',
-          data: { player: 'p2', character: this.selected.p2 }
-        });
-      }
-    } else {
-      // In local mode, alternate between P1 and P2
-      if (this.selectedP1Index === index) {
-        this.selectedP1Index = this.selectedP2Index;
-        this.selectedP2Index = index;
-        this.selected.p1 = this.CHARACTER_KEYS[this.selectedP1Index];
-        this.selected.p2 = this.CHARACTER_KEYS[this.selectedP2Index];
-      } else if (this.selectedP2Index === index) {
-        this.selectedP2Index = this.selectedP1Index;
-        this.selectedP1Index = index;
-        this.selected.p2 = this.CHARACTER_KEYS[this.selectedP2Index];
-        this.selected.p1 = this.CHARACTER_KEYS[this.selectedP1Index];
-      } else {
-        this.selectedP1Index = index;
-        this.selected.p1 = this.CHARACTER_KEYS[index];
-      }
-    }
-
-    this.updateSelectionIndicators();
   }
 
   private updateSelectionIndicators(): void {
-    // Move selector circles to selected character positions
+    if (!this.characters.length) return;
+    
+    // Update P1 indicator
     const p1Char = this.characters[this.selectedP1Index];
-    const p2Char = this.characters[this.selectedP2Index];
     if (p1Char && this.p1SelectorCircle) {
-      this.p1SelectorCircle.setPosition(p1Char.x, p1Char.y);
+      const yOffset = p1Char.bgCircleOffsetY || 0;
+      this.p1SelectorCircle.setPosition(p1Char.x, p1Char.y + yOffset);
+      this.p1SelectorCircle.setVisible(true);
     }
+
+    // Update P2 indicator
+    const p2Char = this.characters[this.selectedP2Index];
     if (p2Char && this.p2SelectorCircle) {
-      this.p2SelectorCircle.setPosition(p2Char.x, p2Char.y);
-    }
-    // Move indicator circles and text as before
-    if (p1Char && this.p1Indicator && this.p1Text) {
-      this.p1Indicator.setPosition(p1Char.x, p1Char.y - 80);
-      this.p1Text.setPosition(p1Char.x, p1Char.y - 80);
-    }
-    if (p2Char && this.p2Indicator && this.p2Text) {
-      this.p2Indicator.setPosition(p2Char.x, p2Char.y - 80);
-      this.p2Text.setPosition(p2Char.x, p2Char.y - 80);
+      const yOffset = p2Char.bgCircleOffsetY || 0;
+      this.p2SelectorCircle.setPosition(p2Char.x, p2Char.y + yOffset);
+      this.p2SelectorCircle.setVisible(true);
     }
   }
 
-  private handleReady(): void {
-    if (this.mode === 'online') {
-      this.wsManager.send({
-        type: 'player_ready',
-        data: {
-          roomCode: this.roomCode,
-          selections: this.selected
-        }
-      });
-      this.readyButton.setVisible(false);
-      this.waitingText.setVisible(true);
+  private handleCharacterSelect(player: 1 | 2, direction: -1 | 1): void {
+    if (this.mode === 'online' && player !== 1) return; // Only player 1 can select in online mode
+    
+    const currentIndex = player === 1 ? this.p1Index : this.p2Index;
+    const newIndex = (currentIndex + direction + this.characters.length) % this.characters.length;
+    
+    if (player === 1) {
+      this.p1Index = newIndex;
+      this.p1Char = this.characters[newIndex].key;
+      this.selected.p1 = this.p1Char;
+      this.selectedP1Index = newIndex;
+      
+      if (this.p1Sprite && this.p1Char) {
+        this.p1Sprite.setTexture('characters', `${this.p1Char}_idle_1`);
+        this.p1Sprite.setScale(2);
+      }
     } else {
-      this.startGame();
+      this.p2Index = newIndex;
+      this.selected.p2 = this.characters[newIndex].key;
+      this.selectedP2Index = newIndex;
     }
+    
+    this.updateSelectionIndicators();
+    
+    // Update WebSocket if in online mode
+    if (this.mode === 'online' && this.wsManager) {
+      const message: PlayerSelectWebSocketMessage = {
+        type: 'playerSelected',
+        player: `p${player}`,
+        character: player === 1 ? this.selected.p1 : this.selected.p2
+      };
+      this.wsManager.send(JSON.stringify(message));
+    }
+  }
+
+  private updateLayout(): void {
+    // Update layout when screen size changes
+    const { width, height } = this.scale;
+    
+    // Update title position
+    if (this.title) {
+      this.title.setPosition(width / 2, height * 0.1);
+    }
+    
+    // Update character grid positions
+    this.setupCharacters();
+    
+    // Update button positions
+    this.createUIButtons();
+  }
+
+  private handleGameStart(data: PlayerSelectWebSocketMessage): void {
+    if (data.type !== 'gameStart' || !('p1Char' in data) || !('p2Char' in data)) return;
+    
+    const gameData = data as GameStartWebSocketMessage;
+    this.scene.start('GameScene', {
+      player1Character: gameData.p1Char,
+      player2Character: gameData.p2Char,
+      mode: 'online' as const,
+      roomCode: gameData.roomCode,
+      isHost: this.isHost
+    });
+  }
+
+  private cleanupWebSocketHandlers(): void {
+    if (!this.wsManager || !this.wsHandlers) return;
+
+    // Clear all callbacks
+    if (this.wsManager.setMessageCallback) this.wsManager.setMessageCallback(() => {});
+    if (this.wsManager.setErrorCallback) this.wsManager.setErrorCallback(() => {});
+    if (this.wsManager.onClose) this.wsManager.onClose(() => {});
+    
+    this.wsHandlers = null;
+    this.isInitialized = false;
+  }
+
+  private showReconnectUI(): void {
+    // Add reconnection UI logic here
+    if (this.reconnectButton) {
+      this.reconnectButton.setVisible(true);
+    }
+  }
+
+  private updateReadyButton(): void {
+    if (!this.readyButton) return;
+    
+    const isReady = this.isHost ? this.player1Ready : this.player2Ready;
+    this.readyButton.setText(isReady ? 'Not Ready' : 'Ready');
+    this.readyButton.setStyle({
+      backgroundColor: isReady ? '#ff4444' : '#4CAF50'
+    });
   }
 
   private handleBack(): void {
-    if (this.mode === 'online') {
+    if (this.mode === 'online' && this.wsManager) {
+      // Notify server that player is leaving
+      this.wsManager.send({
+        type: 'playerLeft',
+        roomCode: this.roomCode || '',
+        isHost: this.isHost
+      });
+      
+      // Clean up WebSocket connection
+      this.cleanupWebSocketHandlers();
       this.wsManager.disconnect();
     }
+    
     this.scene.start('GameModeScene');
   }
 
-  private setupWebSocketHandlers(): void {
-    this.wsManager.setMessageCallback?.((event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'player_selected') {
-          const { player, character } = data.data;
-          this.selected[player as keyof PlayerSelections] = character;
-          this.updateSelectionIndicators();
-        } else if (data.type === 'player_ready') {
-          this.startGame();
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    });
-  }
-
-  private startGame(): void {
-    if ((this as any).player1Ready && (this as any).player2Ready) {
+  private launchGame(): void {
+    // Only start game in local mode if both players are ready
+    if (this.mode === 'local' && (!this.player1Ready || !this.player2Ready)) {
+      if (DEV) console.log('[PlayerSelectScene] Not starting game: players not ready.');
+      return;
+    }
+    // Existing logic
+    if (this.mode === 'online' && this.wsManager) {
+      const message: GameStartWebSocketMessage = {
+        type: 'gameStart',
+        p1Char: this.selected.p1,
+        p2Char: this.selected.p2,
+        roomCode: this.roomCode || ''
+      };
+      this.wsManager.send(JSON.stringify(message));
+    } else {
       this.scene.start('GameScene', {
         player1Character: this.selected.p1,
         player2Character: this.selected.p2,
-        mode: 'local'
+        mode: this.mode,
+        isHost: this.isHost,
+        p1Index: this.p1Index,
+        p2Index: this.p2Index
+      });
+    }
+    if (DEV) {
+      console.log('[PlayerSelectScene] Starting game with:', {
+        p1: this.selected.p1,
+        p2: this.selected.p2,
+        mode: this.mode,
+        isHost: this.isHost
       });
     }
   }
 
-  private updateLayout(gameSize: Phaser.Structs.Size): void {
-    const w = gameSize.width;
-    const h = gameSize.height;
-    // Responsive title position and font size
-    if (this.title) {
-      // Always break title into two lines
-      this.title.setText('Escolha os\nLutadores');
-      const vw = w / 100;
-      const vh = h / 100;
-      const titleFontSize = Math.max(14, Math.round(Math.min(vw, vh) * 6)); // 6vw/vh, min 14px
-      this.title.setFontSize(titleFontSize);
-      this.title.setWordWrapWidth(w * 0.8, true);
-      this.title.setAlign('center');
-      this.title.setPosition(w / 2, vh * 10); // 10vh from top
-      this.title.setOrigin(0.5, 0.5);
-    }
-    // Responsive character positions (centered grid, smaller height section)
-    const gridCols = 3;
-    const gridRows = 3;
-    const gridW = w * 0.7;
-    const gridH = h * 0.38;
-    const spacingX = gridW / (gridCols - 1);
-    const spacingY = gridH / (gridRows - 1);
-    const startX = w / 2 - gridW / 2;
-    const startY = h * 0.18;
-    this.characters.forEach((char, index) => {
-      const row = Math.floor(index / 3);
-      const col = index % 3;
-      char.x = startX + col * spacingX;
-      char.y = startY + row * spacingY;
-      // Move background circle to its intended offset from char.y (not sprite)
-      if (char.bgCircle) {
-        const bgCircleOffsetY = char.bgCircleOffsetY || 100;
-        char.bgCircle.setPosition(char.x, char.y + bgCircleOffsetY);
-        char.bgCircle.setScale(scale);
-        char.bgCircle.setDepth(sprite.depth - 1);
+  private handlePlayerSelected(data: PlayerSelectWebSocketMessage): void {
+    if (data.player === 'p1' && data.character) {
+      this.selected.p1 = data.character;
+      if (DEV) {
+        console.log(`[PlayerSelectScene] Player 1 selected: ${data.character}`);
       }
-      // Move and scale sprite
-      const sprite = this.characterSprites[char.key];
-      if (sprite) {
-        sprite.setPosition(char.x, char.y + 40); // move sprite 40px further down
-        sprite.setScale(scale);
+    } else if (data.player === 'p2' && data.character) {
+      this.selected.p2 = data.character;
+      if (DEV) {
+        console.log(`[PlayerSelectScene] Player 2 selected: ${data.character}`);
       }
-      // Update name label
-      if (char.nameLabel) {
-        const nameOffset = (baseSize * scale) / 2 + 24 + 40;
-        char.nameLabel.setPosition(char.x, char.y + nameOffset);
-      }
-    });
-
-    // Centralize the buttons at the bottom using edge alignment
-    const buttonY = h * 0.97;
-    const buttonSpacing = Math.max(24, w * 0.04);
-    if (this.readyButton && this.backButton) {
-      this.readyButton.setFontSize(Math.max(14, Math.round(h * 0.035)));
-      this.backButton.setFontSize(Math.max(14, Math.round(h * 0.035)));
-      if (this.readyButton.updateText) this.readyButton.updateText();
-      if (this.backButton.updateText) this.backButton.updateText();
-      const readyWidth = this.readyButton.width;
-      const backWidth = this.backButton.width;
-      const totalWidth = readyWidth + backWidth + buttonSpacing;
-      const centerX = w / 2;
-      // Set origins so that their inner edges meet at center
-      this.backButton.setOrigin(1, 0.5); // right edge
-      this.readyButton.setOrigin(0, 0.5); // left edge
-      this.backButton.setPosition(centerX - buttonSpacing / 2, buttonY);
-      this.readyButton.setPosition(centerX + buttonSpacing / 2, buttonY);
     }
-    if (this.waitingText) {
-      this.waitingText.setFontSize(Math.max(12, Math.round(h * 0.03)));
-      this.waitingText.setPosition(w/2, h * 0.87);
-      this.waitingText.setOrigin(0.5);
-    }
-
-    // Responsive selectors (start at correct positions)
-    if (this.p1SelectorCircle) {
-      this.p1SelectorCircle.setPosition(this.characters[0].x, this.characters[0].y);
-    }
-    if (this.p2SelectorCircle) {
-      this.p2SelectorCircle.setPosition(this.characters[this.characters.length-1].x, this.characters[this.characters.length-1].y);
-    }
-
-    // Update selection indicators
     this.updateSelectionIndicators();
   }
 
-  /**
-   * Starts the fight process. In online mode, hosts select scenario first, then continue. Clients or local mode proceed directly.
-   */
-  public startFight(): void {
-    if (this.mode === 'online') {
-      // If host, launch scenario selection first
-      if (this.isHost) {
-        if (DEV) console.log('[PlayerSelectScene] Host selecting scenario before starting fight');
-        this.scene.pause();
-        this.scene.launch('ScenarioSelectScene', {
-          p1: this.CHARACTER_KEYS.indexOf(this.selected.p1),
-          p2: this.CHARACTER_KEYS.indexOf(this.selected.p2),
-          fromPlayerSelect: true,
-          onlineMode: true
-        });
-        // Listen for scenario selection (handled in ScenarioSelectScene)
-        return;
-      }
-      // For non-host or after scenario selection, continue with normal process
-      this.continueStartFight();
-    } else {
-      // Start immediately in local mode
-      this.launchGame();
-    }
-  }
-
-  /**
-   * Continues the fight process after scenario selection or for non-hosts. Optionally accepts a character index for test compatibility.
-   */
-  public continueStartFight(charIndex?: number): void {
-    // Send our character selection
-    const myChar = this.isHost ? this.selected.p1 : this.selected.p2;
-    const charIdx = (typeof charIndex === 'number') ? charIndex : this.CHARACTER_KEYS.indexOf(myChar);
-    const playerNum = this.isHost ? 1 : 2;
-    this.wsManager.send({
-      type: 'player_ready',
-      character: charIdx
-    });
-    if (DEV) console.log('[PlayerSelectScene] Sending player_ready:', {
-      charKey: myChar,
-      charIdx
-    });
-
-    // Add a debug button in online mode for testing and development
-    if (this.mode === 'online' && this.isHost && DEV) {
-      const debugButton = this.add.text(
-        this.cameras.main.width * 0.5,
-        this.cameras.main.height * 0.9,
-        'DEBUG: FORCE START GAME',
-        {
-          fontSize: '16px',
-          color: '#ff0000',
-          fontFamily: 'monospace',
-          backgroundColor: '#000000',
-          padding: { x: 10, y: 5 }
-        }
-      ).setOrigin(0.5).setDepth(100).setInteractive();
-      debugButton.on('pointerdown', () => {
-        if (DEV) console.log('[PlayerSelectScene] Debug button clicked, forcing game start');
-        this.launchGame();
+  private updateReadyUI(): void {
+    if (!this.player1ReadyText || !this.player2ReadyText) return;
+    
+    this.player1ReadyText.setText(`P1 ${this.player1Ready ? 'Ready' : 'Not Ready'}`);
+    this.player2ReadyText.setText(`P2 ${this.player2Ready ? 'Ready' : 'Not Ready'}`);
+    
+    if (this.readyButton) {
+      const isReady = this.isHost ? this.player1Ready : this.player2Ready;
+      this.readyButton.setText(isReady ? 'Not Ready' : 'Ready');
+      this.readyButton.setStyle({
+        backgroundColor: isReady ? '#ff4444' : '#4CAF50'
       });
     }
   }
 
-  /**
-   * Launches the KidsFightScene with the selected characters and scenario.
-   */
-  private launchGame(): void {
-    if (DEV) console.log('[PlayerSelectScene] Starting fight with:', {
-      p1: this.selected.p1,
-      p2: this.selected.p2,
-      isHost: this.isHost
-    });
-    const p1Index = this.CHARACTER_KEYS.indexOf(this.selected.p1);
-    const p2Index = this.CHARACTER_KEYS.indexOf(this.selected.p2);
-    this.scene.start('KidsFightScene', {
-      p1: this.selected.p1,
-      p2: this.selected.p2,
-      p1Index,
-      p2Index,
-      scenario: (this as any).scenarioKey,
-      mode: this.mode,
-      isHost: this.isHost
-    });
+  private handlePlayerReady(data: PlayerSelectWebSocketMessage): void {
+    if (data.player1Ready !== undefined) {
+      this.player1Ready = data.player1Ready;
+      if (DEV) {
+        console.log(`[PlayerSelectScene] Player 1 ready: ${data.player1Ready}`);
+      }
+    }
+    if (data.player2Ready !== undefined) {
+      this.player2Ready = data.player2Ready;
+      if (DEV) {
+        console.log(`[PlayerSelectScene] Player 2 ready: ${data.player2Ready}`);
+      }
+    }
+    this.updateReadyUI();
+  }
+
+  private setupWebSocketHandlers(): void {
+    if (!this.wsManager || this.isInitialized) return;
+    this.isInitialized = true;
+
+    // Clean up any existing handlers first
+    this.cleanupWebSocketHandlers();
+
+    const messageHandler = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data) as PlayerSelectWebSocketMessage;
+        if (DEV) {
+          console.log('[PlayerSelectScene] Received message:', data);
+        }
+
+        if (!data || !data.type) return;
+
+        switch (data.type) {
+          case 'playerSelected':
+            this.handlePlayerSelected(data);
+            break;
+          case 'playerReady':
+            this.handlePlayerReady(data);
+            break;
+          case 'gameStart':
+            this.handleGameStart(data);
+            break;
+          case 'roomInfo':
+            if (data.roomCode) {
+              this.roomCode = data.roomCode;
+              if (this.roomCodeText) {
+                this.roomCodeText.setText(`Room: ${this.roomCode}`);
+              }
+            }
+            break;
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    };
+
+    const errorHandler = (error: Event) => {
+      console.error('WebSocket error:', error);
+    };
+
+    const closeHandler = (event: CloseEvent) => {
+      console.log('WebSocket connection closed:', event);
+      this.cleanupWebSocketHandlers();
+      this.isInitialized = false;
+      if (this.reconnectButton) {
+        this.reconnectButton.setVisible(true);
+      }
+    };
+
+    // Store handlers for cleanup
+    this.wsHandlers = {
+      messageHandler,
+      errorHandler,
+      closeHandler
+    };
+
+    // Add new handlers using the correct WebSocketManager methods
+    if (this.wsManager) {
+      if (this.wsManager.setMessageCallback) this.wsManager.setMessageCallback(messageHandler);
+      if (this.wsManager.setErrorCallback) this.wsManager.setErrorCallback(errorHandler);
+      if (this.wsManager.onClose) this.wsManager.onClose(closeHandler);
+    }
+  }
+
+  private sendWebSocketMessage(message: PlayerSelectWebSocketMessage): void {
+    if (this.wsManager && this.wsManager.send) {
+      this.wsManager.send(JSON.stringify(message));
+    }
+  }
+
+  private handlePlayerSelected(data: PlayerSelectWebSocketMessage): void {
+  }
+
+  public startGame(): void {
+    this.launchGame();
   }
 }
 

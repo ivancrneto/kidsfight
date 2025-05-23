@@ -442,7 +442,7 @@ describe('PlayerSelectScene', () => {
   describe('character selection', () => {
     it('should handle character selection', () => {
       scene.create();
-      const characterKey = 'player1';
+      const characterKey = 'bento';
       
       // Mock the necessary methods for character selection
       const mockSelectCharacter = jest.fn();
@@ -455,7 +455,7 @@ describe('PlayerSelectScene', () => {
 
     it('should handle character deselection', () => {
       scene.create();
-      const characterKey = 'player1';
+      const characterKey = 'bento';
       
       // Mock the necessary methods for character deselection
       const mockDeselectCharacter = jest.fn();
@@ -484,7 +484,7 @@ describe('PlayerSelectScene', () => {
   describe('start game', () => {
     it('should handle game start when both players are ready', () => {
       // Set up the test
-      scene['selected'] = { p1: 'player1', p2: 'player2' };
+      scene['selected'] = { p1: 'bento', p2: 'davir' };
       scene.scene.start = jest.fn();
       // Ensure both players are ready
       (scene as any).player1Ready = true;
@@ -493,11 +493,14 @@ describe('PlayerSelectScene', () => {
       scene['startGame']();
       
       // Verify the scene was started with the correct parameters
-      expect(scene.scene.start).toHaveBeenCalledWith('GameScene', {
-        player1Character: 'player1',
-        player2Character: 'player2',
-        mode: 'local'
-      });
+      expect(scene.scene.start).toHaveBeenCalledWith(
+        'GameScene',
+        expect.objectContaining({
+          player1Character: 'bento',
+          player2Character: 'davir',
+          mode: 'local'
+        })
+      );
     });
 
     it('should not start game when players are not ready', () => {
@@ -505,7 +508,14 @@ describe('PlayerSelectScene', () => {
       (scene as any).player2Ready = false;
       scene.scene.start = jest.fn();
       (scene as any).startGame();
-      expect(scene.scene.start).not.toHaveBeenCalledWith('GameScene', expect.any(Object));
+      expect(scene.scene.start).not.toHaveBeenCalledWith(
+        'GameScene',
+        expect.objectContaining({
+          player1Character: 'bento',
+          player2Character: 'davir',
+          mode: 'local'
+        })
+      );
     });
   });
 

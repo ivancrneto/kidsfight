@@ -200,8 +200,23 @@ describe('PlayerSelectScene UI', () => {
 
   test('selector moves to correct position on player click', () => {
     scene.create();
-    // Simulate character select event
-    scene.handleCharacterSelect(1);
+    // Ensure characters array is populated for selection logic
+    scene.characters = [
+      { name: 'Bento', key: 'bento', x: 0, y: 0, scale: 1 },
+      { name: 'Davir', key: 'davir', x: 0, y: 0, scale: 1 },
+      { name: 'Jose', key: 'jose', x: 0, y: 0, scale: 1 },
+      { name: 'Davis', key: 'davis', x: 0, y: 0, scale: 1 },
+      { name: 'Carol', key: 'carol', x: 0, y: 0, scale: 1 },
+      { name: 'Roni', key: 'roni', x: 0, y: 0, scale: 1 },
+      { name: 'Jacqueline', key: 'jacqueline', x: 0, y: 0, scale: 1 },
+      { name: 'Ivan', key: 'ivan', x: 0, y: 0, scale: 1 },
+      { name: 'D_isa', key: 'd_isa', x: 0, y: 0, scale: 1 }
+    ];
+    // Ensure index is valid before simulating selection
+    scene.p1Index = 0;
+    scene.selectedP1Index = 0;
+    // Simulate character select event with direction 1 (should wrap around safely)
+    scene.handleCharacterSelect(1, 1);
     // This test would need to check if the selector circle moved to the correct position
     // For now, check that handleCharacterSelect does not throw and updates selection
     expect(scene.selected.p1).toBeDefined();
