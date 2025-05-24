@@ -112,17 +112,55 @@ server.on('connection', (ws) => {
             scRoom.host.send(JSON.stringify({
               type: 'scenario_selected',
               scenario: data.scenario,
-              roomCode: roomCode
+              roomCode: data.roomCode
             }));
           }
           if (scRoom.client) {
             scRoom.client.send(JSON.stringify({
               type: 'scenario_selected',
               scenario: data.scenario,
-              roomCode: roomCode
+              roomCode: data.roomCode
             }));
           }
           break;
+
+        case 'game_start': {
+          const room = gameRooms.get(roomCode);
+          console.log('[Server] Received game_start:', data, 'for room', roomCode);
+          console.log('[Server] Room status:', room ? 'exists' : 'not found');
+          if (room) {
+            console.log('[Server] Host connection:', room.host ? 'connected' : 'not connected');
+            console.log('[Server] Guest connection:', room.client ? 'connected' : 'not connected');
+          }
+          
+          if (!room) return;
+          
+          // Forward to both players
+          if (room.host) {
+            console.log('[Server] Forwarding game_start to host');
+            room.host.send(JSON.stringify({
+              type: 'game_start',
+              p1Char: data.p1Char,
+              p2Char: data.p2Char,
+              scenario: data.scenario,
+              roomCode: data.roomCode
+            }));
+          }
+          
+          if (room.client) {
+            console.log('[Server] Forwarding game_start to guest');
+            room.client.send(JSON.stringify({
+              type: 'game_start',
+              p1Char: data.p1Char,
+              p2Char: data.p2Char,
+              scenario: data.scenario,
+              roomCode: data.roomCode
+            }));
+          }
+          
+          console.log('[Server] game_start message handling complete');
+        }
+        break;
 
         case 'game_action':
           const currentRoom = gameRooms.get(roomCode);

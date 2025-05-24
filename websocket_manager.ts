@@ -166,7 +166,9 @@ class WebSocketManager {
 
   public send(message: any): boolean {
     if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+      console.log('[WSM] Sending message, type:', typeof message, 'content:', message);
       const msgToSend = typeof message === 'string' ? message : JSON.stringify(message);
+      console.log('[WSM] Stringified message to send:', msgToSend);
       this._ws.send(msgToSend);
       // Log human-readable message
       if (typeof message === 'string') {
@@ -180,6 +182,7 @@ class WebSocketManager {
       }
       return true;
     }
+    console.log('[WSM] Cannot send message - not connected, readyState:', this._ws?.readyState);
     return false;
   }
 

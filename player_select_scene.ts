@@ -394,11 +394,11 @@ export default class PlayerSelectScene extends Phaser.Scene {
     // Update WebSocket if in online mode
     if (this.mode === 'online' && this.wsManager) {
       const message: PlayerSelectWebSocketMessage = {
-        type: 'playerSelected',
+        type: 'player_selected', // changed from 'playerSelected'
         player: `p${player}`,
         character: player === 1 ? this.selected.p1 : this.selected.p2
       };
-      this.wsManager.send(JSON.stringify(message));
+      this.wsManager.send(message);
     }
   }
 
@@ -478,21 +478,23 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private launchGame(): void {
-    // Only start game in local mode if both players are ready
-    if (this.mode === 'local' && (!this.player1Ready || !this.player2Ready)) {
-      if (DEV) console.log('[PlayerSelectScene] Not starting game: players not ready.');
-      return;
-    }
+    console.log('[PlayerSelectScene] launchGame called, mode:', this.mode, 'isHost:', this.isHost);
+    
     if (this.mode === 'online') {
       if (this.isHost) {
-        // Host transitions to scenario selection
+        console.log('[PlayerSelectScene] Host transitioning to ScenarioSelectScene');
+        console.log('[PlayerSelectScene] Passing wsManager to ScenarioSelectScene:', !!this.wsManager);
+        // Host transitions to scenario selection only
         this.scene.start('ScenarioSelectScene', {
           mode: this.mode,
           selected: this.selected,
           roomCode: this.roomCode,
-          isHost: this.isHost
+          isHost: this.isHost,
+          wsManager: this.wsManager // Pass the WebSocket manager to the next scene
         });
+        return; // Prevent any further transition for host
       } else {
+        console.log('[PlayerSelectScene] Guest waiting for scenario selection');
         // Guest sees waiting message
         if (this.waitingText) this.waitingText.setVisible(true);
         else {
@@ -506,26 +508,44 @@ export default class PlayerSelectScene extends Phaser.Scene {
             fontFamily: 'monospace'
           }).setOrigin(0.5);
         }
+        // Guest stays in PlayerSelectScene and listens for scenario_selected
+        if (this.wsManager && this.wsManager.setMessageCallback) {
+          console.log('[Guest] Setting message callback for game_start');
+          this.wsManager.setMessageCallback((event: MessageEvent) => {
+            try {
+              // Check if data is already an object or needs parsing
+              const data = typeof event.data === 'string' 
+                ? JSON.parse(event.data)
+                : event.data;
+                
+              console.log('[Guest] Received message:', data);
+              
+              if (data.type === 'game_start' || data.type === 'gameStart') {
+                console.log('[Guest] Received game_start:', data);
+                // Transition to fight scene with correct character selection
+                this.scene.start('KidsFightScene', {
+                  mode: this.mode,
+                  selected: { p1: data.p1Char, p2: data.p2Char },
+                  scenario: data.scenario,
+                  roomCode: this.roomCode,
+                  isHost: this.isHost
+                });
+              }
+            } catch (e) { 
+              console.error('Error processing game_start message:', e); 
+            }
+          });
+        }
+        return;
       }
-      return;
     }
-    // Local mode: start game directly
-    this.scene.start('GameScene', {
-      player1Character: this.selected.p1,
-      player2Character: this.selected.p2,
+    
+    console.log('[PlayerSelectScene] Local mode transitioning to ScenarioSelectScene');
+    // Local mode: transition to scenario selection
+    this.scene.start('ScenarioSelectScene', {
       mode: this.mode,
-      isHost: this.isHost,
-      p1Index: this.p1Index,
-      p2Index: this.p2Index
+      selected: this.selected
     });
-    if (DEV) {
-      console.log('[PlayerSelectScene] Starting game with:', {
-        p1: this.selected.p1,
-        p2: this.selected.p2,
-        mode: this.mode,
-        isHost: this.isHost
-      });
-    }
   }
 
   private handlePlayerSelected(data: PlayerSelectWebSocketMessage): void {
@@ -583,7 +603,11 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
     const messageHandler = (event: MessageEvent) => {
       try {
-        const data = JSON.parse(event.data) as PlayerSelectWebSocketMessage;
+        // Check if data is already an object or needs parsing
+        const data = typeof event.data === 'string' 
+          ? JSON.parse(event.data)
+          : event.data;
+          
         if (DEV) {
           console.log('[PlayerSelectScene] Received message:', data);
         }
@@ -591,12 +615,14 @@ export default class PlayerSelectScene extends Phaser.Scene {
         if (!data || !data.type) return;
 
         switch (data.type) {
+          case 'player_selected':
           case 'playerSelected':
             this.handlePlayerSelected(data);
             break;
           case 'playerReady':
             this.handlePlayerReady(data);
             break;
+          case 'game_start':
           case 'gameStart':
             this.handleGameStart(data);
             break;
@@ -644,7 +670,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
   private sendWebSocketMessage(message: PlayerSelectWebSocketMessage): void {
     if (this.wsManager && this.wsManager.send) {
-      this.wsManager.send(JSON.stringify(message));
+      this.wsManager.send(message);
     }
   }
 
@@ -653,5 +679,16 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
   public startGame(): void {
     this.launchGame();
+  }
+
+  private getScenarioNameByKey(scenarioKey: string): string {
+    // Keep in sync with SCENARIOS array in ScenarioSelectScene
+    const scenarios = [
+      { key: 'scenario1', name: 'Dona Isa' },
+      { key: 'scenario2', name: 'Acácia' },
+      // Add more if needed
+    ];
+    const found = scenarios.find(s => s.key === scenarioKey);
+    return found ? found.name : scenarioKey;
   }
 }
