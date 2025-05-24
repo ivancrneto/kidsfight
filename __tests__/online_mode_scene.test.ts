@@ -184,8 +184,8 @@ describe('OnlineModeScene', () => {
 
     it('should handle game_joined message', () => {
       const startGameSpy = jest.spyOn(scene as any, 'startGame');
-      // Simulate receiving game_joined message as a MessageEvent
-      messageCallback({ data: JSON.stringify({ type: 'game_joined' }) });
+      // Simulate receiving game_joined message as a MessageEvent WITH roomCode
+      messageCallback({ data: JSON.stringify({ type: 'game_joined', roomCode: 'TEST123' }) });
       expect(startGameSpy).toHaveBeenCalledWith({
         roomCode: 'TEST123',
         isHost: false
@@ -194,8 +194,8 @@ describe('OnlineModeScene', () => {
 
     it('should handle player_joined message when host', () => {
       const startGameSpy = jest.spyOn(scene as any, 'startGame');
-      // Simulate receiving player_joined message as a MessageEvent
-      messageCallback({ data: JSON.stringify({ type: 'player_joined' }) });
+      // Simulate receiving player_joined message as a MessageEvent WITH roomCode
+      messageCallback({ data: JSON.stringify({ type: 'player_joined', roomCode: 'TEST123' }) });
       expect(startGameSpy).toHaveBeenCalledWith({
         roomCode: 'TEST123',
         isHost: true
@@ -232,6 +232,33 @@ describe('OnlineModeScene', () => {
         expect.any(Error)
       );
       consoleErrorSpy.mockRestore();
+    });
+
+    it('should not throw if showError is called before errorText is initialized', () => {
+      // Simulate missing errorText and other UI elements
+      scene.errorText = null;
+      scene.waitingText = null;
+      scene.roomCodeText = null;
+      scene.roomCodeDisplay = null;
+      scene.showMainButtons = undefined;
+      expect(() => scene['showError']('Room is full')).not.toThrow();
+    });
+
+    it('should display error message if errorText exists (isolated test)', () => {
+      // Isolated test for showError logic
+      const testScene: any = {};
+      testScene.errorText = {
+        setText: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis()
+      };
+      testScene.showMainButtons = undefined;
+      testScene.waitingText = null;
+      testScene.roomCodeText = null;
+      testScene.roomCodeDisplay = null;
+      testScene.showError = OnlineModeScene.prototype['showError'];
+      testScene.showError.call(testScene, 'Room is full');
+      expect(testScene.errorText.setText).toHaveBeenCalledWith('Room is full');
+      expect(testScene.errorText.setVisible).toHaveBeenCalledWith(true);
     });
   });
 

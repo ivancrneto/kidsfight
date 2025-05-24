@@ -56,11 +56,13 @@ server.on('connection', (ws) => {
 
           // Notify both players
           room.host.send(JSON.stringify({ 
-            type: 'player_joined'
+            type: 'player_joined',
+            roomCode: roomCode
           }));
           
           ws.send(JSON.stringify({ 
-            type: 'game_joined'
+            type: 'game_joined',
+            roomCode: roomCode
           }));
 
           console.log(`Player joined room: ${roomCode}`);

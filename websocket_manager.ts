@@ -164,29 +164,23 @@ class WebSocketManager {
     return !!this._ws && this._ws.readyState === WebSocket.OPEN;
   }
 
-  public send(message: WebSocketMessage): boolean {
-    if (!this.isConnected() || !this._ws) {
-      console.error('[WSM] Cannot send message - not connected');
-      return false;
-    }
-
-    try {
-      // Create a clean message object to avoid modifying the original
-      const cleanMessage = { ...message };
-      
-      // Ensure timestamp is a number if it exists
-      if ('timestamp' in cleanMessage && typeof cleanMessage.timestamp !== 'number') {
-        cleanMessage.timestamp = Date.now();
+  public send(message: any): boolean {
+    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+      const msgToSend = typeof message === 'string' ? message : JSON.stringify(message);
+      this._ws.send(msgToSend);
+      // Log human-readable message
+      if (typeof message === 'string') {
+        try {
+          console.log('[WSM] Message sent:', JSON.parse(message));
+        } catch {
+          console.log('[WSM] Message sent:', message);
+        }
+      } else {
+        console.log('[WSM] Message sent:', message);
       }
-      
-      const messageString = JSON.stringify(cleanMessage);
-      this._ws.send(messageString);
-      console.log(`[WSM] Message sent:`, cleanMessage);
       return true;
-    } catch (error) {
-      console.error('[WSM] Error sending message:', error);
-      return false;
     }
+    return false;
   }
 
   public sendGameAction(action: string, data: Record<string, any> = {}): boolean {

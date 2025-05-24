@@ -346,10 +346,12 @@ export default class OnlineModeScene extends Phaser.Scene {
         this.startGame({ roomCode: data.roomCode, isHost: false });
       } else if (data.type === 'player_joined') {
         console.log('Player joined, starting game...');
-        this.startGame({ roomCode: this.wsManager.getRoomCode() || '', isHost: true });
+        this.wsManager.setRoomCode(data.roomCode); // Ensure roomCode is set
+        this.startGame({ roomCode: data.roomCode, isHost: true });
       } else if (data.type === 'game_joined') {
         console.log('Successfully joined game, starting...');
-        this.startGame({ roomCode: this.wsManager.getRoomCode() || '', isHost: false });
+        this.wsManager.setRoomCode(data.roomCode); // Ensure roomCode is set
+        this.startGame({ roomCode: data.roomCode, isHost: false });
       } else if (data.type === 'error') {
         this.showError(data.message);
       }
@@ -365,19 +367,21 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   private showError(message: string): void {
-    this.errorText.setText(message).setVisible(true);
-    this.showMainButtons();
-    this.waitingText.setVisible(false);
-    this.roomCodeText.setVisible(false);
-    this.roomCodeDisplay.setVisible(false);
+    if (this.errorText) {
+      this.errorText.setText(message).setVisible(true);
+    }
+    if (this.showMainButtons) this.showMainButtons();
+    if (this.waitingText) this.waitingText.setVisible(false);
+    if (this.roomCodeText) this.roomCodeText.setVisible(false);
+    if (this.roomCodeDisplay) this.roomCodeDisplay.setVisible(false);
 
     setTimeout(() => {
-      this.errorText.setVisible(false);
+      if (this.errorText) this.errorText.setVisible(false);
     }, 3000);
   }
 
   private startGame(roomData: RoomData): void {
-    console.log('Starting game with room data:', roomData);
+    console.log('Starting game with room data:', roomData); // DEBUG LOG
     try {
       // Set the room code in the WebSocket manager
       this.wsManager.setRoomCode(roomData.roomCode);

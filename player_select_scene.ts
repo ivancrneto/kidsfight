@@ -56,7 +56,7 @@ interface CharacterInfo {
   bgCircleOffsetY?: number;
 }
 
-export class PlayerSelectScene extends Phaser.Scene {
+export default class PlayerSelectScene extends Phaser.Scene {
   // Properties made public for testability
   public CHARACTER_KEYS: string[] = [];
   public p1Index = 0;
@@ -634,5 +634,3 @@ export class PlayerSelectScene extends Phaser.Scene {
     this.launchGame();
   }
 }
-
-export default PlayerSelectScene;
