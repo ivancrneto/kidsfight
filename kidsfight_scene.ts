@@ -227,23 +227,30 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Setup scene
+    // Get the current game dimensions
+    const gameWidth = this.sys.game.canvas.width;
+    const gameHeight = this.sys.game.canvas.height;
+    
+    console.log(`Creating KidsFightScene with dimensions: ${gameWidth}x${gameHeight}`);
+    
+    // Setup scene with proper scaling
     this.background = this.add.image(0, 0, this.selectedScenario)
       .setOrigin(0, 0)
-      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT) as Phaser.GameObjects.Image;
+      .setDisplaySize(gameWidth, gameHeight) as Phaser.GameObjects.Image;
 
-    // Set camera and physics bounds
+    // Set camera and physics bounds to match the actual game size
     if (this.cameras && this.cameras.main && typeof this.cameras.main.setBounds === 'function') {
-      this.cameras.main.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+      this.cameras.main.setBounds(0, 0, gameWidth, gameHeight);
     }
     if (this.physics && this.physics.world && typeof this.physics.world.setBounds === 'function') {
-      this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+      this.physics.world.setBounds(0, 0, gameWidth, gameHeight);
     }
 
+    // Create platform with proper scaling
     this.platform = this.add.rectangle(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT - 100,
-      GAME_WIDTH,
+      gameWidth / 2,
+      gameHeight - 100,
+      gameWidth,
       20,
       0x00ff00
     );
@@ -266,6 +273,12 @@ class KidsFightScene extends Phaser.Scene {
     if (this.gameMode === 'online') {
       this.setupWebSocketHandlers();
     }
+    
+    // Add collision between players and platform
+    if (this.player1 && this.player2 && this.platform) {
+      this.physics.add.collider(this.player1, this.platform);
+      this.physics.add.collider(this.player2, this.platform);
+    }
   }
 
   private createPlayers(): void {
@@ -274,8 +287,19 @@ class KidsFightScene extends Phaser.Scene {
       return;
     }
 
+    // Get the current game dimensions for proper scaling
+    const gameWidth = this.sys.game.canvas.width;
+    const gameHeight = this.sys.game.canvas.height;
+    
+    // Calculate scale factor based on the design resolution vs actual resolution
+    const scaleX = gameWidth / GAME_WIDTH;
+    const scaleY = gameHeight / GAME_HEIGHT;
+    const scale = Math.min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
+    
+    console.log(`Game dimensions: ${gameWidth}x${gameHeight}, Scale factors: ${scaleX}x${scaleY}, Using scale: ${scale}`);
+
     // Create player 1 (left side)
-    const player1 = this.physics.add.sprite(200, 450, this.selected.p1);
+    const player1 = this.physics.add.sprite(200 * scaleX, gameHeight - 30, this.selected.p1);
     if (!player1) {
       console.error('Failed to create player 1');
       return;
@@ -294,11 +318,13 @@ class KidsFightScene extends Phaser.Scene {
       }
     }) as Player;
     
+    // Apply scaling to player 1
+    this.player1.setScale(scale);
     this.player1.setCollideWorldBounds(true);
     this.player1.setBounce(0.2);
 
     // Create player 2 (right side)
-    const player2 = this.physics.add.sprite(600, 450, this.selected.p2);
+    const player2 = this.physics.add.sprite(600 * scaleX, gameHeight - 30, this.selected.p2);
     if (!player2) {
       console.error('Failed to create player 2');
       return;
@@ -317,8 +343,16 @@ class KidsFightScene extends Phaser.Scene {
       }
     }) as Player;
     
+    // Apply scaling to player 2
+    this.player2.setScale(scale);
     this.player2.setCollideWorldBounds(true);
     this.player2.setBounce(0.2);
+    
+    // Adjust the physics bodies to match the scaled sprites
+    if (this.player1.body && this.player2.body) {
+      this.player1.body.setSize(this.player1.width * 0.7, this.player1.height * 0.9);
+      this.player2.body.setSize(this.player2.width * 0.7, this.player2.height * 0.9);
+    }
   }
   
   // Helper method to initialize Player properties
@@ -342,25 +376,35 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   private createUI(): void {
+    // Get the current game dimensions for proper UI scaling
+    const gameWidth = this.sys.game.canvas.width;
+    const gameHeight = this.sys.game.canvas.height;
+    
+    // Calculate scale factor
+    const scaleX = gameWidth / GAME_WIDTH;
+    const scaleY = gameHeight / GAME_HEIGHT;
+    
     // Create health bars
-    this.createHealthBars();
+    this.createHealthBars(scaleX, scaleY);
 
     // Create special bars
-    this.createSpecialBars();
+    this.createSpecialBars(scaleX, scaleY);
 
     // Create player names
-    this.createPlayerNames();
+    this.createPlayerNames(scaleX, scaleY);
 
     // Create touch controls if on mobile
     if (this.sys.game.device.input.touch) {
-      this.createTouchControls();
+      this.createTouchControls(scaleX, scaleY);
     }
   }
 
-  private createHealthBars(): void {
-    // Create health bar backgrounds
-    this.healthBarBg1 = this.add.rectangle(10, 10, 200, 20, 0xffffff) as Phaser.GameObjects.Rectangle;
-    this.healthBarBg2 = this.add.rectangle(GAME_WIDTH - 210, 10, 200, 20, 0xffffff) as Phaser.GameObjects.Rectangle;
+  private createHealthBars(scaleX: number, scaleY: number): void {
+    const gameWidth = this.sys.game.canvas.width;
+    
+    // Create health bar backgrounds with proper scaling
+    this.healthBarBg1 = this.add.rectangle(10 * scaleX, 10 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
+    this.healthBarBg2 = this.add.rectangle(gameWidth - (210 * scaleX), 10 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
 
     // Create health bars
     this.healthBar1 = this.add.graphics() as Phaser.GameObjects.Graphics;
@@ -370,31 +414,50 @@ class KidsFightScene extends Phaser.Scene {
     this.updateHealthBars(1);
   }
 
-  private createSpecialBars(): void {
-    // Create special bar backgrounds
-    this.specialBarBg1 = this.add.rectangle(10, 40, 200, 20, 0xffffff) as Phaser.GameObjects.Rectangle;
-    this.specialBarBg2 = this.add.rectangle(GAME_WIDTH - 210, 40, 200, 20, 0xffffff) as Phaser.GameObjects.Rectangle;
+  private createSpecialBars(scaleX: number, scaleY: number): void {
+    const gameWidth = this.sys.game.canvas.width;
+    
+    // Create special bar backgrounds with proper scaling
+    this.specialBarBg1 = this.add.rectangle(10 * scaleX, 40 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
+    this.specialBarBg2 = this.add.rectangle(gameWidth - (210 * scaleX), 40 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
 
-    // Create special bars
-    this.specialBar1 = this.add.rectangle(10, 40, 0, 20, 0x00ff00) as Phaser.GameObjects.Rectangle;
-    this.specialBar2 = this.add.rectangle(GAME_WIDTH - 210, 40, 0, 20, 0x00ff00) as Phaser.GameObjects.Rectangle;
+    // Create special bars with proper scaling
+    this.specialBar1 = this.add.rectangle(10 * scaleX, 40 * scaleY, 0, 20 * scaleY, 0x00ff00) as Phaser.GameObjects.Rectangle;
+    this.specialBar2 = this.add.rectangle(gameWidth - (210 * scaleX), 40 * scaleY, 0, 20 * scaleY, 0x00ff00) as Phaser.GameObjects.Rectangle;
   }
 
-  private createPlayerNames(): void {
-    // Create player name texts
-    const playerName1 = this.add.text(10, 70, this.p1, { fontSize: 24, color: '#000000' }) as Phaser.GameObjects.Text;
-    const playerName2 = this.add.text(GAME_WIDTH - 210, 70, this.p2, { fontSize: 24, color: '#000000' }) as Phaser.GameObjects.Text;
+  private createPlayerNames(scaleX: number, scaleY: number): void {
+    const gameWidth = this.sys.game.canvas.width;
+    
+    // Create player name texts with proper scaling
+    const fontSize = Math.max(16, Math.floor(24 * scaleY)); // Ensure minimum readable size
+    
+    const playerName1 = this.add.text(10 * scaleX, 70 * scaleY, this.p1, { 
+      fontSize: `${fontSize}px`, 
+      color: '#000000' 
+    }) as Phaser.GameObjects.Text;
+    
+    const playerName2 = this.add.text(gameWidth - (210 * scaleX), 70 * scaleY, this.p2, { 
+      fontSize: `${fontSize}px`, 
+      color: '#000000' 
+    }) as Phaser.GameObjects.Text;
   }
 
-  private createTouchControls(): void {
-    // Create touch controls
+  private createTouchControls(scaleX: number, scaleY: number): void {
+    const gameWidth = this.sys.game.canvas.width;
+    const gameHeight = this.sys.game.canvas.height;
+    
+    // Button size scaled appropriately
+    const buttonSize = 50 * Math.min(scaleX, scaleY);
+    
+    // Create touch controls with proper scaling
     if (this.touchControls) {
-      this.touchControls.leftButton = this.add.rectangle(10, GAME_HEIGHT - 50, 50, 50, 0xffffff) as Phaser.GameObjects.Rectangle;
-      this.touchControls.rightButton = this.add.rectangle(70, GAME_HEIGHT - 50, 50, 50, 0xffffff) as Phaser.GameObjects.Rectangle;
-      this.touchControls.jumpButton = this.add.rectangle(130, GAME_HEIGHT - 50, 50, 50, 0xffffff) as Phaser.GameObjects.Rectangle;
-      this.touchControls.attackButton = this.add.rectangle(190, GAME_HEIGHT - 50, 50, 50, 0xffffff) as Phaser.GameObjects.Rectangle;
-      this.touchControls.specialButton = this.add.rectangle(250, GAME_HEIGHT - 50, 50, 50, 0xffffff) as Phaser.GameObjects.Rectangle;
-      this.touchControls.blockButton = this.add.rectangle(310, GAME_HEIGHT - 50, 50, 50, 0xffffff) as Phaser.GameObjects.Rectangle;
+      this.touchControls.leftButton = this.add.rectangle(10 * scaleX, gameHeight - (50 * scaleY), buttonSize, buttonSize, 0xffffff) as Phaser.GameObjects.Rectangle;
+      this.touchControls.rightButton = this.add.rectangle(70 * scaleX, gameHeight - (50 * scaleY), buttonSize, buttonSize, 0xffffff) as Phaser.GameObjects.Rectangle;
+      this.touchControls.jumpButton = this.add.rectangle(130 * scaleX, gameHeight - (50 * scaleY), buttonSize, buttonSize, 0xffffff) as Phaser.GameObjects.Rectangle;
+      this.touchControls.attackButton = this.add.rectangle(190 * scaleX, gameHeight - (50 * scaleY), buttonSize, buttonSize, 0xffffff) as Phaser.GameObjects.Rectangle;
+      this.touchControls.specialButton = this.add.rectangle(250 * scaleX, gameHeight - (50 * scaleY), buttonSize, buttonSize, 0xffffff) as Phaser.GameObjects.Rectangle;
+      this.touchControls.blockButton = this.add.rectangle(310 * scaleX, gameHeight - (50 * scaleY), buttonSize, buttonSize, 0xffffff) as Phaser.GameObjects.Rectangle;
     } else {
       console.warn('touchControls object not initialized');
     }
@@ -505,7 +568,14 @@ class KidsFightScene extends Phaser.Scene {
       const health = this.playerHealth[playerIndex];
       const maxHealth = this.TOTAL_HEALTH;
       const healthRatio = Math.max(0, health / maxHealth);
-      const newWidth = 200 * healthRatio; // 200px is the max width
+      
+      // Get the current game dimensions
+      const gameWidth = this.sys.game.canvas.width;
+      const scaleX = gameWidth / GAME_WIDTH;
+      
+      // Scale the health bar width
+      const maxBarWidth = 200 * scaleX;
+      const newWidth = maxBarWidth * healthRatio;
 
       // Get the appropriate health bar
       const healthBar = playerIndex === 0 ? this.healthBar1 : this.healthBar2;
@@ -521,23 +591,29 @@ class KidsFightScene extends Phaser.Scene {
         if (typeof healthBar.fillStyle === 'function') {
           healthBar.fillStyle(playerIndex === 0 ? 0x00ff00 : 0xff0000);
           if (typeof healthBar.fillRect === 'function') {
-            const xPos = playerIndex === 0 ? 10 : GAME_WIDTH - 210;
-            healthBar.fillRect(xPos, 10, newWidth, 20);
+            const xPos = playerIndex === 0 ? 10 * scaleX : gameWidth - (210 * scaleX);
+            const yPos = 10 * (gameWidth / GAME_WIDTH);
+            healthBar.fillRect(xPos, yPos, newWidth, 20 * (gameWidth / GAME_WIDTH));
           }
         }
       }
 
-      console.log(`Health bar updated for player ${playerIndex + 1} with ratio: ${healthRatio}`);
+      console.log(`Health bar updated for player ${playerIndex + 1} with ratio: ${healthRatio}, width: ${newWidth}`);
     }
   }
-
-  // Methods needed by tests
 
   // Stretch background method for scenario backgrounds
   stretchBackground(bg: any): void {
     if (!bg) return;
-    // Implementation for stretching background sprites
-    // The scenarioBackgroundStretch tests rely on this method
+    
+    // Get the current game dimensions
+    const gameWidth = this.sys.game.canvas.width;
+    const gameHeight = this.sys.game.canvas.height;
+    
+    // Stretch the background to fill the entire screen
+    bg.setDisplaySize(gameWidth, gameHeight);
+    
+    console.log(`Stretched background to ${gameWidth}x${gameHeight}`);
   }
 
   // Update walking animation for player 1
