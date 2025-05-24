@@ -97,6 +97,31 @@ class ScenarioSelectScene extends Phaser.Scene {
 
     // Responsive layout update on resize
     this.scale.on('resize', this.updateLayout, this);
+
+    // Listen for scenario_selected message if online
+    if (this.mode === 'online') {
+      if (!this.wsManager) {
+        // Try to get global instance if not injected
+        // @ts-ignore
+        this.wsManager = window.wsManager || null;
+      }
+      if (this.wsManager && this.wsManager.setMessageCallback) {
+        this.wsManager.setMessageCallback((event: MessageEvent) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'scenario_selected') {
+              this.scene.start('KidsFightScene', {
+                mode: this.mode,
+                selected: this.selected,
+                scenario: data.scenario,
+                roomCode: this.roomCode,
+                isHost: this.isHost
+              });
+            }
+          } catch (e) { /* ignore */ }
+        });
+      }
+    }
   }
 
   private createNavigationButtons(): void {
@@ -155,8 +180,29 @@ class ScenarioSelectScene extends Phaser.Scene {
     });
 
     // Button click handlers
-    this.readyButton.on('pointerdown', () => this.startGame());
-    this.backButton.on('pointerdown', () => this.goBack());
+    if (this.mode === 'online' && this.isHost) {
+      this.readyButton.on('pointerdown', () => {
+        // Send scenario_selected message to server
+        if (this.wsManager) {
+          this.wsManager.send(JSON.stringify({
+            type: 'scenario_selected',
+            scenario: SCENARIOS[this.selectedScenario].key,
+            roomCode: this.roomCode
+          }));
+        }
+        // Immediately transition for host
+        this.scene.start('KidsFightScene', {
+          mode: this.mode,
+          selected: this.selected,
+          scenario: SCENARIOS[this.selectedScenario].key,
+          roomCode: this.roomCode,
+          isHost: this.isHost
+        });
+      });
+    } else if (this.mode === 'local') {
+      this.readyButton.on('pointerdown', () => this.startGame());
+      this.backButton.on('pointerdown', () => this.goBack());
+    }
   }
 
   private changeScenario(direction: number): void {

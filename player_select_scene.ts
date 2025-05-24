@@ -340,6 +340,11 @@ export default class PlayerSelectScene extends Phaser.Scene {
         button.setStyle({ backgroundColor: '#4a4a4a' });
       });
     });
+    // DEBUG: Add pointerdown for readyButton (start game)
+    this.readyButton.on('pointerdown', () => {
+      console.log('[PlayerSelectScene] Ready button clicked');
+      this.launchGame();
+    });
   }
 
   private updateSelectionIndicators(): void {
@@ -478,25 +483,41 @@ export default class PlayerSelectScene extends Phaser.Scene {
       if (DEV) console.log('[PlayerSelectScene] Not starting game: players not ready.');
       return;
     }
-    // Existing logic
-    if (this.mode === 'online' && this.wsManager) {
-      const message: GameStartWebSocketMessage = {
-        type: 'gameStart',
-        p1Char: this.selected.p1,
-        p2Char: this.selected.p2,
-        roomCode: this.roomCode || ''
-      };
-      this.wsManager.send(JSON.stringify(message));
-    } else {
-      this.scene.start('GameScene', {
-        player1Character: this.selected.p1,
-        player2Character: this.selected.p2,
-        mode: this.mode,
-        isHost: this.isHost,
-        p1Index: this.p1Index,
-        p2Index: this.p2Index
-      });
+    if (this.mode === 'online') {
+      if (this.isHost) {
+        // Host transitions to scenario selection
+        this.scene.start('ScenarioSelectScene', {
+          mode: this.mode,
+          selected: this.selected,
+          roomCode: this.roomCode,
+          isHost: this.isHost
+        });
+      } else {
+        // Guest sees waiting message
+        if (this.waitingText) this.waitingText.setVisible(true);
+        else {
+          const w = this.cameras.main.width;
+          const h = this.cameras.main.height;
+          this.waitingText = this.add.text(w/2, h*0.92, 'Aguardando o anfitrião escolher o cenário...', {
+            fontSize: '22px',
+            color: '#fff',
+            backgroundColor: '#222',
+            padding: { x: 16, y: 8 },
+            fontFamily: 'monospace'
+          }).setOrigin(0.5);
+        }
+      }
+      return;
     }
+    // Local mode: start game directly
+    this.scene.start('GameScene', {
+      player1Character: this.selected.p1,
+      player2Character: this.selected.p2,
+      mode: this.mode,
+      isHost: this.isHost,
+      p1Index: this.p1Index,
+      p2Index: this.p2Index
+    });
     if (DEV) {
       console.log('[PlayerSelectScene] Starting game with:', {
         p1: this.selected.p1,

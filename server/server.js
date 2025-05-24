@@ -104,6 +104,26 @@ server.on('connection', (ws) => {
         //   }
         //   break;
           
+        case 'scenario_selected':
+          const scRoom = gameRooms.get(roomCode);
+          if (!scRoom) return;
+          // Forward scenario selection to both players
+          if (scRoom.host) {
+            scRoom.host.send(JSON.stringify({
+              type: 'scenario_selected',
+              scenario: data.scenario,
+              roomCode: roomCode
+            }));
+          }
+          if (scRoom.client) {
+            scRoom.client.send(JSON.stringify({
+              type: 'scenario_selected',
+              scenario: data.scenario,
+              roomCode: roomCode
+            }));
+          }
+          break;
+
         case 'game_action':
           const currentRoom = gameRooms.get(roomCode);
           if (!currentRoom) return;
