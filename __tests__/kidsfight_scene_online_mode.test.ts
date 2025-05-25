@@ -1,0 +1,414 @@
+// --- Ensure WebSocketManager is mocked at the module level ---
+const mockWebSocketManager = {
+  connect: jest.fn().mockResolvedValue(undefined),
+  on: jest.fn(),
+  send: jest.fn(),
+  close: jest.fn(),
+  sendGameAction: jest.fn(),
+  sendPlayerDamage: jest.fn()
+};
+jest.mock('../websocket_manager', () => ({
+  __esModule: true,
+  default: mockWebSocketManager,
+  WebSocketManager: Object.assign(
+    jest.fn(() => mockWebSocketManager),
+    { getInstance: jest.fn(() => mockWebSocketManager) }
+  )
+}));
+
+import KidsFightScene from '../kidsfight_scene';
+import Phaser from 'phaser';
+
+// Helper to create a mock player
+function createMockPlayer() {
+  const player = {
+    setVelocityX: jest.fn(),
+    setVelocityY: jest.fn(),
+    setFlipX: jest.fn(),
+    setScale: jest.fn(),
+    setCollideWorldBounds: jest.fn(),
+    setBounce: jest.fn(),
+    body: { 
+      velocity: { x: 0, y: 0 }, 
+      touching: { down: true },
+      onFloor: jest.fn().mockReturnValue(true),
+      setVelocityX: jest.fn(),
+      setVelocityY: jest.fn(),
+      setSize: jest.fn(),
+      allowGravity: true,
+      immovable: false
+    },
+    x: 0,
+    y: 0,
+    setAccelerationX: jest.fn(),
+    setAccelerationY: jest.fn(),
+    setMaxVelocityX: jest.fn(),
+    setMaxVelocityY: jest.fn(),
+    setDragX: jest.fn(),
+    setDragY: jest.fn(),
+    getData: jest.fn().mockReturnValue(false),
+    setData: jest.fn(),
+    anims: {
+      play: jest.fn(),
+      currentAnim: { key: 'idle' }
+    },
+    texture: { key: 'player' },
+    active: true
+  };
+  // Ensure setVelocityX is a Jest spy and reset before each test
+  player.setVelocityX.mockClear();
+  return player;
+}
+
+// Helper to create a mock scene with the minimum required properties
+function createOnlineTestScene({ isHost }: { isHost: boolean }) {
+  // Use the real KidsFightScene, not a stub or subclass
+  const scene = new KidsFightScene();
+  scene.gameMode = 'online';
+  scene.isHost = isHost;
+  const player1 = createMockPlayer();
+  const player2 = createMockPlayer();
+  player1.x = 100;
+  player1.y = 300;
+  player2.x = 500;
+  player2.y = 300;
+  scene.player1 = player1;
+  scene.player2 = player2;
+  scene.wsManager = mockWebSocketManager;
+  scene.keys = {
+    left: { isDown: false },
+    right: { isDown: false },
+    up: { isDown: false },
+    down: { isDown: false },
+    attack: { isDown: false },
+    special: { isDown: false },
+    block: { isDown: false },
+    v: { isDown: false },
+    b: { isDown: false },
+    k: { isDown: false },
+    l: { isDown: false }
+  };
+  scene.playerBlocking = [false, false];
+  scene.isAttacking = [false, false];
+  scene.updatePlayerAnimation = jest.fn();
+  // Remove any stub for update or handleRemoteAction so real logic runs
+  delete scene.update;
+  delete scene.handleRemoteAction;
+  return scene;
+}
+
+// Create a test scene class that extends KidsFightScene for testing
+class TestKidsFightScene extends KidsFightScene {
+  // Override private properties to make them accessible for testing
+  public player1: Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
+  public player2: Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
+  public wsManager: any;
+  public isHost: boolean;
+  public gameMode: string;
+  public keys: {
+    left: Phaser.Input.Keyboard.Key;
+    right: Phaser.Input.Keyboard.Key;
+    up: Phaser.Input.Keyboard.Key;
+    down: Phaser.Input.Keyboard.Key;
+    attack: Phaser.Input.Keyboard.Key;
+    special: Phaser.Input.Keyboard.Key;
+    block: Phaser.Input.Keyboard.Key;
+    v: Phaser.Input.Keyboard.Key;
+    b: Phaser.Input.Keyboard.Key;
+    k: Phaser.Input.Keyboard.Key;
+    l: Phaser.Input.Keyboard.Key;
+  };
+  
+  constructor() {
+    super({});
+    
+    // Initialize test keys
+    this.keys = {
+      left: { isDown: false } as Phaser.Input.Keyboard.Key,
+      right: { isDown: false } as Phaser.Input.Keyboard.Key,
+      up: { isDown: false } as Phaser.Input.Keyboard.Key,
+      down: { isDown: false } as Phaser.Input.Keyboard.Key,
+      attack: { isDown: false } as Phaser.Input.Keyboard.Key,
+      special: { isDown: false } as Phaser.Input.Keyboard.Key,
+      block: { isDown: false } as Phaser.Input.Keyboard.Key,
+      v: { isDown: false } as Phaser.Input.Keyboard.Key,
+      b: { isDown: false } as Phaser.Input.Keyboard.Key,
+      k: { isDown: false } as Phaser.Input.Keyboard.Key,
+      l: { isDown: false } as Phaser.Input.Keyboard.Key
+    };
+    
+    // Initialize players with required properties
+    this.player1 = this.createMockPlayer();
+    this.player2 = this.createMockPlayer();
+    
+    // Set up WebSocket manager mock
+    this.wsManager = mockWebSocketManager;
+  }
+  
+  // Helper to create a mock player with required properties
+  private createMockPlayer(): Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body } {
+    return {
+      // Required Phaser.Sprite properties
+      scene: this,
+      x: 0,
+      y: 0,
+      width: 50,
+      height: 50,
+      scale: 1,
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 1,
+      visible: true,
+      active: true,
+      texture: { key: 'player' } as Phaser.Textures.Texture,
+      frame: { name: '' } as Phaser.Textures.Frame,
+      
+      // Required Phaser.Physics.Arcade.Sprite properties
+      body: {
+        velocity: { x: 0, y: 0 },
+        allowGravity: true,
+        immovable: false,
+        enable: true,
+        touching: { down: true, up: false, left: false, right: false, none: false },
+        wasTouching: { down: false, up: false, left: false, right: false, none: false },
+        blocked: { down: false, up: false, left: false, right: false, none: false },
+        onFloor: () => true,
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+        setSize: jest.fn(),
+        setAllowGravity: jest.fn(),
+        setImmovable: jest.fn(),
+        setBounce: jest.fn(),
+        setCollideWorldBounds: jest.fn(),
+        setSize: jest.fn(),
+        setOffset: jest.fn(),
+        reset: jest.fn(),
+        stop: jest.fn(),
+        // Add other required body properties
+      } as unknown as Phaser.Physics.Arcade.Body,
+      
+      // Mock methods
+      setVelocityX: jest.fn(),
+      setVelocityY: jest.fn(),
+      setAccelerationX: jest.fn(),
+      setAccelerationY: jest.fn(),
+      setMaxVelocityX: jest.fn(),
+      setMaxVelocityY: jest.fn(),
+      setDragX: jest.fn(),
+      setDragY: jest.fn(),
+      setBounce: jest.fn(),
+      setCollideWorldBounds: jest.fn(),
+      setScale: jest.fn(),
+      setFlipX: jest.fn(),
+      setFlipY: jest.fn(),
+      setOrigin: jest.fn(),
+      setSize: jest.fn(),
+      setDisplaySize: jest.fn(),
+      setAlpha: jest.fn(),
+      setVisible: jest.fn(),
+      setActive: jest.fn(),
+      setData: jest.fn(),
+      getData: jest.fn().mockReturnValue(false),
+      getCenter: jest.fn().mockReturnValue({ x: 0, y: 0 }),
+      getBounds: jest.fn().mockReturnValue({ x: 0, y: 0, width: 50, height: 50 }),
+      anims: {
+        play: jest.fn(),
+        chain: jest.fn(),
+        playAfterDelay: jest.fn(),
+        playAfterRepeat: jest.fn(),
+        currentAnim: { key: 'idle' } as Phaser.Animations.Animation,
+        // Add other required anims properties
+      },
+      // Add other required sprite methods
+    } as unknown as Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
+  }
+  
+  // Override update method to make it public for testing
+  public update(time: number, delta: number): void {
+    super.update(time, delta);
+  }
+  
+  // Override handleRemoteAction to make it public for testing
+  public handleRemoteAction(action: any): void {
+    super.handleRemoteAction(action);
+  }
+}
+
+describe('KidsFightScene - Online Mode', () => {
+  let scene: TestKidsFightScene;
+  
+  beforeEach(() => {
+    // Create a new test scene for each test
+    scene = new TestKidsFightScene();
+    
+    // Set up game mode and host status
+    scene.gameMode = 'online';
+    scene.isHost = true;
+    
+    // Robust player mocks for movement and animation
+    const mockPlayer1 = {
+      setVelocityX: jest.fn(),
+      setVelocityY: jest.fn(),
+      setFlipX: jest.fn(),
+      setData: jest.fn(),
+      getData: jest.fn(),
+      active: true,
+      body: {
+        touching: { down: true },
+        onFloor: jest.fn(() => true),
+        enable: true,
+        velocity: { x: 0, y: 0 },
+        setSize: jest.fn()
+      },
+      x: 0,
+      y: 0,
+      destroy: jest.fn(),
+      play: jest.fn(),
+      setOrigin: jest.fn(),
+      setDepth: jest.fn(),
+      anims: { play: jest.fn() },
+      texture: { key: 'player1' }
+    };
+    const mockPlayer2 = {
+      setVelocityX: jest.fn(),
+      setVelocityY: jest.fn(),
+      setFlipX: jest.fn(),
+      setData: jest.fn(),
+      getData: jest.fn(),
+      active: true,
+      width: 64,
+      height: 128,
+      body: {
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+        setSize: jest.fn(),
+        touching: { down: true }
+      },
+      x: 0,
+      y: 0,
+      destroy: jest.fn(),
+      play: jest.fn(),
+      setOrigin: jest.fn(),
+      setDepth: jest.fn(),
+      anims: { play: jest.fn() },
+      texture: { key: 'player2' }
+    };
+    scene.player1 = mockPlayer1;
+    scene.player2 = mockPlayer2;
+    scene.wsManager = { sendGameAction: jest.fn() };
+    
+    // Setup keys
+    scene.keys = {
+      left: { isDown: false },
+      right: { isDown: false },
+      up: { isDown: false },
+      down: { isDown: false },
+      attack: { isDown: false },
+      special: { isDown: false },
+      block: { isDown: false }
+    };
+    
+    // Reset all mocks
+    jest.clearAllMocks();
+  });
+  
+  describe('Player Movement', () => {
+    it('should allow player1 movement as guest in online mode', () => {
+      scene.isHost = false;
+      scene.gameMode = 'online';
+      scene.player1.setVelocityX = jest.fn();
+      scene.player1.setFlipX = jest.fn();
+      scene.player1.setData = jest.fn();
+      scene.player1.getData = jest.fn();
+      scene.handleRemoteAction({ type: 'move', playerIndex: 1, direction: 1 });
+      expect(scene.player1.setVelocityX).toHaveBeenCalledWith(160);
+      expect(scene.player1.setFlipX).toHaveBeenCalledWith(false);
+    });
+    
+    it('should NOT move player2 as host in online mode', () => {
+      scene.isHost = true;
+      scene.gameMode = 'online';
+      scene.player2.setVelocityX = jest.fn();
+      scene.player2.setFlipX = jest.fn();
+      scene.player2.setData = jest.fn();
+      scene.player2.getData = jest.fn();
+      scene.keys.right.isDown = true;
+      scene.update(0, 1000);
+      expect(scene.player2.setVelocityX).not.toHaveBeenCalled();
+    });
+    
+    it('should handle remote movement actions', () => {
+      // Simulate receiving a remote movement action for player1 (host)
+      const moveAction = {
+        type: 'move',
+        playerIndex: 0,
+        direction: 1
+      };
+      
+      // Call handleRemoteAction directly
+      scene.handleRemoteAction(moveAction);
+      
+      // Should update player1 velocity based on remote action
+      expect(scene.player1.setVelocityX).toHaveBeenCalledWith(160);
+      expect(scene.player1.setFlipX).toHaveBeenCalledWith(false);
+    });
+    
+    it('should handle remote jump actions', () => {
+      // Simulate receiving a remote jump action for player1 (host)
+      const jumpAction = {
+        type: 'jump',
+        playerIndex: 0
+      };
+      
+      // Call handleRemoteAction directly
+      scene.handleRemoteAction(jumpAction);
+      
+      // Should make player1 jump
+      expect(scene.player1.setVelocityY).toHaveBeenCalledWith(-330);
+    });
+  });
+  
+  describe('Attacks and Specials', () => {
+    it('should handle remote attack actions', () => {
+      // Mock tryAttack method
+      const originalTryAttack = scene['tryAttack'];
+      scene['tryAttack'] = jest.fn();
+      
+      // Simulate receiving a remote attack action for player1 (host)
+      const attackAction = {
+        type: 'attack',
+        playerIndex: 0
+      };
+      
+      // Call handleRemoteAction directly
+      scene.handleRemoteAction(attackAction);
+      
+      // Should call tryAttack with correct parameters
+      expect(scene['tryAttack']).toHaveBeenCalledWith(
+        0,
+        scene.player1,
+        scene.player2,
+        expect.any(Number),
+        false
+      );
+      
+      // Restore original method
+      scene['tryAttack'] = originalTryAttack;
+    });
+    
+    it('should handle remote block actions', () => {
+      // Simulate receiving a remote block action for player1 (host)
+      const blockAction = {
+        type: 'block',
+        playerIndex: 0,
+        active: true
+      };
+      
+      // Call handleRemoteAction directly
+      scene.handleRemoteAction(blockAction);
+      
+      // Should update player1's blocking state
+      expect(scene.player1.setData).toHaveBeenCalledWith('isBlocking', true);
+    });
+  });
+});

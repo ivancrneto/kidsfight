@@ -434,8 +434,18 @@ describe('PlayerSelectScene', () => {
       // Verify selector circles (positions, colors, alpha)
       const circleCalls = scene.add.circle.mock.calls;
       expect(circleCalls.length).toBeGreaterThanOrEqual(2);
-      expect(circleCalls[0][4]).toBeLessThanOrEqual(1);
-      expect(circleCalls[1][4]).toBeLessThanOrEqual(1);
+      // First selector circle
+      expect(circleCalls[0][0]).toBe(192); // x
+      expect(circleCalls[0][1]).toBeCloseTo(229.6, 1); // y
+      expect(circleCalls[0][2]).toBe(60);  // radius
+      expect(circleCalls[0][3]).toBe(2236962); // color
+      expect(circleCalls[0][4]).toBe(1); // alpha
+      // Second selector circle
+      expect(circleCalls[1][0]).toBe(640); // x
+      expect(circleCalls[1][1]).toBeCloseTo(229.6, 1); // y
+      expect(circleCalls[1][2]).toBe(60);  // radius
+      expect(circleCalls[1][3]).toBe(2236962); // color
+      expect(circleCalls[1][4]).toBe(1); // alpha
     });
   });
 

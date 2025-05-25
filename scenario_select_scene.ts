@@ -138,6 +138,7 @@ class ScenarioSelectScene extends Phaser.Scene {
             const data = JSON.parse(event.data);
             if (data.type === 'scenario_selected') {
               this.scene.start('KidsFightScene', {
+                gameMode: 'online',
                 mode: this.mode,
                 selected: this.selected,
                 scenario: data.scenario,
@@ -242,6 +243,7 @@ class ScenarioSelectScene extends Phaser.Scene {
         console.log('[ScenarioSelectScene] Host transitioning to KidsFightScene');
         // Immediately transition for host
         this.scene.start('KidsFightScene', {
+          gameMode: 'online',
           mode: this.mode,
           selected: this.selected,
           scenario: SCENARIOS[this.selectedScenario].key,

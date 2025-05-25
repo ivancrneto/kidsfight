@@ -524,6 +524,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
                 console.log('[Guest] Received game_start:', data);
                 // Transition to fight scene with correct character selection
                 this.scene.start('KidsFightScene', {
+                  gameMode: 'online',
                   mode: this.mode,
                   selected: { p1: data.p1Char, p2: data.p2Char },
                   scenario: data.scenario,

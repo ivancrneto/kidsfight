@@ -17,11 +17,12 @@ server.on('connection', (ws) => {
       switch (data.type) {
         case 'create_room':
           // Generate a unique room code
-          roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-          while (gameRooms.has(roomCode)) {
-            roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-          }
-          
+          // roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+          // while (gameRooms.has(roomCode)) {
+          //   roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+          // }
+          roomCode = '111111';
+
           // Create new room
           gameRooms.set(roomCode, {
             host: ws,
