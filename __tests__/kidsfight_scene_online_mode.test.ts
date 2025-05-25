@@ -18,6 +18,25 @@ jest.mock('../websocket_manager', () => ({
 
 import KidsFightScene from '../kidsfight_scene';
 import Phaser from 'phaser';
+import { createMockPhysicsAdd } from './test-utils';
+
+// Helper to ensure player.body.blocked.down is always defined
+function ensureBlockedDown(player) {
+  if (!player) return;
+  if (!player.body) player.body = {};
+  if (!player.body.blocked) player.body.blocked = {};
+  player.body.blocked.down = true;
+  if (!player.body.velocity) player.body.velocity = {};
+  if (typeof player.body.velocity.x !== 'number') player.body.velocity.x = 0;
+  if (typeof player.body.velocity.y !== 'number') player.body.velocity.y = 0;
+}
+
+// Defensive utility to always ensure setFrame exists
+function ensureSetFrame(player) {
+  if (player && typeof player.setFrame !== 'function') {
+    player.setFrame = jest.fn();
+  }
+}
 
 // Helper to create a mock player
 function createMockPlayer() {
@@ -28,42 +47,100 @@ function createMockPlayer() {
     setScale: jest.fn(),
     setCollideWorldBounds: jest.fn(),
     setBounce: jest.fn(),
+    setOrigin: jest.fn(),
+    setFrame: jest.fn(),
+    setVisible: jest.fn(),
+    destroy: jest.fn(),
+    setGravityY: jest.fn(),
+    setSize: jest.fn(),
+    setOffset: jest.fn(),
+    setDepth: jest.fn(),
     body: { 
       velocity: { x: 0, y: 0 }, 
       touching: { down: true },
-      onFloor: jest.fn().mockReturnValue(true),
+      blocked: { down: true, up: false, left: false, right: false },
       setVelocityX: jest.fn(),
       setVelocityY: jest.fn(),
       setSize: jest.fn(),
+      setOffset: jest.fn(),
       allowGravity: true,
-      immovable: false
+      immovable: false,
+      enable: true,
+      onFloor: jest.fn().mockReturnValue(true),
+      x: 0,
+      y: 0,
+      width: 50,
+      height: 100
     },
     x: 0,
     y: 0,
+    width: 50,
+    height: 100,
     setAccelerationX: jest.fn(),
     setAccelerationY: jest.fn(),
     setMaxVelocityX: jest.fn(),
     setMaxVelocityY: jest.fn(),
     setDragX: jest.fn(),
     setDragY: jest.fn(),
-    getData: jest.fn().mockReturnValue(false),
+    getData: jest.fn((key) => {
+      if (key === 'isBlocking') return false;
+      return undefined;
+    }),
     setData: jest.fn(),
     anims: {
       play: jest.fn(),
-      currentAnim: { key: 'idle' }
+      currentAnim: { key: 'idle' },
+      get: jest.fn().mockReturnValue({ key: 'idle' })
     },
     texture: { key: 'player' },
-    active: true
+    active: true,
+    health: 100,
+    special: 0,
+    isBlocking: false,
+    isAttacking: false,
+    direction: 'right',
+    walkAnimData: {
+      frameTime: 0,
+      currentFrame: 0,
+      frameDelay: 0
+    }
   };
-  // Ensure setVelocityX is a Jest spy and reset before each test
-  player.setVelocityX.mockClear();
+  
+  // Set up method chaining
+  player.setVelocityX.mockImplementation((x) => {
+    player.body.velocity.x = x;
+    return player;
+  });
+  
+  player.setVelocityY.mockImplementation((y) => {
+    player.body.velocity.y = y;
+    return player;
+  });
+  
+  // Defensive check to ensure player.body.blocked.down is always defined
+  if (!player.body) player.body = {};
+  if (!player.body.blocked) player.body.blocked = {};
+  if (typeof player.body.blocked.down === 'undefined') player.body.blocked.down = true;
+  
   return player;
+}
+
+// Defensive utility to always ensure body.blocked.down exists and is true
+function ensureBlockedDown(player) {
+  if (!player) return;
+  if (!player.body) player.body = {};
+  if (!player.body.blocked) player.body.blocked = {};
+  player.body.blocked.down = true;
+  if (!player.body.velocity) player.body.velocity = {};
+  if (typeof player.body.velocity.x !== 'number') player.body.velocity.x = 0;
+  if (typeof player.body.velocity.y !== 'number') player.body.velocity.y = 0;
 }
 
 // Helper to create a mock scene with the minimum required properties
 function createOnlineTestScene({ isHost }: { isHost: boolean }) {
   // Use the real KidsFightScene, not a stub or subclass
   const scene = new KidsFightScene();
+  scene.physics = { add: {}, pause: jest.fn() };
   scene.gameMode = 'online';
   scene.isHost = isHost;
   const player1 = createMockPlayer();
@@ -74,6 +151,10 @@ function createOnlineTestScene({ isHost }: { isHost: boolean }) {
   player2.y = 300;
   scene.player1 = player1;
   scene.player2 = player2;
+  ensureBlockedDown(scene.player1);
+  ensureBlockedDown(scene.player2);
+  ensureSetFrame(scene.player1);
+  ensureSetFrame(scene.player2);
   scene.wsManager = mockWebSocketManager;
   scene.keys = {
     left: { isDown: false },
@@ -138,89 +219,15 @@ class TestKidsFightScene extends KidsFightScene {
     };
     
     // Initialize players with required properties
-    this.player1 = this.createMockPlayer();
-    this.player2 = this.createMockPlayer();
+    this.player1 = createMockPlayer();
+    this.player2 = createMockPlayer();
+    ensureBlockedDown(this.player1);
+    ensureBlockedDown(this.player2);
+    ensureSetFrame(this.player1);
+    ensureSetFrame(this.player2);
     
     // Set up WebSocket manager mock
     this.wsManager = mockWebSocketManager;
-  }
-  
-  // Helper to create a mock player with required properties
-  private createMockPlayer(): Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body } {
-    return {
-      // Required Phaser.Sprite properties
-      scene: this,
-      x: 0,
-      y: 0,
-      width: 50,
-      height: 50,
-      scale: 1,
-      scaleX: 1,
-      scaleY: 1,
-      alpha: 1,
-      visible: true,
-      active: true,
-      texture: { key: 'player' } as Phaser.Textures.Texture,
-      frame: { name: '' } as Phaser.Textures.Frame,
-      
-      // Required Phaser.Physics.Arcade.Sprite properties
-      body: {
-        velocity: { x: 0, y: 0 },
-        allowGravity: true,
-        immovable: false,
-        enable: true,
-        touching: { down: true, up: false, left: false, right: false, none: false },
-        wasTouching: { down: false, up: false, left: false, right: false, none: false },
-        blocked: { down: false, up: false, left: false, right: false, none: false },
-        onFloor: () => true,
-        setVelocityX: jest.fn(),
-        setVelocityY: jest.fn(),
-        setSize: jest.fn(),
-        setAllowGravity: jest.fn(),
-        setImmovable: jest.fn(),
-        setBounce: jest.fn(),
-        setCollideWorldBounds: jest.fn(),
-        setSize: jest.fn(),
-        setOffset: jest.fn(),
-        reset: jest.fn(),
-        stop: jest.fn(),
-        // Add other required body properties
-      } as unknown as Phaser.Physics.Arcade.Body,
-      
-      // Mock methods
-      setVelocityX: jest.fn(),
-      setVelocityY: jest.fn(),
-      setAccelerationX: jest.fn(),
-      setAccelerationY: jest.fn(),
-      setMaxVelocityX: jest.fn(),
-      setMaxVelocityY: jest.fn(),
-      setDragX: jest.fn(),
-      setDragY: jest.fn(),
-      setBounce: jest.fn(),
-      setCollideWorldBounds: jest.fn(),
-      setScale: jest.fn(),
-      setFlipX: jest.fn(),
-      setFlipY: jest.fn(),
-      setOrigin: jest.fn(),
-      setSize: jest.fn(),
-      setDisplaySize: jest.fn(),
-      setAlpha: jest.fn(),
-      setVisible: jest.fn(),
-      setActive: jest.fn(),
-      setData: jest.fn(),
-      getData: jest.fn().mockReturnValue(false),
-      getCenter: jest.fn().mockReturnValue({ x: 0, y: 0 }),
-      getBounds: jest.fn().mockReturnValue({ x: 0, y: 0, width: 50, height: 50 }),
-      anims: {
-        play: jest.fn(),
-        chain: jest.fn(),
-        playAfterDelay: jest.fn(),
-        playAfterRepeat: jest.fn(),
-        currentAnim: { key: 'idle' } as Phaser.Animations.Animation,
-        // Add other required anims properties
-      },
-      // Add other required sprite methods
-    } as unknown as Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
   }
   
   // Override update method to make it public for testing
@@ -240,6 +247,7 @@ describe('KidsFightScene - Online Mode', () => {
   beforeEach(() => {
     // Create a new test scene for each test
     scene = new TestKidsFightScene();
+    scene.physics = { add: {}, pause: jest.fn() };
     
     // Set up game mode and host status
     scene.gameMode = 'online';
@@ -295,6 +303,10 @@ describe('KidsFightScene - Online Mode', () => {
     };
     scene.player1 = mockPlayer1;
     scene.player2 = mockPlayer2;
+    ensureBlockedDown(scene.player1);
+    ensureBlockedDown(scene.player2);
+    ensureSetFrame(scene.player1);
+    ensureSetFrame(scene.player2);
     scene.wsManager = { sendGameAction: jest.fn() };
     
     // Setup keys
@@ -310,6 +322,71 @@ describe('KidsFightScene - Online Mode', () => {
     
     // Reset all mocks
     jest.clearAllMocks();
+    
+    // Import the mock physics.add helper
+    if (scene && scene.physics) {
+      scene.physics.add = createMockPhysicsAdd();
+    }
+  });
+  
+  // Patch: Robust mock for physics.add.sprite with all Phaser chainable methods and body.blocked.down
+  function createMockSprite() {
+    return {
+      setVelocityX: jest.fn().mockReturnThis(),
+      setVelocityY: jest.fn().mockReturnThis(),
+      setFlipX: jest.fn().mockReturnThis(),
+      setFlipY: jest.fn().mockReturnThis(),
+      setScale: jest.fn().mockReturnThis(),
+      setCollideWorldBounds: jest.fn().mockReturnThis(),
+      setBounce: jest.fn().mockReturnThis(),
+      setGravityY: jest.fn().mockReturnThis(),
+      setSize: jest.fn().mockReturnThis(),
+      setOffset: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setOrigin: jest.fn().mockReturnThis(),
+      setFrame: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setAlpha: jest.fn().mockReturnThis(),
+      setActive: jest.fn().mockReturnThis(),
+      setData: jest.fn().mockReturnThis(),
+      getData: jest.fn().mockReturnValue(false),
+      getCenter: jest.fn().mockReturnValue({ x: 0, y: 0 }),
+      getBounds: jest.fn().mockReturnValue({ x: 0, y: 0, width: 50, height: 50 }),
+      destroy: jest.fn(),
+      anims: {
+        play: jest.fn().mockReturnThis(),
+        chain: jest.fn().mockReturnThis(),
+        playAfterDelay: jest.fn().mockReturnThis(),
+        playAfterRepeat: jest.fn().mockReturnThis(),
+        currentAnim: { key: 'idle' }
+      },
+      texture: { key: 'player' },
+      width: 64,
+      height: 128,
+      body: {
+        velocity: { x: 0, y: 0 },
+        touching: { down: true },
+        blocked: { down: true },
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+        setSize: jest.fn(),
+        setOffset: jest.fn(),
+        allowGravity: true,
+        immovable: false,
+        enable: true,
+        onFloor: jest.fn().mockReturnValue(true)
+      },
+      x: 0,
+      y: 0
+    };
+  }
+
+  // Patch physics.add.sprite in test setup
+  beforeEach(() => {
+    if (!scene.physics) scene.physics = { add: {}, pause: jest.fn() };
+    if (!scene.physics.add) scene.physics.add = {};
+    scene.physics.pause = jest.fn();
+    scene.physics.add.sprite = jest.fn(() => createMockSprite());
   });
   
   describe('Player Movement', () => {

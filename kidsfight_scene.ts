@@ -125,10 +125,8 @@ class KidsFightScene extends Phaser.Scene {
   private healthBarBg1?: Phaser.GameObjects.Rectangle;
   private healthBar1?: Phaser.GameObjects.Graphics;
   private healthBar2?: Phaser.GameObjects.Graphics;
-  private specialBar1?: Phaser.GameObjects.Rectangle;
-  private specialBar2?: Phaser.GameObjects.Rectangle;
-  private specialBarBg1?: Phaser.GameObjects.Rectangle;
-  private specialBarBg2?: Phaser.GameObjects.Rectangle;
+  private specialPips1: Phaser.GameObjects.Graphics[] = [];
+  private specialPips2: Phaser.GameObjects.Graphics[] = [];
   private specialReadyText1?: Phaser.GameObjects.Text;
   private specialReadyText2?: Phaser.GameObjects.Text;
   private wsManager: WebSocketManager = WebSocketManager.getInstance(); // Use the singleton instance
@@ -156,8 +154,6 @@ class KidsFightScene extends Phaser.Scene {
   private touchControlsVisible: boolean = false;
   private touchStartY: number = 0;
   attackCount: number[] = [0, 0];
-  private specialPips1: Phaser.GameObjects.Graphics[] = [];
-  private specialPips2: Phaser.GameObjects.Graphics[] = [];
   private p1SpriteKey: string = '';
   private p2SpriteKey: string = '';
   private attackHitboxes!: Phaser.Physics.Arcade.Group;
@@ -252,6 +248,15 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Reset game state
+    this.gameOver = false;
+    this.timeLeft = this.ROUND_TIME;
+    this.playerHealth = [MAX_HEALTH * 2, MAX_HEALTH * 2];
+    this.playerSpecial = [0, 0];
+    this.isAttacking = [false, false];
+    this.playerBlocking = [false, false];
+    this.attackCount = [0, 0];
+    
     // Get the current game dimensions
     const gameWidth = this.sys.game.canvas.width;
     const gameHeight = this.sys.game.canvas.height;
@@ -263,7 +268,9 @@ class KidsFightScene extends Phaser.Scene {
       p1: this.p1,
       p2: this.p2,
       selected: this.selected,
-      gameMode: this.gameMode
+      gameMode: this.gameMode,
+      playerHealth: this.playerHealth,
+      gameOver: this.gameOver
     });
     
     // Setup scene with proper scaling
@@ -360,6 +367,17 @@ class KidsFightScene extends Phaser.Scene {
 
     // Adjust the physics bodies to match the scaled sprites
     if (this.player1.body && this.player2.body) {
+      // --- ONLINE MODE: Set up WebSocket message handler ---
+      if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.setMessageCallback === 'function') {
+        this.wsManager.setMessageCallback((event: MessageEvent) => {
+          try {
+            const action = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            this.handleRemoteAction(action);
+          } catch (e) {
+            console.error('[KidsFightScene] Failed to parse remote action:', e, event);
+          }
+        });
+      }
       // Make hitbox slightly smaller than visual sprite for better gameplay
       this.player1.body.setSize(this.player1.width * 0.6, this.player1.height * 0.5);
       this.player2.body.setSize(this.player2.width * 0.6, this.player2.height * 0.5);
@@ -393,6 +411,7 @@ class KidsFightScene extends Phaser.Scene {
 
     // Create special bars
     this.createSpecialBars(scaleX, scaleY);
+    this.updateSpecialPips(); // Update special pips after creating
 
     // Create player names
     this.createPlayerNames(scaleX, scaleY);
@@ -410,7 +429,7 @@ class KidsFightScene extends Phaser.Scene {
     if (this.healthBar1) this.healthBar1.destroy();
     if (this.healthBar2) this.healthBar2.destroy();
 
-    // Draw single background bar (no more white bars)
+    // Draw single dark background bar (not white!)
     this.healthBarBg1 = this.add.rectangle(barX, barY, barWidth, barHeight, 0x222222).setOrigin(0.5, 0.5);
     this.healthBar1 = this.add.graphics(); // Player 1 (left)
     this.healthBar2 = this.add.graphics(); // Player 2 (right)
@@ -475,10 +494,52 @@ class KidsFightScene extends Phaser.Scene {
 
   private createSpecialBars(scaleX: number, scaleY: number): void {
     const gameWidth = this.sys.game.canvas.width;
+    const pipRadius = 10 * scaleX;
+    const pipSpacing = 30 * scaleX;
+    const pipY = 48 * scaleY;
 
-    // Create special bars with proper scaling
-    this.specialBar1 = this.add.rectangle(10 * scaleX, 40 * scaleY, 0, 20 * scaleY, 0x00ff00) as Phaser.GameObjects.Rectangle;
-    this.specialBar2 = this.add.rectangle(gameWidth - (210 * scaleX), 40 * scaleY, 0, 20 * scaleY, 0x00ff00) as Phaser.GameObjects.Rectangle;
+    // Remove old pips if they exist
+    this.specialPips1.forEach(pip => pip.destroy());
+    this.specialPips2.forEach(pip => pip.destroy());
+    this.specialPips1 = [];
+    this.specialPips2 = [];
+
+    // Draw 3 pips (special circles) for each player
+    for (let i = 0; i < 3; i++) {
+      // Player 1 (left)
+      const pip1 = this.add.graphics();
+      pip1.fillStyle(0xffffff, 0.3);
+      pip1.fillCircle(40 * scaleX + pipSpacing * i, pipY, pipRadius);
+      pip1.setDepth(10);
+      this.specialPips1.push(pip1);
+
+      // Player 2 (right)
+      const pip2 = this.add.graphics();
+      pip2.fillStyle(0xffffff, 0.3);
+      pip2.fillCircle(gameWidth - (40 * scaleX + pipSpacing * i), pipY, pipRadius);
+      pip2.setDepth(10);
+      this.specialPips2.push(pip2);
+    }
+    this.updateSpecialPips();
+  }
+
+  private updateSpecialPips(): void {
+    // Update fill color based on playerSpecial count
+    for (let i = 0; i < 3; i++) {
+      // Player 1
+      if (this.specialPips1[i]) {
+        this.specialPips1[i].clear();
+        // Fill with yellow if this pip is filled (earned), white if not
+        this.specialPips1[i].fillStyle(i < this.playerSpecial[0] ? 0xffe066 : 0xffffff, i < this.playerSpecial[0] ? 1 : 0.3);
+        this.specialPips1[i].fillCircle(40 * (this.sys.game.canvas.width/800) + 30 * (this.sys.game.canvas.width/800) * i, 48 * (this.sys.game.canvas.height/480), 10 * (this.sys.game.canvas.width/800));
+      }
+      // Player 2
+      if (this.specialPips2[i]) {
+        this.specialPips2[i].clear();
+        this.specialPips2[i].fillStyle(i < this.playerSpecial[1] ? 0xffe066 : 0xffffff, i < this.playerSpecial[1] ? 1 : 0.3);
+        this.specialPips2[i].fillCircle(this.sys.game.canvas.width - (40 * (this.sys.game.canvas.width/800) + 30 * (this.sys.game.canvas.width/800) * i), 48 * (this.sys.game.canvas.height/480), 10 * (this.sys.game.canvas.width/800));
+      }
+    }
   }
 
   private createPlayerNames(scaleX: number, scaleY: number): void {
@@ -663,10 +724,15 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   private handleSpecial(): void {
-    // Example: Play special animation or trigger special logic
-    if (this.player1 && !this.player1.getData('isSpecialAttacking')) {
+    // Only allow if enough special points
+    if (this.player1 && this.playerSpecial[0] >= this.SPECIAL_COST && !this.player1.getData('isSpecialAttacking')) {
       this.player1.setData('isSpecialAttacking', true);
-      // Play special animation or trigger special effect
+      // Spend special points
+      this.playerSpecial[0] -= this.SPECIAL_COST;
+      if (this.playerSpecial[0] < 0) this.playerSpecial[0] = 0;
+      this.updateSpecialPips();
+      // Actually perform special attack logic
+      this.tryAction(0, 'special', true);
       // Reset special attacking state after short delay
       this.time.delayedCall(700, () => {
         if (this.player1) this.player1.setData('isSpecialAttacking', false);
@@ -836,6 +902,7 @@ private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, 
     return;
   }
   if (!attacker || !defender) return;
+  
   console.log('[TRYATTACK] BEFORE', {
     playerIdx,
     defenderIdx,
@@ -843,8 +910,17 @@ private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, 
     player1Health: this.player1?.health,
     player2Health: this.player2?.health
   });
+  
   // Call the actual attack logic from gameUtils
   tryAttack(this, playerIdx, attacker, defender, now, special);
+  
+  // Sync health between player object and playerHealth array
+  if (defender === this.player1) {
+    this.player1.health = this.playerHealth[0];
+  } else if (defender === this.player2) {
+    this.player2.health = this.playerHealth[1];
+  }
+  
   console.log('[TRYATTACK] AFTER', {
     playerIdx,
     defenderIdx,
@@ -852,8 +928,25 @@ private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, 
     player1Health: this.player1?.health,
     player2Health: this.player2?.health
   });
-  // Update health bar UI
+  
+  // Update health bar UI and check for winner
   this.updateHealthBar(defenderIdx);
+  this.checkWinner();
+  
+  // Update special pips after attack
+  this.updateSpecialPips();
+  
+  // Award special points for successful hits
+  if (!special && playerIdx === 0) {
+    this.playerSpecial[0] = Math.min(3, this.playerSpecial[0] + 1);
+    console.log('[DEBUG] Player 1 special:', this.playerSpecial[0]);
+    this.updateSpecialPips();
+  }
+  if (!special && playerIdx === 1) {
+    this.playerSpecial[1] = Math.min(3, this.playerSpecial[1] + 1);
+    console.log('[DEBUG] Player 2 special:', this.playerSpecial[1]);
+    this.updateSpecialPips();
+  }
 }
 
 private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: number): void {
@@ -878,25 +971,25 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     // Optionally set a hit frame
     player.setFrame(3); // Example: frame 3 for hit
     // DEBUG
-    console.log('ANIM: HIT', playerIndex);
+    //console.log('ANIM: HIT', playerIndex);
   } else if (player.getData('isAttacking')) {
-    player.setFrame(4); // Frame 4 for attack
+    player.setFrame(5); // Frame 5 for attack
     // DEBUG
-    console.log('ANIM: ATTACK', playerIndex);
+    //console.log('ANIM: ATTACK', playerIndex);
   } else if (player.body && !player.body.blocked.down) {
     player.setFrame(0); // Use idle frame for jump (customize if needed)
     // DEBUG
-    console.log('ANIM: JUMP', playerIndex);
+    //console.log('ANIM: JUMP', playerIndex);
   } else if (player.body && player.body.blocked.down && Math.abs(player.body.velocity.x) > 2) {
     // Walking: alternate between frame 1 and 2
     const frame = (Math.floor(Date.now() / 120) % 2) + 1;
     player.setFrame(frame);
     // DEBUG
-    console.log('ANIM: WALK', playerIndex, player.body.velocity.x);
+    //console.log('ANIM: WALK', playerIndex, player.body.velocity.x);
   } else {
     player.setFrame(0); // Idle
     // DEBUG
-    console.log('ANIM: IDLE', playerIndex);
+    //console.log('ANIM: IDLE', playerIndex);
   }
 }
 
@@ -911,40 +1004,74 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     }
   }
 
-  private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, special: boolean) {
-    // Robustly determine defenderIdx
-    let defenderIdx = undefined;
-    if (defender === this.player1) defenderIdx = 0;
-    else if (defender === this.player2) defenderIdx = 1;
-    else {
-      console.error('[TRYATTACK] Could not determine defenderIdx!', defender, this.player1, this.player2);
-      return;
+  // private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, special: boolean) {
+  //   // Robustly determine defenderIdx
+  //   let defenderIdx = undefined;
+  //   if (defender === this.player1) defenderIdx = 0;
+  //   else if (defender === this.player2) defenderIdx = 1;
+  //   else {
+  //     console.error('[TRYATTACK] Could not determine defenderIdx!', defender, this.player1, this.player2);
+  //     return;
+  //   }
+  //   if (!attacker || !defender) return;
+  //   console.log('[TRYATTACK] BEFORE', {
+  //     playerIdx,
+  //     defenderIdx,
+  //     playerHealth: this.playerHealth.slice(),
+  //     player1Health: this.player1?.health,
+  //     player2Health: this.player2?.health
+  //   });
+  //   // Call the actual attack logic from gameUtils
+  //   tryAttack(this, playerIdx, attacker, defender, now, special);
+  //   console.log('[TRYATTACK] AFTER', {
+  //     playerIdx,
+  //     defenderIdx,
+  //     playerHealth: this.playerHealth.slice(),
+  //     player1Health: this.player1?.health,
+  //     player2Health: this.player2?.health
+  //   });
+  //   // Update health bar UI
+  //   this.updateHealthBar(defenderIdx);
+  //   this.updateSpecialPips(); // Update special pips after attack
+  // }
+
+  private checkWinner(): boolean {
+    if (this.gameOver) return false;
+    
+    // Check if player health is defined and less than or equal to 0
+    const p1Health = this.player1?.health ?? this.playerHealth[0];
+    const p2Health = this.player2?.health ?? this.playerHealth[1];
+    
+    if (p1Health <= 0) {
+      // Player 2 won
+      this.endGame(1, 'Player 2 Venceu!');
+      return true;
+    } else if (p2Health <= 0) {
+      // Player 1 won
+      this.endGame(0, 'Player 1 Venceu!');
+      return true;
+    } else if (this.timeLeft <= 0) {
+      // Time's up - check who has more health
+      if (p1Health > p2Health) {
+        this.endGame(0, 'Player 1 Venceu!');
+      } else if (p2Health > p1Health) {
+        this.endGame(1, 'Player 2 Venceu!');
+      } else {
+        this.endGame(-1, 'Empate!');
+      }
+      return true;
     }
-    if (!attacker || !defender) return;
-    console.log('[TRYATTACK] BEFORE', {
-      playerIdx,
-      defenderIdx,
-      playerHealth: this.playerHealth.slice(),
-      player1Health: this.player1?.health,
-      player2Health: this.player2?.health
-    });
-    // Call the actual attack logic from gameUtils
-    tryAttack(this, playerIdx, attacker, defender, now, special);
-    console.log('[TRYATTACK] AFTER', {
-      playerIdx,
-      defenderIdx,
-      playerHealth: this.playerHealth.slice(),
-      player1Health: this.player1?.health,
-      player2Health: this.player2?.health
-    });
-    // Update health bar UI
-    this.updateHealthBar(defenderIdx);
+    
+    return false;
   }
 
   update(): void {
     // Call animation update for both players every frame
     this.updatePlayerAnimation(0);
     this.updatePlayerAnimation(1);
+
+    // Check for a winner
+    this.checkWinner();
 
     // --- Player cross logic ---
     if (this.player1 && this.player2) {
@@ -961,7 +1088,6 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
         this.playerDirection[1] = 'left';
       }
     }
-    // Add any other per-frame logic here if needed
   }
 }
 

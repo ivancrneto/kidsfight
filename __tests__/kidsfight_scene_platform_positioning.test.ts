@@ -35,14 +35,45 @@ describe('KidsFightScene - Platform & Player Positioning', () => {
             setGravityY: jest.fn().mockReturnThis(),
             setSize: jest.fn().mockReturnThis(),
             setOffset: jest.fn().mockReturnThis(),
+            setFlipX: jest.fn().mockReturnThis(), // <-- add setFlipX
             body: { setSize: jest.fn(), setOffset: jest.fn(), setGravityY: jest.fn() }
           };
         })
       }
     } as any;
     scene.add = {
-      rectangle: jest.fn(() => ({ setDepth: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis() })),
-      image: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setDisplaySize: jest.fn().mockReturnThis() }))
+      rectangle: jest.fn(() => ({
+        setDepth: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        setOrigin: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+      })),
+      image: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setDisplaySize: jest.fn().mockReturnThis() })),
+      graphics: jest.fn(() => ({
+        clear: jest.fn().mockReturnThis(),
+        fillStyle: jest.fn().mockReturnThis(),
+        fillRect: jest.fn().mockReturnThis(),
+        fillCircle: jest.fn().mockReturnThis(),
+        lineStyle: jest.fn().mockReturnThis(),
+        strokeRect: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+      })),
+      text: jest.fn(() => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setFontSize: jest.fn().mockReturnThis(),
+        setColor: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        setText: jest.fn().mockReturnThis(),
+      }))
     } as any;
     scene.selected = { p1: 'player1', p2: 'player2' };
     scene.TOTAL_HEALTH = 100;

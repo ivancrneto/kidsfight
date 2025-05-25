@@ -18,11 +18,12 @@ export const createMockPlayer = () => ({
   on: jest.fn().mockReturnThis(),
   play: jest.fn().mockReturnThis(),
   body: {
+    blocked: { down: true },
+    velocity: { x: 0, y: 0 },
     setAllowGravity: jest.fn(),
     setImmovable: jest.fn(),
     setSize: jest.fn(),
     setOffset: jest.fn(),
-    velocity: { x: 0, y: 0 },
     setVelocityX: jest.fn(),
     setVelocityY: jest.fn(),
     setCollideWorldBounds: jest.fn(),

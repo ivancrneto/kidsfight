@@ -19,6 +19,7 @@ jest.mock('../websocket_manager', () => ({
 
 import KidsFightScene from '../kidsfight_scene';
 import Phaser from 'phaser';
+import { createMockPhysicsAdd } from './test-utils';
 
 type RemoteAction = {
   type: 'move' | 'jump' | 'attack' | 'special' | 'block';
@@ -162,6 +163,9 @@ describe('KidsFightScene - Online Mode', () => {
     // Create scene and set up test environment
     scene = new KidsFightScene();
     // Ensure physics.add has all required mocks: existing, sprite, collider
+    if (scene && scene.physics) {
+      scene.physics.add = createMockPhysicsAdd();
+    }
     scene.physics.add = {
       existing: jest.fn(obj => {
         if (obj && obj === scene.platform) {
@@ -175,32 +179,49 @@ describe('KidsFightScene - Online Mode', () => {
       sprite: jest.fn((x, y, key) => ({
         setVelocityX: jest.fn(),
         setVelocityY: jest.fn(),
-        setFlipX: jest.fn(),
+        setFlipX: jest.fn().mockReturnThis(),
         setData: jest.fn(),
         getData: jest.fn(),
         anims: { play: jest.fn() },
         texture: { key },
         width: 64,
         height: 128,
-        setScale: jest.fn(),
-        setCollideWorldBounds: jest.fn(),
-        setBounce: jest.fn(),
+        setScale: jest.fn().mockReturnThis(),
+        setCollideWorldBounds: jest.fn().mockReturnThis(),
+        setBounce: jest.fn().mockReturnThis(),
+        setOrigin: jest.fn().mockReturnThis(),
+        setFrame: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+        setGravityY: jest.fn().mockReturnThis(),
+        setSize: jest.fn().mockReturnThis(),
+        setOffset: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
         body: {
           setVelocityX: jest.fn(),
           setVelocityY: jest.fn(),
           setSize: jest.fn(),
           setOffset: jest.fn(),
-          touching: { down: true }
+          touching: { down: true },
+          blocked: { down: true },
         },
         x,
-        y
+        y,
       })),
       collider: jest.fn(),
       group: jest.fn(() => ({
         add: jest.fn(),
         clear: jest.fn(),
         children: { entries: [] }
-      }))
+      })),
+      staticGroup: jest.fn(() => ({
+        create: jest.fn().mockReturnValue({
+          setDisplaySize: jest.fn().mockReturnThis(),
+          setVisible: jest.fn().mockReturnThis(),
+          refreshBody: jest.fn().mockReturnThis()
+        }),
+        getChildren: jest.fn().mockReturnValue([])
+      })),
     };
     scene.player1 = mockPlayer1;
     scene.player2 = mockPlayer2;
@@ -240,33 +261,50 @@ describe('KidsFightScene - Online Mode', () => {
     };
     // Add updatePlayerAnimation as a spy if not present
     scene.updatePlayerAnimation = jest.fn();
-    // Mock scene.add.image to support method chaining for setOrigin and setDisplaySize
-    const fakeImage = {
-      setOrigin: jest.fn().mockReturnThis(),
-      setDisplaySize: jest.fn().mockReturnThis()
+    // Patch: Combine all scene.add mocks into one object
+    scene.add = {
+      image: jest.fn(() => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setDisplaySize: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+      })),
+      rectangle: jest.fn(() => ({
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        setFillStyle: jest.fn().mockReturnThis(),
+        setStrokeStyle: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+        setOrigin: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis(),
+      })),
+      graphics: jest.fn(() => ({
+        fillStyle: jest.fn().mockReturnThis(),
+        fillCircle: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        fillRect: jest.fn().mockReturnThis(),
+        clear: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+      })),
+      text: jest.fn(() => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        setFontSize: jest.fn().mockReturnThis(),
+        setColor: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        setStyle: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+      })),
     };
-    // Mock scene.add.rectangle to support method chaining as needed
-    const fakeRect = {
-      setOrigin: jest.fn().mockReturnThis(),
-      setDisplaySize: jest.fn().mockReturnThis(),
-      setDepth: jest.fn().mockReturnThis(),
-      setAlpha: jest.fn().mockReturnThis(),
-      setScrollFactor: jest.fn().mockReturnThis(),
-      setImmovable: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis()
-    };
-    scene.add = scene.add || {};
-    scene.add.image = jest.fn(() => fakeImage);
-    scene.add.rectangle = jest.fn(() => fakeRect);
-    // Mock scene.add.graphics to support health bar creation
-    scene.add.graphics = jest.fn(() => ({
-      fillStyle: jest.fn().mockReturnThis(),
-      fillRect: jest.fn().mockReturnThis(),
-      clear: jest.fn().mockReturnThis(),
-      lineStyle: jest.fn().mockReturnThis(),
-      strokeRect: jest.fn().mockReturnThis(),
-      setScrollFactor: jest.fn().mockReturnThis()
-    }));
     // Ensure sys.game.canvas and device are mocked before create()
     scene.sys = scene.sys || {};
     scene.sys.game = scene.sys.game || {};

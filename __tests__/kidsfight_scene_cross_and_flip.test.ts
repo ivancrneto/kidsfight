@@ -28,6 +28,8 @@ describe('KidsFightScene player cross and flip logic', () => {
     scene.player1 = mockPlayer1;
     scene.player2 = mockPlayer2;
     scene.playerDirection = ['right', 'left'];
+    // Mock physics with pause method
+    scene.physics = { pause: jest.fn() } as any;
   });
 
   it('should flipX and directions correctly when player1 is left of player2', () => {

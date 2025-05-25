@@ -2,11 +2,6 @@ import KidsFightScene from '../kidsfight_scene';
 
 // Create a testable version of KidsFightScene that exposes protected methods
 class TestableKidsFightScene extends KidsFightScene {
-  // Make protected methods accessible for testing
-  public testHandleRemoteAction(action: any) {
-    return this.handleRemoteAction(action);
-  }
-  
   // Mock required methods
   public create() {
     // No-op to avoid calling Phaser methods
@@ -19,6 +14,12 @@ class TestableKidsFightScene extends KidsFightScene {
   // Mock the checkHit method that's called by handleRemoteAction
   protected checkHit(playerIndex: number, attacker: any, target: any, isSpecial: boolean): void {
     // Mock implementation
+  }
+  
+  // Override the private method to make it accessible for testing
+  public testHandleRemoteAction(action: any) {
+    // @ts-ignore - We're intentionally accessing protected member for testing
+    return this.handleRemoteAction(action);
   }
 }
 
@@ -33,7 +34,28 @@ describe('handleRemoteAction', () => {
       setVelocityX: jest.fn(),
       setVelocityY: jest.fn(),
       setFlipX: jest.fn(),
+      setFrame: jest.fn(),
       setData: jest.fn(),
+      body: {
+        blocked: {
+          down: true,  // Simulate being on the ground by default
+          left: false,
+          right: false,
+          up: false,
+          none: false
+        },
+        touching: { down: true, left: false, right: false, up: false, none: false },
+        velocity: { x: 0, y: 0 },
+        setVelocityX: jest.fn().mockImplementation(function(this: any, x: number) {
+          this.velocity.x = x;
+        }),
+        setVelocityY: jest.fn().mockImplementation(function(this: any, y: number) {
+          this.velocity.y = y;
+        }),
+        setGravityY: jest.fn(),
+        setCollideWorldBounds: jest.fn(),
+        on: jest.fn()
+      },
       getData: jest.fn().mockImplementation(function(this: any, key: string) {
         if (!this._data) {
           this._data = {
@@ -43,7 +65,10 @@ describe('handleRemoteAction', () => {
             'specialCooldown': 0,
             'attackCooldown': 0,
             'health': 100,
-            'specialMeter': 0
+            'specialMeter': 0,
+            'lastDirection': 1,
+            'isJumping': false,
+            'isDucking': false
           };
         }
         return this._data[key];
@@ -56,16 +81,6 @@ describe('handleRemoteAction', () => {
       },
       width: 32,
       height: 64,
-      body: {
-        touching: { down: true },
-        velocity: { x: 0, y: 0 },
-        setVelocityX: jest.fn().mockImplementation(function(this: any, x: number) {
-          this.velocity.x = x;
-        }),
-        setVelocityY: jest.fn().mockImplementation(function(this: any, y: number) {
-          this.velocity.y = y;
-        })
-      },
       // Add health and special meter properties
       health: 100,
       specialMeter: 0,

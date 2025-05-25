@@ -16,7 +16,9 @@ if (!global.cancelAnimationFrame) {
   };
 }
 
-// Minimal Phaser mock
+// Enhanced Phaser mock to cover all test requirements
+// Add all GameObject, Sprite, Graphics, Text, Rectangle, Physics, and Scene methods used in tests
+
 type PhaserMock = {
   Scale: {
     NONE: number;
@@ -31,20 +33,28 @@ type PhaserMock = {
         DOWN: number;
         SPACE: number;
         ENTER: number;
+        SHIFT: number;
+        CTRL: number;
       };
+      createCursorKeys: jest.Mock;
+      addKey: jest.Mock;
     };
   };
   GameObjects: {
     GameObject: {
-      prototype: {
-        setOrigin: jest.Mock;
-        setPosition: jest.Mock;
-        setVisible: jest.Mock;
-        setTint: jest.Mock;
-        setAlpha: jest.Mock;
-        setInteractive: jest.Mock;
-        on: jest.Mock;
-      };
+      prototype: any;
+    };
+    Sprite: {
+      prototype: any;
+    };
+    Text: {
+      prototype: any;
+    };
+    Rectangle: {
+      prototype: any;
+    };
+    Graphics: {
+      prototype: any;
     };
   };
   Math: {
@@ -52,36 +62,63 @@ type PhaserMock = {
       Between: (min: number, max: number) => number;
     };
   };
+  Physics: {
+    Arcade: {
+      Sprite: any;
+      Group: any;
+      Body: any;
+    };
+  };
+  Scene: any;
 };
 
-declare global {
-  // Test utilities
-  const getMockWebSocketInstances: () => MockWebSocketInstance[];
-  const simulateServerMessage: (message: any, instanceIndex?: number) => void;
-  const mockWebSocketInstances: MockWebSocketInstance[];
-  const mockWebSocketConstructor: any;
-
-  // Extend the global scope
-  interface Window {
-    Phaser: PhaserMock;
-  }
-
-  namespace NodeJS {
-    interface Global {
-      Phaser: PhaserMock;
-      mockWebSocketInstances: MockWebSocketInstance[];
-      getMockWebSocketInstances: () => MockWebSocketInstance[];
-      simulateServerMessage: (message: any, instanceIndex?: number) => void;
-      mockWebSocketConstructor: any;
-    }
-  }
+// Helper to generate a mock object with all common methods
+function createPhaserMockObject() {
+  return {
+    setOrigin: jest.fn().mockReturnThis(),
+    setPosition: jest.fn().mockReturnThis(),
+    setVisible: jest.fn().mockReturnThis(),
+    setTint: jest.fn().mockReturnThis(),
+    setAlpha: jest.fn().mockReturnThis(),
+    setInteractive: jest.fn().mockReturnThis(),
+    setCrop: jest.fn().mockReturnThis(),
+    setFrame: jest.fn().mockReturnThis(),
+    setScale: jest.fn().mockReturnThis(),
+    setBounce: jest.fn().mockReturnThis(),
+    setCollideWorldBounds: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis(),
+    setDisplaySize: jest.fn().mockReturnThis(),
+    setStrokeStyle: jest.fn().mockReturnThis(),
+    setAllowGravity: jest.fn().mockReturnThis(),
+    setImmovable: jest.fn().mockReturnThis(),
+    setSize: jest.fn().mockReturnThis(),
+    setOffset: jest.fn().mockReturnThis(),
+    setFlipX: jest.fn().mockReturnThis(),
+    setFlipY: jest.fn().mockReturnThis(),
+    play: jest.fn().mockReturnThis(),
+    destroy: jest.fn().mockReturnThis(),
+    clear: jest.fn().mockReturnThis(),
+    fillStyle: jest.fn().mockReturnThis(),
+    fillRect: jest.fn().mockReturnThis(),
+    setScrollFactor: jest.fn().mockReturnThis(),
+    on: jest.fn().mockReturnThis(),
+    group: jest.fn().mockReturnThis(),
+    collider: jest.fn().mockReturnThis(),
+    overlap: jest.fn().mockReturnThis(),
+    // Add a mock body with blocked.down for physics-based tests
+    body: { blocked: { down: true } },
+  };
 }
+
+// Assign the enhanced mock to global.Phaser in the setup file after type declaration (see below for initialization)
+
+
 
 // Initialize Phaser mock
 const phaserMock: PhaserMock = {
   Scale: {
     NONE: 0,
-    CENTER_BOTH: 1,
+    CENTER_BOTH: 1
   },
   Input: {
     Keyboard: {
@@ -92,28 +129,141 @@ const phaserMock: PhaserMock = {
         DOWN: 40,
         SPACE: 32,
         ENTER: 13,
+        SHIFT: 16,
+        CTRL: 17
       },
-    },
+      createCursorKeys: jest.fn(() => ({ left: {}, right: {}, up: {} })),
+      addKey: jest.fn()
+    }
   },
   GameObjects: {
-    GameObject: {
-      prototype: {
-        setOrigin: jest.fn(),
-        setPosition: jest.fn(),
-        setVisible: jest.fn(),
-        setTint: jest.fn(),
-        setAlpha: jest.fn(),
-        setInteractive: jest.fn(),
-        on: jest.fn(),
-      },
-    },
+    GameObject: { prototype: createPhaserMockObject() },
+    Sprite: { prototype: {
+      ...createPhaserMockObject(),
+      setFlipX: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      body: { blocked: { down: true } },
+    } },
+    Text: { prototype: {
+      ...createPhaserMockObject(),
+      setFlipX: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      body: { blocked: { down: true } },
+    } },
+    Rectangle: { prototype: createPhaserMockObject() },
+    Graphics: { prototype: createPhaserMockObject() }
   },
   Math: {
     Between: {
-      Between: (min: number, max: number) => Math.floor(Math.random() * (max - min + 1) + min),
-    },
+      Between: (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
+    }
   },
+  Physics: {
+    Arcade: {
+      Sprite: createPhaserMockObject(),
+      Group: createPhaserMockObject(),
+      Body: createPhaserMockObject()
+    }
+  },
+  Scene: createPhaserMockObject()
 };
+
+// Assign to global for test files
+(global as any).Phaser = phaserMock;
+
+// Patch commonly used scene/physics/add methods globally for all tests
+beforeEach(() => {
+  // Patch scene.add
+  const addMock = {
+    rectangle: jest.fn(() => ({
+      ...createPhaserMockObject(),
+      destroy: jest.fn()
+    })),
+    text: jest.fn(() => ({
+      ...createPhaserMockObject(),
+      destroy: jest.fn(),
+      setOrigin: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      setFlipX: jest.fn().mockReturnThis(),
+      body: { blocked: { down: true } },
+    })),
+    image: jest.fn(() => ({
+      ...createPhaserMockObject(),
+      destroy: jest.fn()
+    })),
+    circle: jest.fn(() => ({
+      ...createPhaserMockObject(),
+      destroy: jest.fn()
+    })),
+    graphics: jest.fn(() => ({
+      ...createPhaserMockObject(),
+      destroy: jest.fn()
+    })),
+    sprite: jest.fn(() => ({
+      ...createPhaserMockObject(),
+      destroy: jest.fn(),
+      setFlipX: jest.fn().mockReturnThis(),
+      body: { blocked: { down: true } },
+    })),
+  };
+  // Patch scene.physics.add
+  const staticGroupMock = () => ({
+    create: jest.fn(() => ({
+      ...createPhaserMockObject(),
+      setDisplaySize: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setAlpha: jest.fn().mockReturnThis(),
+      refreshBody: jest.fn().mockReturnThis(),
+      destroy: jest.fn(),
+      setFlipX: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      body: { blocked: { down: true } },
+    }))
+  });
+  const physicsAddMock = {
+    sprite: jest.fn(() => ({ ...createPhaserMockObject(), destroy: jest.fn() })),
+    staticGroup: jest.fn(staticGroupMock),
+    group: jest.fn(() => ({ add: jest.fn() })),
+    collider: jest.fn(),
+    overlap: jest.fn()
+  };
+  // Patch scene.physics
+  const physicsMock = {
+    add: physicsAddMock,
+    world: { setBounds: jest.fn() },
+    pause: jest.fn().mockReturnThis(), // Make pause chainable
+  };
+  // Patch scene.scene
+  const sceneSceneMock = {
+    start: jest.fn(),
+    pause: jest.fn(),
+    stop: jest.fn(),
+    resume: jest.fn(),
+    isActive: jest.fn().mockReturnValue(true),
+    isPaused: jest.fn().mockReturnValue(false),
+    isSleeping: jest.fn().mockReturnValue(false),
+    isVisible: jest.fn().mockReturnValue(true)
+  };
+  // Patch scene
+  (global as any).mockScene = {
+    add: addMock,
+    physics: physicsMock,
+    scene: sceneSceneMock,
+    cameras: { main: { width: 800, height: 600 } },
+    scale: { width: 800, height: 600, on: jest.fn() },
+    sys: { game: { config: { width: 800, height: 600 }, canvas: { width: 800, height: 600 }, device: { os: { android: false, iOS: false } } } },
+    input: { keyboard: { createCursorKeys: jest.fn(() => ({ left: {}, right: {}, up: {} })), addKey: jest.fn() } },
+    time: { delayedCall: jest.fn(), addEvent: jest.fn() },
+    anims: { create: jest.fn(), play: jest.fn() },
+    player1: undefined,
+    player2: undefined,
+    playerDirection: ['right', 'left'],
+    playerBlocking: [false, false],
+    playerHealth: [100, 100],
+    TOTAL_HEALTH: 100
+  };
+});
 
 // Initialize global mocks
 const mockWebSocketInstances: MockWebSocketInstance[] = [];
@@ -124,6 +274,11 @@ class MockWebSocketImpl implements MockWebSocketInstance {
   static readonly OPEN = 1;
   static readonly CLOSING = 2;
   static readonly CLOSED = 3;
+
+  CONNECTING = 0;
+  OPEN = 1;
+  CLOSING = 2;
+  CLOSED = 3;
 
   url: string;
   readyState: number = MockWebSocketImpl.CONNECTING;
@@ -149,7 +304,7 @@ class MockWebSocketImpl implements MockWebSocketInstance {
     }, 0);
   }
 
-  send(_data: string | ArrayBuffer | Blob | ArrayBufferView): void {
+  send(data: string | ArrayBuffer | Blob | ArrayBufferView): void {
     // Mock implementation
   }
 
@@ -206,13 +361,20 @@ function createMockWebSocket(this: any, url: string): WebSocket {
   return ws as unknown as WebSocket;
 }
 
-// Add static properties to the mock constructor
-const mockWebSocketConstructor = Object.assign(createMockWebSocket, {
-  CONNECTING: 0,
-  OPEN: 1,
-  CLOSING: 2,
-  CLOSED: 3,
-});
+const mockWebSocketConstructor = createMockWebSocket;
+
+// --- Test WebSocket Mock Types ---
+interface MockWebSocketInstance {
+  url: string;
+  readyState: number;
+  CONNECTING: number;
+  OPEN: number;
+  CLOSING: number;
+  CLOSED: number;
+  binaryType: string;
+  bufferedAmount: number;
+  extensions: string;
+}
 
 // Setup global mocks
 if (!('Phaser' in global)) {

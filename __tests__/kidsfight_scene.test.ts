@@ -1039,4 +1039,195 @@ describe('KidsFightScene', () => {
       expect(scene.hitEffects).not.toContain(hitEffect);
     });
   });
+
+  describe('Health and Win Conditions', () => {
+    let scene: KidsFightScene;
+    let sceneAny: any;
+    let originalConsoleWarn: typeof console.warn;
+    let mockPhysics: any;
+    let mockEndGame: jest.Mock;
+
+    beforeEach(() => {
+      // Create a fresh scene for each test
+      const testScene = createTestScene();
+      scene = testScene.scene;
+      sceneAny = testScene.sceneAny;
+      
+      // Mock physics system
+      mockPhysics = {
+        add: {
+          staticGroup: jest.fn().mockReturnValue({
+            create: jest.fn().mockReturnThis(),
+            setDisplaySize: jest.fn().mockReturnThis(),
+            setVisible: jest.fn().mockReturnThis(),
+            refresh: jest.fn()
+          }),
+          collider: jest.fn(),
+          overlap: jest.fn()
+        },
+        pause: jest.fn(),
+        resume: jest.fn(),
+        world: {
+          setBounds: jest.fn()
+        }
+      };
+      sceneAny.physics = mockPhysics;
+      
+      // Mock scene methods
+      sceneAny.scene = {
+        pause: jest.fn(),
+        launch: jest.fn(),
+        add: {
+          text: jest.fn().mockReturnThis(),
+          setInteractive: jest.fn().mockReturnThis()
+        }
+      };
+      
+      // Mock game timer
+      sceneAny.gameTimer = {
+        getProgress: jest.fn().mockReturnValue(0.5),
+        paused: false,
+        progress: 0.5
+      };
+      
+      // Mock player objects
+      sceneAny.player1 = {
+        health: 100,
+        getData: jest.fn().mockReturnValue(false),
+        setData: jest.fn(),
+        setFrame: jest.fn(),
+        setFlipX: jest.fn(),
+        x: 100,
+        y: 300,
+        body: {
+          velocity: { x: 0, y: 0 },
+          blocked: { down: true },
+          setVelocity: jest.fn(),
+          setAcceleration: jest.fn(),
+          setGravityY: jest.fn()
+        }
+      };
+      
+      sceneAny.player2 = {
+        health: 100,
+        getData: jest.fn().mockReturnValue(false),
+        setData: jest.fn(),
+        setFrame: jest.fn(),
+        setFlipX: jest.fn(),
+        x: 700,
+        y: 300,
+        body: {
+          velocity: { x: 0, y: 0 },
+          blocked: { down: true },
+          setVelocity: jest.fn(),
+          setAcceleration: jest.fn(),
+          setGravityY: jest.fn()
+        }
+      };
+      
+      // Mock endGame method
+      mockEndGame = jest.fn();
+      sceneAny.endGame = mockEndGame;
+      
+      // Initialize game state
+      sceneAny.gameOver = false;
+      sceneAny.timeLeft = 60;
+      sceneAny.playerHealth = [100, 100];
+      sceneAny.playerSpecial = [0, 0];
+      sceneAny.playerDirection = ['right', 'left'];
+      
+      // Mock console.warn
+      originalConsoleWarn = console.warn;
+      console.warn = jest.fn();
+    });
+    
+    afterEach(() => {
+      // Restore console.warn
+      console.warn = originalConsoleWarn;
+    });
+
+    it('should detect when player1 wins by reducing player2 health to 0', () => {
+      // Set player2 health to 0
+      sceneAny.player1.health = 100;
+      sceneAny.player2.health = 0;
+      sceneAny.playerHealth = [100, 0];
+      
+      // Call update to trigger checkWinner
+      sceneAny.update(0);
+      
+      // Verify endGame was called with correct winner (player1)
+      expect(mockEndGame).toHaveBeenCalledWith(0, 'Player 1 Venceu!');
+    });
+
+    it('should detect when player2 wins by reducing player1 health to 0', () => {
+      // Set player1 health to 0
+      sceneAny.player1.health = 0;
+      sceneAny.player2.health = 100;
+      sceneAny.playerHealth = [0, 100];
+      
+      // Call update to trigger checkWinner
+      sceneAny.update(0);
+      
+      // Verify endGame was called with correct winner (player2)
+      expect(mockEndGame).toHaveBeenCalledWith(1, 'Player 2 Venceu!');
+    });
+
+    it('should handle time running out with player1 having more health', () => {
+      // Setup initial state
+      sceneAny.player1.health = 70;
+      sceneAny.player2.health = 30;
+      sceneAny.playerHealth = [70, 30]; // Player1 has more health
+      sceneAny.timeLeft = 0; // Time's up
+      
+      // Call update to trigger checkWinner
+      sceneAny.update(0);
+      
+      // Verify endGame was called with correct winner (player1)
+      expect(mockEndGame).toHaveBeenCalledWith(0, 'Player 1 Venceu!');
+    });
+
+    it('should handle time running out with player2 having more health', () => {
+      // Setup initial state
+      sceneAny.player1.health = 30;
+      sceneAny.player2.health = 70;
+      sceneAny.playerHealth = [30, 70]; // Player2 has more health
+      sceneAny.timeLeft = 0; // Time's up
+      
+      // Call update to trigger checkWinner
+      sceneAny.update(0);
+      
+      // Verify endGame was called with correct winner (player2)
+      expect(mockEndGame).toHaveBeenCalledWith(1, 'Player 2 Venceu!');
+    });
+
+    it('should handle draw when time runs out with equal health', () => {
+      // Setup initial state
+      sceneAny.player1.health = 50;
+      sceneAny.player2.health = 50;
+      sceneAny.playerHealth = [50, 50]; // Equal health
+      sceneAny.timeLeft = 0; // Time's up
+      
+      // Call update to trigger checkWinner
+      sceneAny.update(0);
+      
+      // Verify endGame was called with draw condition
+      expect(mockEndGame).toHaveBeenCalledWith(-1, 'Empate!');
+    });
+
+    it('should not end game if time is not up and both players have health', () => {
+      // Mock endGame method
+      const mockEndGame = jest.fn();
+      sceneAny.endGame = mockEndGame;
+      
+      // Setup initial state
+      sceneAny.playerHealth = [100, 100]; // Both players have full health
+      sceneAny.timeLeft = 60; // Time remaining
+      
+      // Call update
+      sceneAny.update(0);
+      
+      // Verify endGame was not called
+      expect(mockEndGame).not.toHaveBeenCalled();
+    });
+  });
 });

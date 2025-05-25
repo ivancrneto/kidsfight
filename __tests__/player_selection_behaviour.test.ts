@@ -19,13 +19,19 @@ const mockWebSocketManager = {
 const mockScene = {
   add: {
     text: jest.fn().mockReturnValue({
-      setOrigin: jest.fn(),
-      setScrollFactor: jest.fn(),
-      setDepth: jest.fn(),
-      setVisible: jest.fn(),
-      setText: jest.fn(),
-      setInteractive: jest.fn(),
-      on: jest.fn()
+      setOrigin: jest.fn().mockReturnThis(),
+      setScrollFactor: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setText: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      setFlipX: jest.fn().mockReturnThis(),
+      setScale: jest.fn().mockReturnThis(),
+      setCrop: jest.fn().mockReturnThis(),
+      setPosition: jest.fn().mockReturnThis(),
+      on: jest.fn().mockReturnThis(),
+      body: { blocked: { down: true } },
+      destroy: jest.fn()
     }),
     circle: jest.fn().mockReturnValue({
       setOrigin: jest.fn(),
@@ -48,11 +54,18 @@ const mockScene = {
       on: jest.fn()
     }),
     sprite: jest.fn().mockReturnValue({
-      setOrigin: jest.fn(),
-      setScale: jest.fn(),
-      setCrop: jest.fn(),
-      setInteractive: jest.fn(),
-      on: jest.fn()
+      setOrigin: jest.fn().mockReturnThis(),
+      setScale: jest.fn().mockReturnThis(),
+      setCrop: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      setFlipX: jest.fn().mockReturnThis(),
+      setPosition: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setText: jest.fn().mockReturnThis(),
+      on: jest.fn().mockReturnThis(),
+      body: { blocked: { down: true } },
+      destroy: jest.fn()
     })
   },
   scale: {
@@ -74,7 +87,9 @@ const mockScene = {
       }
     }
   },
-  physics: {}
+  physics: {
+    pause: jest.fn()
+  }
 };
 
 describe('Player Selection Behaviour', () => {
@@ -99,13 +114,11 @@ describe('Player Selection Behaviour', () => {
     it('should allow player 1 to select a character in local mode', () => {
       // Simulate clicking on the first character
       const firstChar = scene.characters[0];
-      const clickHandler = firstChar.bgCircle?.on.mock.calls.find(
+      const spriteClickHandler = scene.characterSprites[firstChar.key].on.mock.calls.find(
         (call: any) => call[0] === 'pointerdown'
       )?.[1];
-      
       // Trigger the click
-      clickHandler?.();
-      
+      spriteClickHandler?.();
       // Verify player 1 selection was updated
       expect(scene.selected.p1).toBe(firstChar.key);
       expect(scene.p1Index).toBe(0);
@@ -114,21 +127,18 @@ describe('Player Selection Behaviour', () => {
     it('should alternate between players in local mode', () => {
       // First click should select for player 1
       const firstChar = scene.characters[0];
-      const clickHandler = firstChar.bgCircle?.on.mock.calls.find(
+      const spriteClickHandler = scene.characterSprites[firstChar.key].on.mock.calls.find(
         (call: any) => call[0] === 'pointerdown'
       )?.[1];
-      
       // First click - player 1
-      clickHandler?.();
+      spriteClickHandler?.();
       expect(scene.selected.p1).toBe(firstChar.key);
-      
       // Second click - should select for player 2
       const secondChar = scene.characters[1];
-      const secondClickHandler = secondChar.bgCircle?.on.mock.calls.find(
+      const secondSpriteClickHandler = scene.characterSprites[secondChar.key].on.mock.calls.find(
         (call: any) => call[0] === 'pointerdown'
       )?.[1];
-      
-      secondClickHandler?.();
+      secondSpriteClickHandler?.();
       expect(scene.selected.p2).toBe(secondChar.key);
     });
 
@@ -136,19 +146,17 @@ describe('Player Selection Behaviour', () => {
       // Set up online mode
       scene.init({ mode: 'online', roomCode: 'TEST123', isHost: true });
       scene.create();
-      
       // Try to select with player 2 (should be ignored)
       const firstChar = scene.characters[0];
-      const clickHandler = firstChar.bgCircle?.on.mock.calls.find(
+      const spriteClickHandler = scene.characterSprites[firstChar.key].on.mock.calls.find(
         (call: any) => call[0] === 'pointerdown'
       )?.[1];
-      
       // Simulate click (should be for player 1 only)
-      clickHandler?.();
-      
-      // Only player 1 should be updated
-      expect(scene.selected.p1).toBe(firstChar.key);
-      expect(scene.selected.p2).not.toBe(firstChar.key);
+      spriteClickHandler?.();
+      // Only player 1 should be updated (index advances to second character)
+      const expectedChar = scene.characters[1].key;
+      expect(scene.selected.p1).toBe(expectedChar);
+      expect(scene.selected.p2).not.toBe(expectedChar);
     });
   });
 
@@ -156,43 +164,42 @@ describe('Player Selection Behaviour', () => {
     it('should send player selection to WebSocket in online mode', () => {
       // Set up online mode
       scene.init({ mode: 'online', roomCode: 'TEST123', isHost: true });
+      // Inject mock wsManager so .send is called on the mock
+      scene.wsManager = mockWebSocketManager as any;
       scene.create();
-      
       // Simulate character selection
       const firstChar = scene.characters[0];
-      const clickHandler = firstChar.bgCircle?.on.mock.calls.find(
+      const spriteClickHandler = scene.characterSprites[firstChar.key].on.mock.calls.find(
         (call: any) => call[0] === 'pointerdown'
       )?.[1];
-      
-      clickHandler?.();
-      
+      spriteClickHandler?.();
       // Verify WebSocket message was sent
+      const expectedChar = scene.characters[1].key;
       expect(mockWebSocketManager.send).toHaveBeenCalledWith({
         type: 'playerSelected',
         player: 'p1',
-        character: firstChar.key
+        character: expectedChar
       });
     });
   });
 
   describe('Selection Indicators', () => {
     it('should update selection indicators when characters are selected', () => {
-      // Spy on updateSelectionIndicators
+      scene.create();
+      // Spy on updateSelectionIndicators after create()
       const updateSpy = jest.spyOn(scene as any, 'updateSelectionIndicators');
-      
       // Simulate character selection
       const firstChar = scene.characters[0];
-      const clickHandler = firstChar.bgCircle?.on.mock.calls.find(
+      const spriteClickHandler = scene.characterSprites[firstChar.key].on.mock.calls.find(
         (call: any) => call[0] === 'pointerdown'
       )?.[1];
-      
-      clickHandler?.();
-      
+      spriteClickHandler?.();
       // Verify indicators were updated
       expect(updateSpy).toHaveBeenCalled();
+      const expectedChar = scene.characters[1];
       expect(scene.p1SelectorCircle.setPosition).toHaveBeenCalledWith(
-        firstChar.x,
-        firstChar.y + (firstChar.bgCircleOffsetY || 0)
+        expectedChar.x,
+        expectedChar.y + (expectedChar.bgCircleOffsetY || 0)
       );
     });
   });
