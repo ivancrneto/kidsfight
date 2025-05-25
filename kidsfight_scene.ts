@@ -256,7 +256,15 @@ class KidsFightScene extends Phaser.Scene {
     const gameWidth = this.sys.game.canvas.width;
     const gameHeight = this.sys.game.canvas.height;
     
-    console.log(`Creating KidsFightScene with dimensions: ${gameWidth}x${gameHeight}, isMobile: ${this.sys.game.device.os.android || this.sys.game.device.os.iOS}`);
+    console.log('Creating KidsFightScene with settings:', {
+      dimensions: `${gameWidth}x${gameHeight}`,
+      isMobile: this.sys.game.device.os.android || this.sys.game.device.os.iOS,
+      selectedScenario: this.selectedScenario,
+      p1: this.p1,
+      p2: this.p2,
+      selected: this.selected,
+      gameMode: this.gameMode
+    });
     
     // Setup scene with proper scaling
     this.background = this.add.image(0, 0, this.selectedScenario)
@@ -271,177 +279,92 @@ class KidsFightScene extends Phaser.Scene {
       this.physics.world.setBounds(0, 0, gameWidth, gameHeight);
     }
 
-    // Create platform with proper scaling
-    const platformHeight = this.sys.game.device.os.android || this.sys.game.device.os.iOS ? 
-      gameHeight - (gameHeight * 0.15) : // Mobile: position platform higher to account for touch controls
-      gameHeight - 100; // Desktop
-      
-    this.platform = this.add.rectangle(
+    // Calculate platform height ONCE
+    const platformHeight = this.sys.game.device.os.android || this.sys.game.device.os.iOS ?
+      gameHeight - (gameHeight * 0.15) :
+      gameHeight - 100;
+
+    // Add extreme debugging - LOOK FOR THIS IN CONSOLE
+    console.log('******** ATTEMPTING TO POSITION PLAYERS MUCH HIGHER - IMPORTANT *********');
+    console.log('platformHeight:', platformHeight, 'gameHeight:', gameHeight);
+
+    // Calculate new upper platform height (move platform down to 20% up from bottom)
+    const upperPlatformY = platformHeight - gameHeight * 0.2;
+
+    // Create new physics platform at upper position
+    const upperPlatform = this.physics.add.staticGroup();
+    upperPlatform.create(gameWidth / 2, upperPlatformY, null)
+      .setDisplaySize(gameWidth, 32)
+      .setVisible(false)
+      .refreshBody();
+
+    // Visual representation of the upper platform
+    const upperPlatformVisual = this.add.rectangle(
       gameWidth / 2,
-      platformHeight,
+      upperPlatformY,
       gameWidth,
-      20,
-      0x00ff00
+      32,
+      0x888888
     );
-    if (this.platform) {
-      this.platform.setOrigin(0.5, 0);
-      // Make platform semi-transparent on mobile for better visibility
-      if (this.sys.game.device.os.android || this.sys.game.device.os.iOS) {
-        this.platform.setAlpha(0.7);
-      }
-    }
+    upperPlatformVisual.setDepth(0);
+    upperPlatformVisual.setAlpha(0); // Make the platform fully transparent
 
-    if (this.physics && this.platform) {
-      const physicsBody = this.physics.add.existing(this.platform) as Phaser.Physics.Arcade.Sprite;
-      physicsBody.body.setAllowGravity(false);
-      physicsBody.body.immovable = true;
-    }
+    // Create players with proper positioning and selected characters
+    // Place player feet directly on the upper platform
+    this.player1 = this.physics.add.sprite(gameWidth * 0.25, upperPlatformY, this.p1) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+    this.player2 = this.physics.add.sprite(gameWidth * 0.75, upperPlatformY, this.p2) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+    this.player1.setOrigin(0.5, 1.0);
+    this.player2.setOrigin(0.5, 1.0);
 
-    this.createPlayers();
+    // Enable collision between players and the new upper platform
+    this.physics.add.collider(this.player1, upperPlatform);
+    this.physics.add.collider(this.player2, upperPlatform);
 
-    this.createUI();
-
-    this.setupInputHandlers();
-
-    if (this.gameMode === 'online') {
-      this.setupWebSocketHandlers();
-    }
-    
-    // Add collision between players and platform
-    if (this.player1 && this.player2 && this.platform) {
-      this.physics.add.collider(this.player1, this.platform);
-      this.physics.add.collider(this.player2, this.platform);
-    }
-    
-    // Initialize hitbox groups
-    this.attackHitboxes = this.physics.add.group();
-    this.specialHitboxes = this.physics.add.group();
-    
-    // Create touch controls if on mobile
-    const isMobile = this.sys.game.device.os.android || this.sys.game.device.os.iOS;
-    if (isMobile) {
-      this.createTouchControls();
-      this.showTouchControls(true);
-    } else {
-      this.showTouchControls(false);
-    }
-  }
-
-  private setupInputHandlers(): void {
-    // Setup keyboard controls
-    const cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = {
-      left: cursors.left!,
-      right: cursors.right!,
-      up: cursors.up!,
-      attack: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
-      special: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
-      block: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL),
-      // Add more keys if needed
-    };
-  }
-
-  private createPlayers(): void {
-    if (!this.selected?.p1 || !this.selected?.p2) {
-      console.error('Player selection is undefined');
-      return;
-    }
-
-    // Get the current game dimensions for proper scaling
-    const gameWidth = this.sys.game.canvas.width;
-    const gameHeight = this.sys.game.canvas.height;
-
-    // Calculate scale factor based on the design resolution vs actual resolution
-    const scaleX = gameWidth / GAME_WIDTH;
-    const scaleY = gameHeight / GAME_HEIGHT;
-    const scale = Math.min(scaleX, scaleY) * 0.8; // Use 80% of the smaller scale to ensure players aren't too large
-
-    // Adjust for mobile devices
-    const isMobile = this.sys.game.device.os.android || this.sys.game.device.os.iOS;
-    const mobileScaleFactor = isMobile ? 0.7 : 1; // Reduce size on mobile
-    const finalScale = scale * mobileScaleFactor;
-
-    console.log(`Game dimensions: ${gameWidth}x${gameHeight}, Scale factors: ${scaleX}x${scaleY}, Using scale: ${finalScale}, isMobile: ${isMobile}`);
-
-    // Platform height for player positioning
-    const platformHeight = isMobile ?
-        gameHeight - (gameHeight * 0.15) : // Mobile: position platform higher
-        gameHeight - 100; // Desktop
-
-    // Create player 1 (left side)
-    const player1 = this.physics.add.sprite(
-        gameWidth * 0.25, // 25% from left
-        platformHeight - 50, // Just above the platform
-        this.selected.p1
-    );
-    console.log('Player1 sprite:', player1, 'key:', this.selected.p1);
-    player1.setTint(0xff00ff).setAlpha(1);
-    if (!player1) {
-      console.error('Failed to create player 1');
-      return;
-    }
-
-    this.player1 = Object.assign(player1, {
-      health: this.TOTAL_HEALTH,
-      special: 0,
-      isBlocking: false,
-      isAttacking: false,
-      direction: 'right' as const,
-      walkAnimData: {
-        frameTime: 0,
-        currentFrame: 0,
-        frameDelay: 50
-      }
-    }) as Player;
+    [this.player1, this.player2].forEach((player, index) => {
+      const isPlayer1 = index === 0;
+      player.setCollideWorldBounds(true);
+      player.setBounce(0.2);
+      player.setGravityY(300);
+      player.setSize(80, 200);
+      player.setOffset(92, 32);
+      
+      // Set custom properties
+      player.health = MAX_HEALTH;
+      player.special = 0;
+      player.isBlocking = false;
+      player.isAttacking = false;
+      player.direction = isPlayer1 ? 'right' : 'left';
+      
+      console.log(`Created player ${index + 1} with sprite: ${isPlayer1 ? this.p1 : this.p2}`, {
+        position: { x: player.x, y: player.y },
+        direction: player.direction,
+        health: player.health
+      });
+    });
 
     // Apply scaling to player 1
-    this.player1.setScale(finalScale);
-    this.player1.setCollideWorldBounds(true);
-    this.player1.setBounce(0.2);
+    this.player1.setScale(0.4); // Decrease scale for appropriate size
+    this.player1.setDepth(1);
 
-    // Create player 2 (right side)
-    const player2 = this.physics.add.sprite(
-        gameWidth * 0.75, // 75% from left
-        platformHeight - 50, // Just above the platform
-        this.selected.p2
-    );
-    console.log('Player2 sprite:', player2, 'key:', this.selected.p2);
-    player2.setTint(0x00ffff).setAlpha(1);
-    if (!player2) {
-      console.error('Failed to create player 2');
-      return;
-    }
-
-    this.player2 = Object.assign(player2, {
-      health: this.TOTAL_HEALTH,
-      special: 0,
-      isBlocking: false,
-      isAttacking: false,
-      direction: 'left' as const,
-      walkAnimData: {
-        frameTime: 0,
-        currentFrame: 0,
-        frameDelay: 50
-      }
-    }) as Player;
 
     // Apply scaling to player 2
-    this.player2.setScale(finalScale);
+    this.player2.setScale(0.4); // Decrease scale for appropriate size
     this.player2.setCollideWorldBounds(true);
     this.player2.setBounce(0.2);
+    this.player2.setDepth(1);
 
     // Adjust the physics bodies to match the scaled sprites
     if (this.player1.body && this.player2.body) {
       // Make hitbox slightly smaller than visual sprite for better gameplay
-      this.player1.body.setSize(this.player1.width * 0.6, this.player1.height * 0.8);
-      this.player2.body.setSize(this.player2.width * 0.6, this.player2.height * 0.8);
+      this.player1.body.setSize(this.player1.width * 0.6, this.player1.height * 0.5);
+      this.player2.body.setSize(this.player2.width * 0.6, this.player2.height * 0.5);
 
       // Set offset to center the hitbox
-      this.player1.body.setOffset(this.player1.width * 0.2, this.player1.height * 0.2);
-      this.player2.body.setOffset(this.player2.width * 0.2, this.player2.height * 0.2);
+      this.player1.body.setOffset(this.player1.width * 0.2, this.player1.height * 0.25);
+      this.player2.body.setOffset(this.player2.width * 0.2, this.player2.height * 0.25);
 
       // Increase gravity on mobile for better feel
-      if (isMobile) {
+      if (this.sys.game.device.os.android || this.sys.game.device.os.iOS) {
         this.player1.body.setGravityY(300);
         this.player2.body.setGravityY(300);
       }
