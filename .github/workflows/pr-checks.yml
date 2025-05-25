@@ -1,0 +1,33 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: ['*']
+  push:
+    branches: ['main']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npx eslint@8 . --max-warnings=0
+
+      - name: Check formatting
+        run: npx prettier --check .
+
+      - name: TypeScript type check
+        run: npm run type-check
+
+      - name: Run tests
+        run: npm test
