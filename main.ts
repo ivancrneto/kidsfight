@@ -5,6 +5,7 @@ import OnlineModeScene from './online_mode_scene';
 import KidsFightScene from './kidsfight_scene';
 import ScenarioSelectScene from './scenario_select_scene';
 import RotatePromptScene from './rotate_prompt_scene';
+import BootDebugScene from './boot_debug_scene';
 
 console.log('*** FULL SCENE REGISTRATION: All main scenes included ***');
 
@@ -15,6 +16,7 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: 'game-container',
   backgroundColor: '#222222',
   scene: [
+    BootDebugScene,
     RotatePromptScene,
     GameModeScene,
     PlayerSelectScene,

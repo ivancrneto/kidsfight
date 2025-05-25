@@ -369,6 +369,9 @@ class KidsFightScene extends Phaser.Scene {
         this.player2.body.setGravityY(300);
       }
     }
+    // Restore UI and touch controls
+    this.createUI();
+    this.createTouchControls();
   }
 
   private createUI(): void {

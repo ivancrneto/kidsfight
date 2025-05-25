@@ -270,8 +270,14 @@ export default class PlayerSelectScene extends Phaser.Scene {
         }
       ).setOrigin(0.5);
       char.nameLabel = label;
-      // Click handler - pass both player (1 for P1) and index
-      sprite.on('pointerdown', () => this.handleCharacterSelect(1, 1)); // 1 for next character
+      // Click handler for character selection
+      sprite.on('pointerdown', () => {
+        // In online mode, only player 1 can select
+        // In local mode, alternate between players
+        const currentPlayer = this.mode === 'online' ? 1 : 
+          (this.p1SelectorCircle.alpha === 1 ? 1 : 2);
+        this.handleCharacterSelect(currentPlayer, 1);
+      });
     });
   }
 
@@ -371,18 +377,13 @@ export default class PlayerSelectScene extends Phaser.Scene {
     if (this.mode === 'online' && player !== 1) return; // Only player 1 can select in online mode
     
     const currentIndex = player === 1 ? this.p1Index : this.p2Index;
-    const newIndex = (currentIndex + direction + this.characters.length) % this.characters.length;
+    let newIndex = (currentIndex + direction) % this.characters.length;
+    if (newIndex < 0) newIndex = this.characters.length - 1;
     
     if (player === 1) {
       this.p1Index = newIndex;
-      this.p1Char = this.characters[newIndex].key;
-      this.selected.p1 = this.p1Char;
+      this.selected.p1 = this.characters[newIndex].key;
       this.selectedP1Index = newIndex;
-      
-      if (this.p1Sprite && this.p1Char) {
-        this.p1Sprite.setTexture('characters', `${this.p1Char}_idle_1`);
-        this.p1Sprite.setScale(2);
-      }
     } else {
       this.p2Index = newIndex;
       this.selected.p2 = this.characters[newIndex].key;
@@ -391,14 +392,13 @@ export default class PlayerSelectScene extends Phaser.Scene {
     
     this.updateSelectionIndicators();
     
-    // Update WebSocket if in online mode
+    // In online mode, notify other players of the selection
     if (this.mode === 'online' && this.wsManager) {
-      const message: PlayerSelectWebSocketMessage = {
-        type: 'player_selected', // changed from 'playerSelected'
+      this.wsManager.send({
+        type: 'playerSelected',
         player: `p${player}`,
         character: player === 1 ? this.selected.p1 : this.selected.p2
-      };
-      this.wsManager.send(message);
+      });
     }
   }
 
@@ -673,9 +673,6 @@ export default class PlayerSelectScene extends Phaser.Scene {
     if (this.wsManager && this.wsManager.send) {
       this.wsManager.send(message);
     }
-  }
-
-  private handlePlayerSelected(data: PlayerSelectWebSocketMessage): void {
   }
 
   public startGame(): void {
