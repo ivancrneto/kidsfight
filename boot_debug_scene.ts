@@ -21,15 +21,15 @@ export default class BootDebugScene extends Phaser.Scene {
     this.load.image('scenario1', scenario1Img);
     this.load.image('scenario2', scenario2Img);
     // Use correct frame size for 3072x512 spritesheets: 256x256
-    this.load.spritesheet('player1', player1RawImg, { frameWidth: 256, frameHeight: 512 });
-    this.load.spritesheet('player2', player2RawImg, { frameWidth: 256, frameHeight: 512 });
-    this.load.spritesheet('player3', player3RawImg, { frameWidth: 256, frameHeight: 512 });
-    this.load.spritesheet('player4', player4RawImg, { frameWidth: 256, frameHeight: 512 });
-    this.load.spritesheet('player5', player5RawImg, { frameWidth: 256, frameHeight: 512 });
-    this.load.spritesheet('player6', player6RawImg, { frameWidth: 256, frameHeight: 512 });
-    this.load.spritesheet('player7', player7RawImg, { frameWidth: 256, frameHeight: 512 });
-    this.load.spritesheet('player8', player8RawImg, { frameWidth: 256, frameHeight: 512 });
-    this.load.spritesheet('player9', player9RawImg, { frameWidth: 256, frameHeight: 512 });
+    this.load.spritesheet('player1', player1RawImg, { frameWidth: 300, frameHeight: 512 });
+    this.load.spritesheet('player2', player2RawImg, { frameWidth: 300, frameHeight: 512 });
+    this.load.spritesheet('player3', player3RawImg, { frameWidth: 340, frameHeight: 512 });
+    this.load.spritesheet('player4', player4RawImg, { frameWidth: 340, frameHeight: 512 });
+    this.load.spritesheet('player5', player5RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player6', player6RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player7', player7RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player8', player8RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player9', player9RawImg, { frameWidth: 510, frameHeight: 512 });
   }
 
   create() {

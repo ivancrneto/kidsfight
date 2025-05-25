@@ -75,7 +75,7 @@ export function stretchBackgroundToFill(bg: any, width: number, height: number):
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 480;
 const MAX_HEALTH = 100; // Each health bar represents this amount of health
-const TOTAL_HEALTH = MAX_HEALTH; // Just one health bar
+const TOTAL_HEALTH = MAX_HEALTH * 2; // Double health
 const ATTACK_DAMAGE = 10;
 const SPECIAL_DAMAGE = 20;
 const ATTACK_COOLDOWN = 500; // ms
@@ -122,10 +122,9 @@ class KidsFightScene extends Phaser.Scene {
   private player2?: Phaser.Physics.Arcade.Sprite & PlayerProps;
   private platform?: Phaser.GameObjects.Rectangle;
   private background?: Phaser.GameObjects.Image;
+  private healthBarBg1?: Phaser.GameObjects.Rectangle;
   private healthBar1?: Phaser.GameObjects.Graphics;
   private healthBar2?: Phaser.GameObjects.Graphics;
-  private healthBarBg1?: Phaser.GameObjects.Rectangle;
-  private healthBarBg2?: Phaser.GameObjects.Rectangle;
   private specialBar1?: Phaser.GameObjects.Rectangle;
   private specialBar2?: Phaser.GameObjects.Rectangle;
   private specialBarBg1?: Phaser.GameObjects.Rectangle;
@@ -145,7 +144,7 @@ class KidsFightScene extends Phaser.Scene {
   private roundStartTime!: number;
   private roundEndTime!: number;
   private lastUpdateTime!: number;
-  playerHealth: number[] = [MAX_HEALTH, MAX_HEALTH];
+  playerHealth: number[] = [MAX_HEALTH * 2, MAX_HEALTH * 2];
   private playerSpecial: number[] = [0, 0];
   playerDirection: ('left' | 'right')[] = ['right', 'left'];
   isAttacking: boolean[] = [false, false];
@@ -190,7 +189,7 @@ class KidsFightScene extends Phaser.Scene {
     blockButton?: Phaser.GameObjects.Rectangle;
   };
 
-  private readonly TOTAL_HEALTH: number = 100;
+  private readonly TOTAL_HEALTH: number = 200;
   private readonly DAMAGE: number = 10;
   private readonly SPECIAL_DAMAGE: number = 20;
   private readonly SPECIAL_COST: number = 3;
@@ -210,7 +209,7 @@ class KidsFightScene extends Phaser.Scene {
     this.isHost = false;
     this.touchControls = {};
     this.touchControlsVisible = false;
-    this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
+    this.playerHealth = [MAX_HEALTH * 2, MAX_HEALTH * 2];
     this.playerSpecial = [0, 0];
     this.playerDirection = ['right', 'left'];
     this.isAttacking = [false, false];
@@ -241,15 +240,15 @@ class KidsFightScene extends Phaser.Scene {
     // Preload assets if needed
     this.load.image('scenario1', scenario1Img);
     this.load.image('scenario2', scenario2Img);
-    this.load.spritesheet('player1', player1RawImg, { frameWidth: 264, frameHeight: 264 });
-    this.load.spritesheet('player2', player2RawImg, { frameWidth: 264, frameHeight: 264 });
-    this.load.spritesheet('player3', player3RawImg, { frameWidth: 264, frameHeight: 264 });
-    this.load.spritesheet('player4', player4RawImg, { frameWidth: 264, frameHeight: 264 });
-    this.load.spritesheet('player5', player5RawImg, { frameWidth: 264, frameHeight: 264 });
-    this.load.spritesheet('player6', player6RawImg, { frameWidth: 264, frameHeight: 264 });
-    this.load.spritesheet('player7', player7RawImg, { frameWidth: 264, frameHeight: 264 });
-    this.load.spritesheet('player8', player8RawImg, { frameWidth: 264, frameHeight: 264 });
-    this.load.spritesheet('player9', player9RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player1', player1RawImg, { frameWidth: 300, frameHeight: 512 });
+    this.load.spritesheet('player2', player2RawImg, { frameWidth: 300, frameHeight: 512 });
+    this.load.spritesheet('player3', player3RawImg, { frameWidth: 340, frameHeight: 512 });
+    this.load.spritesheet('player4', player4RawImg, { frameWidth: 340, frameHeight: 512 });
+    this.load.spritesheet('player5', player5RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player6', player6RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player7', player7RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player8', player8RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player9', player9RawImg, { frameWidth: 510, frameHeight: 512 });
   }
 
   create(): void {
@@ -317,6 +316,11 @@ class KidsFightScene extends Phaser.Scene {
     this.player1.setOrigin(0.5, 1.0);
     this.player2.setOrigin(0.5, 1.0);
 
+    // After creating player2 sprite, ensure it is flipped horizontally
+    if (this.player2) {
+      this.player2.setFlipX(true);
+    }
+
     // Enable collision between players and the new upper platform
     this.physics.add.collider(this.player1, upperPlatform);
     this.physics.add.collider(this.player2, upperPlatform);
@@ -330,7 +334,7 @@ class KidsFightScene extends Phaser.Scene {
       player.setOffset(92, 32);
       
       // Set custom properties
-      player.health = MAX_HEALTH;
+      player.health = MAX_HEALTH * 2;
       player.special = 0;
       player.isBlocking = false;
       player.isAttacking = false;
@@ -396,26 +400,81 @@ class KidsFightScene extends Phaser.Scene {
 
   private createHealthBars(scaleX: number, scaleY: number): void {
     const gameWidth = this.sys.game.canvas.width;
+    const barWidth = 300 * scaleX;
+    const barHeight = 24 * scaleY;
+    const barX = gameWidth / 2;
+    const barY = 20 * scaleY;
 
-    // Create health bar backgrounds with proper scaling
-    this.healthBarBg1 = this.add.rectangle(10 * scaleX, 10 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
-    this.healthBarBg2 = this.add.rectangle(gameWidth - (210 * scaleX), 10 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
+    // Remove old bars if they exist
+    if (this.healthBarBg1) this.healthBarBg1.destroy();
+    if (this.healthBar1) this.healthBar1.destroy();
+    if (this.healthBar2) this.healthBar2.destroy();
 
-    // Create health bars
-    this.healthBar1 = this.add.graphics() as Phaser.GameObjects.Graphics;
-    this.healthBar2 = this.add.graphics() as Phaser.GameObjects.Graphics;
+    // Draw single background bar (no more white bars)
+    this.healthBarBg1 = this.add.rectangle(barX, barY, barWidth, barHeight, 0x222222).setOrigin(0.5, 0.5);
+    this.healthBar1 = this.add.graphics(); // Player 1 (left)
+    this.healthBar2 = this.add.graphics(); // Player 2 (right)
 
-    // Initialize health bars
-    this.updateHealthBar(0);
-    this.updateHealthBar(1);
+    this.updateHealthBar(-1); // Draw both layers
+  }
+
+  private updateHealthBar(playerIndex: number): void {
+    // Double health: two layers per player
+    const maxHealth = this.TOTAL_HEALTH || 200; // Should be 200 for double health
+    const halfHealth = maxHealth / 2;
+    const gameWidth = this.sys.game.canvas.width;
+    const scaleX = gameWidth / 800;
+    const barWidth = 300 * scaleX;
+    const barHeight = 24 * scaleX;
+    const barX = gameWidth / 2;
+    const barY = 20 * scaleX;
+
+    this.healthBar1?.clear();
+    this.healthBar2?.clear();
+
+    // --- Player 1 (left half) ---
+    let p1 = Math.max(0, this.playerHealth[0]);
+    // Draw depleted background (gray)
+    this.healthBar1?.fillStyle(0x444444);
+    this.healthBar1?.fillRect(barX - barWidth/2, barY - barHeight/2, barWidth/2, barHeight);
+    // Draw second layer (yellow) if health > half
+    if (p1 > halfHealth) {
+      const secondLayer = (p1 - halfHealth) / halfHealth;
+      const secondLayerWidth = barWidth/2 * secondLayer;
+      this.healthBar1?.fillStyle(0xffff00); // yellow
+      this.healthBar1?.fillRect(barX - barWidth/2, barY - barHeight/2, secondLayerWidth, barHeight);
+      // Draw main layer (green) for the bottom half
+      this.healthBar1?.fillStyle(0x00ff00);
+      this.healthBar1?.fillRect(barX - barWidth/2 + secondLayerWidth, barY - barHeight/2, barWidth/2 - secondLayerWidth, barHeight);
+    } else if (p1 > 0) {
+      // Only main layer (green)
+      const mainLayerWidth = barWidth/2 * (p1 / halfHealth);
+      this.healthBar1?.fillStyle(0x00ff00);
+      this.healthBar1?.fillRect(barX - barWidth/2, barY - barHeight/2, mainLayerWidth, barHeight);
+    }
+
+    // --- Player 2 (right half) ---
+    let p2 = Math.max(0, this.playerHealth[1]);
+    this.healthBar2?.fillStyle(0x444444);
+    this.healthBar2?.fillRect(barX, barY - barHeight/2, barWidth/2, barHeight);
+    if (p2 > halfHealth) {
+      const secondLayer = (p2 - halfHealth) / halfHealth;
+      const secondLayerWidth = barWidth/2 * secondLayer;
+      this.healthBar2?.fillStyle(0x0000ff); // blue
+      this.healthBar2?.fillRect(barX + barWidth/2 - secondLayerWidth, barY - barHeight/2, secondLayerWidth, barHeight);
+      // Draw main layer (red) for the bottom half
+      this.healthBar2?.fillStyle(0xff0000);
+      this.healthBar2?.fillRect(barX, barY - barHeight/2, barWidth/2 - secondLayerWidth, barHeight);
+    } else if (p2 > 0) {
+      // Only main layer (red)
+      const mainLayerWidth = barWidth/2 * (p2 / halfHealth);
+      this.healthBar2?.fillStyle(0xff0000);
+      this.healthBar2?.fillRect(barX + barWidth/2 - mainLayerWidth, barY - barHeight/2, mainLayerWidth, barHeight);
+    }
   }
 
   private createSpecialBars(scaleX: number, scaleY: number): void {
     const gameWidth = this.sys.game.canvas.width;
-
-    // Create special bar backgrounds with proper scaling
-    this.specialBarBg1 = this.add.rectangle(10 * scaleX, 40 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
-    this.specialBarBg2 = this.add.rectangle(gameWidth - (210 * scaleX), 40 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
 
     // Create special bars with proper scaling
     this.specialBar1 = this.add.rectangle(10 * scaleX, 40 * scaleY, 0, 20 * scaleY, 0x00ff00) as Phaser.GameObjects.Rectangle;
@@ -439,30 +498,6 @@ class KidsFightScene extends Phaser.Scene {
           fontSize: `${fontSize}px`,
           color: '#000000'
         }) as Phaser.GameObjects.Text;
-  }
-
-  private updateHealthBar(playerIndex: number): void {
-    if (playerIndex !== 0 && playerIndex !== 1) return;
-    const health = this.playerHealth[playerIndex];
-    const maxHealth = this.TOTAL_HEALTH || 100;
-    const healthRatio = Math.max(0, health / maxHealth);
-    const gameWidth = this.sys.game.canvas.width;
-    const scaleX = gameWidth / 800; // Assume 800 is base width
-    const maxBarWidth = 200 * scaleX;
-    const newWidth = maxBarWidth * healthRatio;
-    const healthBar = playerIndex === 0 ? this.healthBar1 : this.healthBar2;
-    if (!healthBar) return;
-    if (typeof healthBar.clear === 'function') {
-      healthBar.clear();
-      if (typeof healthBar.fillStyle === 'function') {
-        healthBar.fillStyle(playerIndex === 0 ? 0x00ff00 : 0xff0000);
-        if (typeof healthBar.fillRect === 'function') {
-          const xPos = playerIndex === 0 ? 10 * scaleX : gameWidth - (210 * scaleX);
-          const yPos = 10 * scaleX;
-          healthBar.fillRect(xPos, yPos, newWidth, 20 * scaleX);
-        }
-      }
-    }
   }
 
   private createTouchControls(): void {
@@ -827,25 +862,45 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
 
   // If called with isWalking parameter (legacy call)
   if (isWalking !== undefined) {
-    player.anims.play(isWalking ? `${player.texture.key}_run` : `${player.texture.key}_idle`, true);
+    // Use setFrame for walk animation
+    if (isWalking) {
+      // Alternate between frames 1 and 2 based on current time
+      const frame = (Math.floor(Date.now() / 120) % 2) + 1; // 1 or 2
+      player.setFrame(frame);
+    } else {
+      player.setFrame(0); // Idle frame
+    }
     return;
   }
 
   // New animation logic
   if (player.getData('isHit')) {
-    player.anims.play(`${player.texture.key}_hit`, true);
+    // Optionally set a hit frame
+    player.setFrame(3); // Example: frame 3 for hit
+    // DEBUG
+    console.log('ANIM: HIT', playerIndex);
   } else if (player.getData('isAttacking')) {
-    // Animation already set in tryAttack
-  } else if (player.body.velocity.y !== 0) {
-    player.anims.play(`${player.texture.key}_jump`, true);
-  } else if (player.body.velocity.x !== 0) {
-    player.anims.play(`${player.texture.key}_run`, true);
+    player.setFrame(4); // Frame 4 for attack
+    // DEBUG
+    console.log('ANIM: ATTACK', playerIndex);
+  } else if (player.body && !player.body.blocked.down) {
+    player.setFrame(0); // Use idle frame for jump (customize if needed)
+    // DEBUG
+    console.log('ANIM: JUMP', playerIndex);
+  } else if (player.body && player.body.blocked.down && Math.abs(player.body.velocity.x) > 2) {
+    // Walking: alternate between frame 1 and 2
+    const frame = (Math.floor(Date.now() / 120) % 2) + 1;
+    player.setFrame(frame);
+    // DEBUG
+    console.log('ANIM: WALK', playerIndex, player.body.velocity.x);
   } else {
-    player.anims.play(`${player.texture.key}_idle`, true);
+    player.setFrame(0); // Idle
+    // DEBUG
+    console.log('ANIM: IDLE', playerIndex);
   }
 }
 
-private showTouchControls(visible: boolean): void {
+  private showTouchControls(visible: boolean): void {
     // Show/hide all known touch control buttons if they exist
     const buttons = ['leftButton', 'rightButton', 'jumpButton', 'attackButton', 'specialButton', 'blockButton'];
     for (const btnName of buttons) {
@@ -884,6 +939,29 @@ private showTouchControls(visible: boolean): void {
     });
     // Update health bar UI
     this.updateHealthBar(defenderIdx);
+  }
+
+  update(): void {
+    // Call animation update for both players every frame
+    this.updatePlayerAnimation(0);
+    this.updatePlayerAnimation(1);
+
+    // --- Player cross logic ---
+    if (this.player1 && this.player2) {
+      // If player1 is to the right of player2, swap their directions and flipX
+      if (this.player1.x > this.player2.x) {
+        this.player1.setFlipX(true);
+        this.player2.setFlipX(false);
+        this.playerDirection[0] = 'left';
+        this.playerDirection[1] = 'right';
+      } else {
+        this.player1.setFlipX(false);
+        this.player2.setFlipX(true);
+        this.playerDirection[0] = 'right';
+        this.playerDirection[1] = 'left';
+      }
+    }
+    // Add any other per-frame logic here if needed
   }
 }
 
