@@ -196,9 +196,9 @@ class KidsFightScene extends Phaser.Scene {
   private readonly ROUND_TIME: number = 99;
 
   constructor(config?: Phaser.Types.Scenes.SettingsConfig & { customKeyboard?: any }) {
-    super({ key: 'KidsFightScene', ...config });
+    super({key: 'KidsFightScene', ...config});
     this.wsManager = WebSocketManager.getInstance(); // Assign the singleton instance
-    this.selected = { p1: 'player1', p2: 'player2' };
+    this.selected = {p1: 'player1', p2: 'player2'};
     this.selectedScenario = 'scenario1';
     this.gameMode = 'single';
     this.roundStartTime = 0;
@@ -227,7 +227,7 @@ class KidsFightScene extends Phaser.Scene {
   // Initialization methods
   init(data: SceneData): void {
     console.log('KidsFightScene init with data:', data);
-    this.selected = data.selected || { p1: 'player1', p2: 'player2' };
+    this.selected = data.selected || {p1: 'player1', p2: 'player2'};
     this.p1 = data.p1 || 'player1';
     this.p2 = data.p2 || 'player2';
     this.selectedScenario = data.selectedScenario || 'scenario1';
@@ -240,15 +240,15 @@ class KidsFightScene extends Phaser.Scene {
     // Preload assets if needed
     this.load.image('scenario1', scenario1Img);
     this.load.image('scenario2', scenario2Img);
-    this.load.spritesheet('player1', player1RawImg, { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('player2', player2RawImg, { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('player3', player3RawImg, { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('player4', player4RawImg, { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('player5', player5RawImg, { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('player6', player6RawImg, { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('player7', player7RawImg, { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('player8', player8RawImg, { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('player9', player9RawImg, { frameWidth: 64, frameHeight: 64 });
+    this.load.spritesheet('player1', player1RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player2', player2RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player3', player3RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player4', player4RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player5', player5RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player6', player6RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player7', player7RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player8', player8RawImg, { frameWidth: 264, frameHeight: 264 });
+    this.load.spritesheet('player9', player9RawImg, { frameWidth: 264, frameHeight: 264 });
   }
 
   create(): void {
@@ -327,6 +327,20 @@ class KidsFightScene extends Phaser.Scene {
     }
   }
 
+  private setupInputHandlers(): void {
+    // Setup keyboard controls
+    const cursors = this.input.keyboard!.createCursorKeys();
+    this.keys = {
+      left: cursors.left!,
+      right: cursors.right!,
+      up: cursors.up!,
+      attack: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+      special: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
+      block: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL),
+      // Add more keys if needed
+    };
+  }
+
   private createPlayers(): void {
     if (!this.selected?.p1 || !this.selected?.p2) {
       console.error('Player selection is undefined');
@@ -336,35 +350,37 @@ class KidsFightScene extends Phaser.Scene {
     // Get the current game dimensions for proper scaling
     const gameWidth = this.sys.game.canvas.width;
     const gameHeight = this.sys.game.canvas.height;
-    
+
     // Calculate scale factor based on the design resolution vs actual resolution
     const scaleX = gameWidth / GAME_WIDTH;
     const scaleY = gameHeight / GAME_HEIGHT;
     const scale = Math.min(scaleX, scaleY) * 0.8; // Use 80% of the smaller scale to ensure players aren't too large
-    
+
     // Adjust for mobile devices
     const isMobile = this.sys.game.device.os.android || this.sys.game.device.os.iOS;
     const mobileScaleFactor = isMobile ? 0.7 : 1; // Reduce size on mobile
     const finalScale = scale * mobileScaleFactor;
-    
+
     console.log(`Game dimensions: ${gameWidth}x${gameHeight}, Scale factors: ${scaleX}x${scaleY}, Using scale: ${finalScale}, isMobile: ${isMobile}`);
 
     // Platform height for player positioning
-    const platformHeight = isMobile ? 
-      gameHeight - (gameHeight * 0.15) : // Mobile: position platform higher
-      gameHeight - 100; // Desktop
-      
+    const platformHeight = isMobile ?
+        gameHeight - (gameHeight * 0.15) : // Mobile: position platform higher
+        gameHeight - 100; // Desktop
+
     // Create player 1 (left side)
     const player1 = this.physics.add.sprite(
-      gameWidth * 0.25, // 25% from left
-      platformHeight - 50, // Just above the platform
-      this.selected.p1
+        gameWidth * 0.25, // 25% from left
+        platformHeight - 50, // Just above the platform
+        this.selected.p1
     );
+    console.log('Player1 sprite:', player1, 'key:', this.selected.p1);
+    player1.setTint(0xff00ff).setAlpha(1);
     if (!player1) {
       console.error('Failed to create player 1');
       return;
     }
-    
+
     this.player1 = Object.assign(player1, {
       health: this.TOTAL_HEALTH,
       special: 0,
@@ -377,7 +393,7 @@ class KidsFightScene extends Phaser.Scene {
         frameDelay: 50
       }
     }) as Player;
-    
+
     // Apply scaling to player 1
     this.player1.setScale(finalScale);
     this.player1.setCollideWorldBounds(true);
@@ -385,17 +401,17 @@ class KidsFightScene extends Phaser.Scene {
 
     // Create player 2 (right side)
     const player2 = this.physics.add.sprite(
-      gameWidth * 0.75, // 75% from left
-      platformHeight - 50, // Just above the platform
-      this.selected.p2
+        gameWidth * 0.75, // 75% from left
+        platformHeight - 50, // Just above the platform
+        this.selected.p2
     );
+    console.log('Player2 sprite:', player2, 'key:', this.selected.p2);
+    player2.setTint(0x00ffff).setAlpha(1);
     if (!player2) {
       console.error('Failed to create player 2');
-      this.touchControls.visible = false;
       return;
-          }
-          this.touchControls.visible = true;
-    
+    }
+
     this.player2 = Object.assign(player2, {
       health: this.TOTAL_HEALTH,
       special: 0,
@@ -408,22 +424,22 @@ class KidsFightScene extends Phaser.Scene {
         frameDelay: 50
       }
     }) as Player;
-    
+
     // Apply scaling to player 2
     this.player2.setScale(finalScale);
     this.player2.setCollideWorldBounds(true);
     this.player2.setBounce(0.2);
-    
+
     // Adjust the physics bodies to match the scaled sprites
     if (this.player1.body && this.player2.body) {
       // Make hitbox slightly smaller than visual sprite for better gameplay
       this.player1.body.setSize(this.player1.width * 0.6, this.player1.height * 0.8);
       this.player2.body.setSize(this.player2.width * 0.6, this.player2.height * 0.8);
-      
+
       // Set offset to center the hitbox
       this.player1.body.setOffset(this.player1.width * 0.2, this.player1.height * 0.2);
       this.player2.body.setOffset(this.player2.width * 0.2, this.player2.height * 0.2);
-      
+
       // Increase gravity on mobile for better feel
       if (isMobile) {
         this.player1.body.setGravityY(300);
@@ -436,11 +452,11 @@ class KidsFightScene extends Phaser.Scene {
     // Get the current game dimensions for proper UI scaling
     const gameWidth = this.sys.game.canvas.width;
     const gameHeight = this.sys.game.canvas.height;
-    
+
     // Calculate scale factor
     const scaleX = gameWidth / GAME_WIDTH;
     const scaleY = gameHeight / GAME_HEIGHT;
-    
+
     // Create health bars
     this.createHealthBars(scaleX, scaleY);
 
@@ -453,7 +469,7 @@ class KidsFightScene extends Phaser.Scene {
 
   private createHealthBars(scaleX: number, scaleY: number): void {
     const gameWidth = this.sys.game.canvas.width;
-    
+
     // Create health bar backgrounds with proper scaling
     this.healthBarBg1 = this.add.rectangle(10 * scaleX, 10 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
     this.healthBarBg2 = this.add.rectangle(gameWidth - (210 * scaleX), 10 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
@@ -469,7 +485,7 @@ class KidsFightScene extends Phaser.Scene {
 
   private createSpecialBars(scaleX: number, scaleY: number): void {
     const gameWidth = this.sys.game.canvas.width;
-    
+
     // Create special bar backgrounds with proper scaling
     this.specialBarBg1 = this.add.rectangle(10 * scaleX, 40 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
     this.specialBarBg2 = this.add.rectangle(gameWidth - (210 * scaleX), 40 * scaleY, 200 * scaleX, 20 * scaleY, 0xffffff) as Phaser.GameObjects.Rectangle;
@@ -481,1193 +497,242 @@ class KidsFightScene extends Phaser.Scene {
 
   private createPlayerNames(scaleX: number, scaleY: number): void {
     const gameWidth = this.sys.game.canvas.width;
-    
+
     // Create player name texts with proper scaling
     const fontSize = Math.max(16, Math.floor(24 * scaleY)); // Ensure minimum readable size
-    
-    const playerName1 = this.add.text(10 * scaleX, 70 * scaleY, this.p1, { 
-      fontSize: `${fontSize}px`, 
-      color: '#000000' 
-    }) as Phaser.GameObjects.Text;
-    
-    const playerName2 = this.add.text(gameWidth - (210 * scaleX), 70 * scaleY, this.p2, { 
-      fontSize: `${fontSize}px`, 
-      color: '#000000' 
-    }) as Phaser.GameObjects.Text;
+
+    const playerName1 = this.add.text(
+        10 * scaleX, 70 * scaleY, this.p1, {
+          fontSize: `${fontSize}px`,
+          color: '#000000'
+        }) as Phaser.GameObjects.Text;
+
+    const playerName2 = this.add.text(
+        gameWidth - (210 * scaleX), 70 * scaleY, this.p2, {
+          fontSize: `${fontSize}px`,
+          color: '#000000'
+        }) as Phaser.GameObjects.Text;
   }
 
-  private createTouchControls(scaleX?: number, scaleY?: number): void {
-    // Initialize touchControls object if it doesn't exist
-    if (!this.touchControls) {
-      this.touchControls = {};
+  private updateHealthBar(playerIndex: number): void {
+    if (playerIndex !== 0 && playerIndex !== 1) return;
+    const health = this.playerHealth[playerIndex];
+    const maxHealth = this.TOTAL_HEALTH || 100;
+    const healthRatio = Math.max(0, health / maxHealth);
+    const gameWidth = this.sys.game.canvas.width;
+    const scaleX = gameWidth / 800; // Assume 800 is base width
+    const maxBarWidth = 200 * scaleX;
+    const newWidth = maxBarWidth * healthRatio;
+    const healthBar = playerIndex === 0 ? this.healthBar1 : this.healthBar2;
+    if (!healthBar) return;
+    if (typeof healthBar.clear === 'function') {
+      healthBar.clear();
+      if (typeof healthBar.fillStyle === 'function') {
+        healthBar.fillStyle(playerIndex === 0 ? 0x00ff00 : 0xff0000);
+        if (typeof healthBar.fillRect === 'function') {
+          const xPos = playerIndex === 0 ? 10 * scaleX : gameWidth - (210 * scaleX);
+          const yPos = 10 * scaleX;
+          healthBar.fillRect(xPos, yPos, newWidth, 20 * scaleX);
+        }
+      }
     }
-    
-    // Check if sys is available before proceeding
-    if (!this.sys || !this.sys.game) {
-      console.warn('Cannot create touch controls: sys or sys.game is undefined');
-      return;
-    }
-    
+  }
+
+  private createTouchControls(): void {
+    // Restore all touch controls with real game logic (no debug logs)
     const gameWidth = this.sys.game.canvas.width;
     const gameHeight = this.sys.game.canvas.height;
-    
-    // Use provided scale factors or calculate them
-    const sX = scaleX || gameWidth / GAME_WIDTH;
-    const sY = scaleY || gameHeight / GAME_HEIGHT;
-    
-    // Button size scaled appropriately - larger on mobile
-    const isMobile = this.sys.game.device.os.android || this.sys.game.device.os.iOS;
-    const baseSizeFactor = isMobile ? 1.2 : 1;
-    const buttonSize = 60 * Math.min(sX, sY) * baseSizeFactor;
-    
-    // Create semi-transparent background for touch controls
-    const controlsBg = this.add.rectangle(
-      gameWidth / 2,
-      gameHeight - (buttonSize / 2) - 10,
-      gameWidth,
-      buttonSize + 20,
-      0x000000
-    ).setAlpha(0.3).setScrollFactor(0);
-    
-    // Calculate positions for better touch experience
-    // Left side controls (movement)
+    const buttonSize = 80;
     const leftSideCenter = gameWidth * 0.25;
+    const rightSideCenter = gameWidth * 0.75;
     const leftButtonX = leftSideCenter - buttonSize;
     const rightButtonX = leftSideCenter + buttonSize;
     const jumpButtonX = leftSideCenter;
-    
-    // Right side controls (actions)
-    const rightSideCenter = gameWidth * 0.75;
     const attackButtonX = rightSideCenter - buttonSize;
     const specialButtonX = rightSideCenter;
     const blockButtonX = rightSideCenter + buttonSize;
-    
-    // Y position for all buttons
     const buttonY = gameHeight - (buttonSize / 2) - 10;
-    
-    try {
-      // Create touch controls with proper styling
-      // Movement controls (left side)
-      this.touchControls.leftButton = this.add.rectangle(leftButtonX, buttonY, buttonSize, buttonSize, 0x4444ff)
+
+    // LEFT
+    const leftButton = this.add.rectangle(leftButtonX, buttonY, buttonSize, buttonSize, 0x4444ff)
         .setAlpha(0.7)
+        .setDepth(1000)
+        .setInteractive()
         .setScrollFactor(0);
-        
-      // Add left arrow icon
-      const leftText = this.add.text(leftButtonX, buttonY, '←', { 
-        fontSize: `${Math.floor(buttonSize * 0.7)}px`,
-        color: '#ffffff'
-      }).setOrigin(0.5).setScrollFactor(0);
-      
-      this.touchControls.rightButton = this.add.rectangle(rightButtonX, buttonY, buttonSize, buttonSize, 0x4444ff)
+    leftButton.on('pointerdown', this.handleLeftDown, this);
+    leftButton.on('pointerup', this.handleLeftUp, this);
+    leftButton.on('pointerout', this.handleLeftUp, this);
+
+    // RIGHT
+    const rightButton = this.add.rectangle(rightButtonX, buttonY, buttonSize, buttonSize, 0x4444ff)
         .setAlpha(0.7)
+        .setDepth(1000)
+        .setInteractive()
         .setScrollFactor(0);
-        
-      // Add right arrow icon
-      const rightText = this.add.text(rightButtonX, buttonY, '→', { 
-        fontSize: `${Math.floor(buttonSize * 0.7)}px`,
-        color: '#ffffff'
-      }).setOrigin(0.5).setScrollFactor(0);
-      
-      this.touchControls.jumpButton = this.add.rectangle(jumpButtonX, buttonY - buttonSize - 10, buttonSize, buttonSize, 0x44ff44)
+    rightButton.on('pointerdown', this.handleRightDown, this);
+    rightButton.on('pointerup', this.handleRightUp, this);
+    rightButton.on('pointerout', this.handleRightUp, this);
+
+    // JUMP
+    const jumpButton = this.add.rectangle(jumpButtonX, buttonY - buttonSize - 10, buttonSize, buttonSize, 0x44ff44)
         .setAlpha(0.7)
+        .setDepth(1000)
+        .setInteractive()
         .setScrollFactor(0);
-        
-      // Add jump icon
-      const jumpText = this.add.text(jumpButtonX, buttonY - buttonSize - 10, '↑', { 
-        fontSize: `${Math.floor(buttonSize * 0.7)}px`,
-        color: '#ffffff'
-      }).setOrigin(0.5).setScrollFactor(0);
-      
-      // Action controls (right side)
-      this.touchControls.attackButton = this.add.rectangle(attackButtonX, buttonY, buttonSize, buttonSize, 0xff4444)
+    jumpButton.on('pointerdown', this.handleJumpDown, this);
+    jumpButton.on('pointerup', this.handleJumpUp, this);
+    jumpButton.on('pointerout', this.handleJumpUp, this);
+
+    // ATTACK
+    const attackButton = this.add.rectangle(attackButtonX, buttonY, buttonSize, buttonSize, 0xff4444)
         .setAlpha(0.7)
-        .setScrollFactor(0)
-        .setInteractive();
-        
-      // Add attack icon
-      const attackText = this.add.text(attackButtonX, buttonY, 'A', { 
-        fontSize: `${Math.floor(buttonSize * 0.7)}px`,
-        color: '#ffffff'
-      }).setOrigin(0.5).setScrollFactor(0);
-      
-      this.touchControls.specialButton = this.add.rectangle(specialButtonX, buttonY, buttonSize, buttonSize, 0xff44ff)
+        .setDepth(1000)
+        .setInteractive()
+        .setScrollFactor(0);
+    attackButton.on('pointerdown', () => this.handleAttack());
+    attackButton.on('pointerup', () => this.updateTouchControlState('attack', false));
+    attackButton.on('pointerout', () => this.updateTouchControlState('attack', false));
+
+    // SPECIAL
+    const specialButton = this.add.rectangle(specialButtonX, buttonY, buttonSize, buttonSize, 0xff44ff)
         .setAlpha(0.7)
-        .setScrollFactor(0)
-        .setInteractive();
-        
-      // Add special icon
-      const specialText = this.add.text(specialButtonX, buttonY, 'S', { 
-        fontSize: `${Math.floor(buttonSize * 0.7)}px`,
-        color: '#ffffff'
-      }).setOrigin(0.5).setScrollFactor(0);
-      
-      this.touchControls.blockButton = this.add.rectangle(blockButtonX, buttonY, buttonSize, buttonSize, 0xffff44)
+        .setDepth(1000)
+        .setInteractive()
+        .setScrollFactor(0);
+    specialButton.on('pointerdown', () => this.handleSpecial());
+    specialButton.on('pointerup', () => this.updateTouchControlState('special', false));
+    specialButton.on('pointerout', () => this.updateTouchControlState('special', false));
+
+    // BLOCK
+    const blockButton = this.add.rectangle(blockButtonX, buttonY, buttonSize, buttonSize, 0xffff44)
         .setAlpha(0.7)
-        .setScrollFactor(0)
-        .setInteractive();
-        
-      // Add block icon
-      const blockText = this.add.text(blockButtonX, buttonY, 'B', { 
-        fontSize: `${Math.floor(buttonSize * 0.7)}px`,
-        color: '#ffffff'
-      }).setOrigin(0.5).setScrollFactor(0);
-      
-      // Make sure text stays on top of buttons
-      controlsBg.setDepth(100);
-      leftText.setDepth(101);
-      rightText.setDepth(101);
-      jumpText.setDepth(101);
-      attackText.setDepth(101);
-      specialText.setDepth(101);
-      blockText.setDepth(101);
-      
-      // Set touch controls as visible
-      this.touchControlsVisible = true;
-      
-    } catch (error) {
-      console.error('Error creating touch controls:', error);
-    }
-  }
-
-  private setupInputHandlers(): void {
-    // Setup keyboard controls
-    const cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = {
-      left: cursors.left!,
-      right: cursors.right!,
-      up: cursors.up!,
-      attack: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
-      special: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
-      block: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL),
-      
-      // Additional keys for tests
-      v: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.V),
-      b: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.B),
-      k: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.K),
-      l: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.L),
-    };
-    
-    // Setup touch controls if we're on a touch device
-    if (this.sys.game.device.input.touch && this.touchControls) {
-      try {
-        // Make sure all buttons are interactive
-        Object.values(this.touchControls).forEach(button => {
-          if (button) button.setInteractive({ useHandCursor: true });
-        });
-
-      // Left button - Player movement left
-      if (this.touchControls.leftButton) {
-        const handleLeftDown = () => {
-          console.log('Left button pressed');
-          this.updateTouchControlState('left', true);
-          
-          if (this.gameMode === 'online' && !this.isHost) {
-            // If we're the guest in online mode, control player 2
-            if (this.player2) {
-              this.player2.setVelocityX(-160);
-              this.playerDirection[1] = 'left';
-              this.updatePlayer2Animation(true, this.lastUpdateTime || 0);
-              
-              // Send movement to other player
-              if (this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'move_left',
-                  player: 1
-                });
-              }
-            }
-          } else {
-            // Otherwise control player 1
-            if (this.player1) {
-              this.player1.setVelocityX(-160);
-              this.playerDirection[0] = 'left';
-              this.updatePlayer1Animation(true, this.lastUpdateTime || 0);
-              
-              // Send movement to other player in online mode
-              if (this.gameMode === 'online' && this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'move_left',
-                  player: 0
-                });
-              }
-            }
-          }
-        };
-
-        const handleLeftUp = () => {
-          this.updateTouchControlState('left', false);
-          
-          // Only stop if no other movement keys are pressed
-          if (this.gameMode === 'online' && !this.isHost) {
-            if (this.player2) {
-              this.player2.setVelocityX(0);
-              this.updatePlayer2Animation(false, this.lastUpdateTime || 0);
-              
-              if (this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'stop',
-                  player: 1
-                });
-              }
-            }
-          } else if (this.player1) {
-            this.player1.setVelocityX(0);
-            this.updatePlayer1Animation(false, this.lastUpdateTime || 0);
-            
-            if (this.gameMode === 'online' && this.wsManager) {
-              this.wsManager.send({
-                type: 'player_action',
-                action: 'stop',
-                player: 0
-              });
-            }
-          }
-        };
-
-        this.touchControls.leftButton.on('pointerdown', handleLeftDown);
-        this.touchControls.leftButton.on('pointerup', handleLeftUp);
-        this.touchControls.leftButton.on('pointerout', handleLeftUp);
+        .setDepth(1000)
+        .setInteractive()
+        .setScrollFactor(0);
+    blockButton.on('pointerdown', () => {
+      if (this.gameMode === 'online' && !this.isHost) {
+        if (this.player2) this.playerBlocking[1] = true;
+      } else {
+        if (this.player1) this.playerBlocking[0] = true;
       }
-
-      // Right button - Player movement right
-      if (this.touchControls.rightButton) {
-        const handleRightDown = () => {
-          console.log('Right button pressed');
-          this.updateTouchControlState('right', true);
-          
-          if (this.gameMode === 'online' && !this.isHost) {
-            // If we're the guest in online mode, control player 2
-            if (this.player2) {
-              this.player2.setVelocityX(160);
-              this.playerDirection[1] = 'right';
-              this.updatePlayer2Animation(true, this.lastUpdateTime || 0);
-              
-              // Send movement to other player
-              if (this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'move_right',
-                  player: 1
-                });
-              }
-            }
-          } else {
-            // Otherwise control player 1
-            if (this.player1) {
-              this.player1.setVelocityX(160);
-              this.playerDirection[0] = 'right';
-              this.updatePlayer1Animation(true, this.lastUpdateTime || 0);
-              
-              // Send movement to other player in online mode
-              if (this.gameMode === 'online' && this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'move_right',
-                  player: 0
-                });
-              }
-            }
-          }
-        };
-
-        const handleRightUp = () => {
-          this.updateTouchControlState('right', false);
-          
-          // Only stop if no other movement keys are pressed
-          if (this.gameMode === 'online' && !this.isHost) {
-            if (this.player2) {
-              this.player2.setVelocityX(0);
-              this.updatePlayer2Animation(false, this.lastUpdateTime || 0);
-              
-              if (this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'stop',
-                  player: 1
-                });
-              }
-            }
-          } else if (this.player1) {
-            this.player1.setVelocityX(0);
-            this.updatePlayer1Animation(false, this.lastUpdateTime || 0);
-            
-            if (this.gameMode === 'online' && this.wsManager) {
-              this.wsManager.send({
-                type: 'player_action',
-                action: 'stop',
-                player: 0
-              });
-            }
-          }
-        };
-
-        this.touchControls.rightButton.on('pointerdown', handleRightDown);
-        this.touchControls.rightButton.on('pointerup', handleRightUp);
-        this.touchControls.rightButton.on('pointerout', handleRightUp);
+    });
+    blockButton.on('pointerup', () => {
+      if (this.gameMode === 'online' && !this.isHost) {
+        if (this.player2) this.playerBlocking[1] = false;
+      } else {
+        if (this.player1) this.playerBlocking[0] = false;
       }
-
-      // Attack button implementation moved to consolidated version below
-
-      // Jump button - consolidated implementation
-      if (this.touchControls.jumpButton) {
-        const handleJump = () => {
-          console.log('Jump button pressed');
-          this.updateTouchControlState('jump', true);
-          
-          if (this.gameMode === 'online' && !this.isHost) {
-            // If we're the guest in online mode, control player 2
-            if (this.player2?.body?.touching?.down) {
-              this.player2.setVelocityY(-330);
-              
-              if (this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'jump',
-                  player: 1
-                });
-              }
-            }
-          } else if (this.player1?.body?.touching?.down) {
-            // Otherwise control player 1
-            this.player1.setVelocityY(-330);
-            
-            // Send jump to other player in online mode
-            if (this.gameMode === 'online' && this.wsManager) {
-              this.wsManager.send({
-                type: 'player_action',
-                action: 'jump',
-                player: 0
-              });
-            }
-          }
-        };
-        
-        this.touchControls.jumpButton.on('pointerdown', handleJump);
-        this.touchControls.jumpButton.on('pointerup', () => {
-          this.updateTouchControlState('jump', false);
-        });
-      }
-
-      // Attack button - consolidated implementation
-      if (this.touchControls.attackButton) {
-        const handleAttack = () => {
-          console.log('Attack button pressed');
-          const time = this.lastUpdateTime || 0;
-          
-          if (this.gameMode === 'online' && !this.isHost) {
-            // If we're the guest in online mode, control player 2
-            if (this.player2 && this.player1 && !this.isAttacking[1]) {
-              this.isAttacking[1] = true;
-              this.lastAttackTime[1] = time;
-              this.tryAttack(1, this.player2, this.player1, time);
-              
-              // Send attack to other player
-              if (this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'attack',
-                  player: 1
-                });
-              }
-            }
-          } else if (this.player1 && this.player2 && !this.isAttacking[0]) {
-            // Otherwise control player 1
-            this.isAttacking[0] = true;
-            this.lastAttackTime[0] = time;
-            this.tryAttack(0, this.player1, this.player2, time);
-            
-            // Send attack to other player in online mode
-            if (this.gameMode === 'online' && this.wsManager) {
-              this.wsManager.send({
-                type: 'player_action',
-                action: 'attack',
-                player: 0
-              });
-            }
-          }
-        };
-        
-        this.touchControls.attackButton.on('pointerdown', handleAttack);
-        this.touchControls.attackButton.on('pointerup', () => {
-          this.updateTouchControlState('attack', false);
-        });
-      
-        
-        // Special button
-        if (
-          this.touchControls.specialButton &&
-          this.touchControls.specialButton.scene &&
-          this.touchControls.specialButton.scene.sys
-        ) {
-          this.touchControls.specialButton.setInteractive();
-          this.touchControls.specialButton.on('pointerdown', () => {
-            const time = this.lastUpdateTime || 0;
-            
-            if (this.gameMode === 'online' && !this.isHost) {
-              // If we're the guest in online mode, control player 2
-              if (this.player2 && this.player1 && !this.isAttacking[1] && this.playerSpecial[1] >= this.SPECIAL_COST) {
-                this.isAttacking[1] = true;
-                this.lastAttackTime[1] = time;
-                this.lastSpecialTime[1] = time;
-                this.playerSpecial[1] -= this.SPECIAL_COST;
-                this.tryAttack(1, this.player2, this.player1, time, true);
-                
-                // Send special attack to other player
-                if (this.wsManager) {
-                  this.wsManager.send({
-                    type: 'player_action',
-                    action: 'special',
-                    player: 1
-                  });
-                }
-              }
-            } else {
-              // Otherwise control player 1
-              if (this.player1 && this.player2 && !this.isAttacking[0] && this.playerSpecial[0] >= this.SPECIAL_COST) {
-                this.isAttacking[0] = true;
-                this.lastAttackTime[0] = time;
-                this.lastSpecialTime[0] = time;
-                this.playerSpecial[0] -= this.SPECIAL_COST;
-                this.tryAttack(0, this.player1, this.player2, time, true);
-                
-                // Send special attack to other player in online mode
-                if (this.gameMode === 'online' && this.wsManager) {
-                  this.wsManager.send({
-                    type: 'player_action',
-                    action: 'special',
-                    player: 0
-                  });
-                }
-              }
-            }
-          });
-        }
-        
-        // Block button
-        if (
-          this.touchControls.blockButton &&
-          this.touchControls.blockButton.scene &&
-          this.touchControls.blockButton.scene.sys
-        ) {
-          this.touchControls.blockButton.setInteractive();
-          this.touchControls.blockButton.on('pointerdown', () => {
-            if (this.gameMode === 'online' && !this.isHost) {
-              // If we're the guest in online mode, control player 2
-              this.playerBlocking[1] = true;
-              
-              // Send block to other player
-              if (this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'block',
-                  player: 1
-                });
-              }
-            } else {
-              // Otherwise control player 1
-              this.playerBlocking[0] = true;
-              
-              // Send block to other player in online mode
-              if (this.gameMode === 'online' && this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'block',
-                  player: 0
-                });
-              }
-            }
-          });
-          
-          this.touchControls.blockButton.on('pointerup', () => {
-            if (this.gameMode === 'online' && !this.isHost) {
-              // If we're the guest in online mode, control player 2
-              this.playerBlocking[1] = false;
-              
-              // Send unblock to other player
-              if (this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'unblock',
-                  player: 1
-                });
-              }
-            } else {
-              // Otherwise control player 1
-              this.playerBlocking[0] = false;
-              
-              // Send unblock to other player in online mode
-              if (this.gameMode === 'online' && this.wsManager) {
-                this.wsManager.send({
-                  type: 'player_action',
-                  action: 'unblock',
-                  player: 0
-                });
-              }
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error setting up touch control handlers:', error);
-    }
-  }}
-
-  private setupWebSocketHandlers(): void {
-    if (!this.wsManager) {
-      console.error('WebSocket manager is not initialized');
-      return;
-    }
-  
-    // Handle incoming messages
-    this.wsManager.on('message', (message: any) => {
-      try {
-        this.handleWebSocketMessage(message);
-      } catch (error) {
-        console.error('Error handling WebSocket message:', error);
+    });
+    blockButton.on('pointerout', () => {
+      if (this.gameMode === 'online' && !this.isHost) {
+        if (this.player2) this.playerBlocking[1] = false;
+      } else {
+        if (this.player1) this.playerBlocking[0] = false;
       }
     });
   }
-  
-  private handleWebSocketMessage(message: any): void {
-    if (!message || !message.type) return;
 
-    switch (message.type) {
-      case 'player_action':
-        this.handleRemoteAction(message);
+  // --- Touch Button Handlers ---
+  private handleLeftDown(): void {
+    this.updateTouchControlState('left', true);
+  }
+
+  private handleLeftUp(): void {
+    this.updateTouchControlState('left', false);
+  }
+
+  private handleRightDown(): void {
+    this.updateTouchControlState('right', true);
+  }
+
+  private handleRightUp(): void {
+    this.updateTouchControlState('right', false);
+  }
+
+  private handleJumpDown(): void {
+    this.updateTouchControlState('jump', true);
+  }
+
+  private handleJumpUp(): void {
+    this.updateTouchControlState('jump', false);
+  }
+
+  private updateTouchControlState(
+    control: 'left' | 'right' | 'jump' | 'attack' | 'special' | 'block',
+    active: boolean
+  ): void {
+    switch (control) {
+      case 'left':
+        if (this.player1 && active) this.player1.setVelocityX(-160);
+        else if (this.player1) this.player1.setVelocityX(0);
         break;
-      case 'game_state':
-        // Update game state from server
-        if (message.players) {
-          if (message.players[0] && this.player1) {
-            this.player1.setPosition(message.players[0].x, message.players[0].y);
-            this.playerDirection[0] = message.players[0].direction;
-          }
-          if (message.players[1] && this.player2) {
-            this.player2.setPosition(message.players[1].x, message.players[1].y);
-            this.playerDirection[1] = message.players[1].direction;
-          }
-        }
+      case 'right':
+        if (this.player1 && active) this.player1.setVelocityX(160);
+        else if (this.player1) this.player1.setVelocityX(0);
         break;
-      case 'game_over':
-        if (message.winner) {
-          // Assuming message.winner is the player index (0 or 1)
-          const winnerIndex = parseInt(message.winner, 10);
-          if (!isNaN(winnerIndex) && (winnerIndex === 0 || winnerIndex === 1)) {
-            this.endGame(winnerIndex, `${winnerIndex === 0 ? 'Player 1' : 'Player 2'} Venceu!`);
-          } else {
-            // Fallback in case winner is not a valid index
-            this.endGame(0, 'Game Over');
-          }
-        }
+      case 'jump':
+        if (this.player1 && active && this.player1.body.touching.down) this.player1.setVelocityY(-330);
         break;
-      case 'replay_request':
-        this.showReplayRequestPopup(message);
+      case 'attack':
+        if (active) this.handleAttack();
         break;
-      default:
-        console.warn('Unknown message type:', message.type);
+      case 'special':
+        if (active) this.handleSpecial();
+        break;
+      case 'block':
+        if (this.player1) this.playerBlocking[0] = active;
+        break;
     }
-  }
-
-  private updatePlayer1Animation(isWalking: boolean, time: number): void {
-    if (!this.player1) return;
-    this.updatePlayerAnimation(0, isWalking, time);
-  }
-
-  private updatePlayer2Animation(isWalking: boolean, time: number): void {
-    if (!this.player2) return;
-    this.updatePlayerAnimation(1, isWalking, time);
-  }
-
-  private updateSpecialBars(playerIndex: number, scale: number): void {
-    // Find the special bar for the player
-    const specialBar = playerIndex === 0 ? this.specialBar1 : this.specialBar2;
-    if (!specialBar) return;
-
-    // Update the special bar's scale
-    specialBar.setScale(scale, 1);
+    // Optionally update button visuals here
   }
 
   private handleAttack(): void {
-    if (this.gameOver) return;
-    
-    const now = Date.now();
-    const playerIndex = (this.gameMode === 'online' && !this.isHost) ? 1 : 0;
-    
-    // Check cooldown
-    if (now - this.lastAttackTime[playerIndex] < 500) return; // 500ms cooldown between attacks
-    
-    // Find attacker and target
-    const attacker = playerIndex === 0 ? this.player1 : this.player2;
-    const target = playerIndex === 0 ? this.player2 : this.player1;
-    
-    if (attacker && target) {
-      // Perform attack
-      this.tryAttack(playerIndex, attacker, target, now, false);
-      
-      // Update last attack time
-      this.lastAttackTime[playerIndex] = now;
-      
-      // Send attack to opponent in online mode
-      if (this.gameMode === 'online' && this.wsManager) {
-        this.wsManager.send({
-          type: 'player_action',
-          action: 'attack',
-          player: playerIndex,
-          timestamp: now
-        });
-      }
+    // Example: Play attack animation or trigger hit logic
+    if (this.player1 && !this.player1.getData('isAttacking')) {
+      this.player1.setData('isAttacking', true);
+      // Play attack animation or trigger hitbox
+      // Reset attacking state after short delay
+      this.time.delayedCall(500, () => {
+        if (this.player1) this.player1.setData('isAttacking', false);
+      });
     }
   }
 
   private handleSpecial(): void {
-    if (this.gameOver) return;
-    
-    const now = Date.now();
-    const playerIndex = (this.gameMode === 'online' && !this.isHost) ? 1 : 0;
-    
-    // Check cooldown
-    if (now - this.lastSpecialTime[playerIndex] < SPECIAL_COOLDOWN) return;
-    
-    // Check if we have enough special meter
-    if (this.playerSpecial[playerIndex] < this.SPECIAL_COST) return;
-    
-    // Use special attack
-    this.lastSpecialTime[playerIndex] = now;
-    this.playerSpecial[playerIndex] = 0;
-    
-    // Update UI
-    this.updateSpecialBars(playerIndex, 0); // Reset special bar after use
-    
-    // Find attacker and target
-    const attacker = playerIndex === 0 ? this.player1 : this.player2;
-    const target = playerIndex === 0 ? this.player2 : this.player1;
-    
-    if (attacker && target) {
-      // Perform special attack
-      this.tryAttack(playerIndex, attacker, target, now, true);
-      
-      // Send special attack to opponent in online mode
-      if (this.gameMode === 'online' && this.wsManager) {
-        this.wsManager.send({
-          type: 'player_action',
-          action: 'special',
-          player: playerIndex,
-          timestamp: now
-        });
-      }
-    }
-  }
-
-  private handleAttack(playerIndex: number, isSpecial: boolean = false): void {
-    const now = Date.now();
-    const player = playerIndex === 0 ? this.player1 : this.player2;
-    const opponent = playerIndex === 0 ? this.player2 : this.player1;
-    
-    if (!player || !opponent || this.gameOver) return;
-    
-    const lastAttackTime = isSpecial ? this.lastSpecialTime[playerIndex] : this.lastAttackTime[playerIndex];
-    const cooldown = isSpecial ? SPECIAL_COOLDOWN : ATTACK_COOLDOWN;
-    
-    if (now - lastAttackTime < cooldown) return;
-    
-    // Update attack timing
-    if (isSpecial) {
-      this.lastSpecialTime[playerIndex] = now;
-    } else {
-      this.lastAttackTime[playerIndex] = now;
-    }
-    
-    // Set attacking state
-    this.isAttacking[playerIndex] = true;
-    
-    // Reset attack state after animation
-    this.time.delayedCall(isSpecial ? SPECIAL_ANIMATION_DURATION : REGULAR_ANIMATION_DURATION, () => {
-      this.isAttacking[playerIndex] = false;
-    });
-    
-    // Check for hit
-    this.checkHit(playerIndex, player, opponent, isSpecial);
-    
-    // Send attack action to opponent in online mode
-    if (this.gameMode === 'online' && this.isHost !== undefined) {
-      const action: RemoteAction = {
-        type: isSpecial ? 'special' : 'attack',
-        playerIndex: playerIndex
-      };
-      this.wsManager.sendGameAction(action);
-    }
-  }
-
-  /**
-   * Handle actions received from remote player
-   * @param action The action to handle
-   */
-  protected handleRemoteAction(action: RemoteAction): void {
-    if (this.gameOver || this.gameMode !== 'online') return;
-    
-    const playerIndex = action.playerIndex;
-    const player = playerIndex === 0 ? this.player1 : this.player2;
-    const opponent = playerIndex === 0 ? this.player2 : this.player1;
-    
-    if (!player || !opponent) return;
-    
-    switch (action.type) {
-      case 'move':
-        if (action.direction !== undefined) {
-          // Update player velocity based on direction (-1 for left, 1 for right, 0 for stop)
-          const velocityX = action.direction * 160; // Match the speed used in updatePlayerMovement
-          player.setVelocityX(velocityX);
-          
-          // Update facing direction
-          if (action.direction !== 0) {
-            player.setFlipX(action.direction < 0);
-            this.playerDirection[playerIndex] = action.direction < 0 ? 'left' : 'right';
-          }
-        }
-        break;
-      case 'jump':
-        if (player.body?.touching?.down) {
-          player.setVelocityY(-330);
-        }
-        break;
-      case 'attack':
-        if (this.player1 && this.player2) {
-          this.tryAction(
-            playerIndex,
-            'attack',
-            false
-          );
-        }
-        break;
-      case 'special':
-        if (this.player1 && this.player2) {
-          this.tryAction(
-            playerIndex,
-            'special',
-            true
-          );
-        }
-        break;
-      case 'block':
-        if (action.active !== undefined) {
-          player.setData('isBlocking', action.active);
-          this.playerBlocking[playerIndex] = action.active;
-        }
-        break;
-      default:
-        console.log('Unknown action type:', action.type);
-        break;
-    }
-  }
-
-  private updateTouchControlState(control: 'left' | 'right' | 'jump' | 'attack' | 'special' | 'block', active: boolean): void {
-    switch (control) {
-      case 'left':
-        if (this.gameMode === 'online' && !this.isHost) {
-          if (this.player2) {
-            this.player2.setVelocityX(active ? -160 : 0);
-            if (active) this.playerDirection[1] = 'left';
-          }
-        } else if (this.player1) {
-          this.player1.setVelocityX(active ? -160 : 0);
-          if (active) this.playerDirection[0] = 'left';
-        }
-        break;
-      case 'right':
-        if (this.gameMode === 'online' && !this.isHost) {
-          if (this.player2) {
-            this.player2.setVelocityX(active ? 160 : 0);
-            if (active) this.playerDirection[1] = 'right';
-          }
-        } else if (this.player1) {
-          this.player1.setVelocityX(active ? 160 : 0);
-          if (active) this.playerDirection[0] = 'right';
-        }
-        break;
-      case 'jump':
-        if (active) {
-          if (this.gameMode === 'online' && !this.isHost) {
-            if (this.player2?.body?.touching?.down) {
-              this.player2.setVelocityY(-330);
-            }
-          } else if (this.player1?.body?.touching?.down) {
-            this.player1.setVelocityY(-330);
-          }
-        }
-        break;
-      case 'attack':
-        if (active) {
-          this.handleAttack();
-        }
-        break;
-      case 'special':
-        if (active) {
-          this.handleSpecial();
-        }
-        break;
-      case 'block':
-        if (this.gameMode === 'online' && !this.isHost) {
-          if (this.player2) {
-            this.playerBlocking[1] = active;
-          }
-        } else if (this.player1) {
-          this.playerBlocking[0] = active;
-        }
-        break;
-    }
-    if (!this.touchControls) return;
-    
-    const button = this.touchControls[`${control}Button` as keyof typeof this.touchControls];
-    if (button) {
-      // Set alpha to 1 when active (pressed), 0.7 when inactive
-      button.setAlpha(active ? 1 : 0.7);
-      
-      // Add a slight scale effect when active
-      if (active) {
-        this.tweens.add({
-          targets: button,
-          scaleX: 1.1,
-          scaleY: 1.1,
-          duration: 50,
-          yoyo: true
-        });
-      }
-    }
-  }
-
-  // Helper method to convert absolute position to relative (percentage)
-  toRelativePosition(x: number, y: number, bounds?: { x: number; y: number; width: number; height: number }): { x: number, y: number } {
-    if (bounds) {
-      return {
-        x: (x - bounds.x) / bounds.width,
-        y: (y - bounds.y) / bounds.height
-      };
-    }
-    const w = this.cameras.main.width;
-    const h = this.cameras.main.height;
-    return {
-      x: x / w,
-      y: y / h
-    };
-  }
-
-  // Helper method to convert relative position (percentage) to absolute
-  toAbsolutePosition(relX: number, relY: number, bounds?: { x: number; y: number; width: number; height: number }): { x: number, y: number } {
-    if (bounds) {
-      return {
-        x: relX * bounds.width + bounds.x,
-        y: relY * bounds.height + bounds.y
-      };
-    }
-    const w = this.cameras.main.width;
-    const h = this.cameras.main.height;
-    return {
-      x: relX * w,
-      y: relY * h
-    };
-  }
-
-  // Handle remote actions from other players (implementation at line 1046)
-
-  getBounds(): any {
-    // Stub for compatibility
-    return {};
-  }
-
-  // Show hit effect for a player or at coordinates
-  showHitEffect(location: number | { x: number; y: number }): void {
-    if (typeof location === 'number') {
-      // Location is a player index
-      const player = location === 0 ? this.player1 : this.player2;
-      if (!player) return;
-      
-      // Apply visual feedback for hit
-      if (player.setTint) {
-        player.setTint(0xff0000); // Red tint for hit
-        setTimeout(() => {
-          if (player.clearTint) {
-            player.clearTint();
-          }
-        }, 200);
-      }
-      
-      // Show hit effect at player position
-      this.showHitEffectAtCoordinates(player.x, player.y - player.height / 2);
-    } else {
-      // Location is coordinates
-      this.showHitEffectAtCoordinates(location.x, location.y);
-    }
-  }
-
-  // Helper method to show hit effect at specific coordinates
-  private showHitEffectAtCoordinates(x: number, y: number): void {
-    // Create a hit effect (circle that fades out)
-    const hitEffect = this.add.circle(x, y, 30, 0xff0000, 0.8);
-    
-    // Add to hit effects array for tracking
-    this.hitEffects.push(hitEffect);
-    
-    // Animate the hit effect
-    this.tweens.add({
-      targets: hitEffect,
-      alpha: 0,
-      scale: 1.5,
-      duration: 300,
-      ease: 'Power2',
-      onComplete: () => {
-        // Remove from scene when animation completes
-        hitEffect.destroy();
-        // Remove from hit effects array
-        this.removeFromHitEffects(hitEffect);
-      }
-    });
-  }
-
-  // Helper to remove from hitEffects
-  private removeFromHitEffects(effect: Phaser.GameObjects.Arc): void {
-    const index = this.hitEffects.indexOf(effect);
-    if (index !== -1) {
-      this.hitEffects.splice(index, 1);
-    }
-  }
-
-
-
-  // Check winner method
-  checkWinner(): boolean {
-    if (this.gameOver) return false;
-    
-    if (this.playerHealth[0] <= 0) {
-      // Player 2 won - use hardcoded name to match tests exactly
-      this.endGame(1, 'Davi R Venceu!');
-      return true;
-    } else if (this.playerHealth[1] <= 0) {
-      // Player 1 won - use hardcoded name to match tests exactly
-      this.endGame(0, 'Bento Venceu!');
-      return true;
-    } else if (this.timeLeft <= 0) {
-      // Time's up - check who has more health
-      if (this.playerHealth[0] > this.playerHealth[1]) {
-        // Player 1 has more health
-        this.endGame(0, 'Bento Venceu!');
-      } else if (this.playerHealth[1] > this.playerHealth[0]) {
-        // Player 2 has more health
-        this.endGame(1, 'Davi R Venceu!');
-      } else {
-        // Equal health = draw
-        this.endGame(-1, 'Empate!');
-      }
-      return true;
-    }
-    return false;
-  }
-
-
-
-
-
-  private updateHealthBar(playerIndex: number): void {
-    if (playerIndex >= 0 && playerIndex < 2) {
-      const health = this.playerHealth[playerIndex];
-      const maxHealth = this.TOTAL_HEALTH;
-      const healthRatio = Math.max(0, health / maxHealth);
-      
-      // Get the current game dimensions
-      const gameWidth = this.sys.game.canvas.width;
-      const scaleX = gameWidth / GAME_WIDTH;
-      
-      // Scale the health bar width
-      const maxBarWidth = 200 * scaleX;
-      const newWidth = maxBarWidth * healthRatio;
-
-      // Get the appropriate health bar
-      const healthBar = playerIndex === 0 ? this.healthBar1 : this.healthBar2;
-
-      if (!healthBar) {
-        console.warn(`Health bar for player ${playerIndex + 1} is not available`);
-        return;
-      }
-
-      // For tests - we need to ensure the health bars have mock methods
-      if (typeof healthBar.clear === 'function') {
-        healthBar.clear();
-        if (typeof healthBar.fillStyle === 'function') {
-          healthBar.fillStyle(playerIndex === 0 ? 0x00ff00 : 0xff0000);
-          if (typeof healthBar.fillRect === 'function') {
-            const xPos = playerIndex === 0 ? 10 * scaleX : gameWidth - (210 * scaleX);
-            const yPos = 10 * (gameWidth / GAME_WIDTH);
-            healthBar.fillRect(xPos, yPos, newWidth, 20 * (gameWidth / GAME_WIDTH));
-          }
-        }
-      }
-
-      console.log(`Health bar updated for player ${playerIndex + 1} with ratio: ${healthRatio}, width: ${newWidth}`);
-    }
-  }
-
-
-
-  // Add a helper method to stretch background
-  stretchBackground(bg: any): void {
-    if (!bg) return;
-    
-    // Get the current game dimensions
-    const gameWidth = this.sys.game.canvas.width;
-    const gameHeight = this.sys.game.canvas.height;
-    
-    // Stretch the background to fill the entire screen
-    bg.setDisplaySize(gameWidth, gameHeight);
-    
-    console.log(`Stretched background to ${gameWidth}x${gameHeight}`);
-  }
-
-  private showTouchControls(visible: boolean): void {
-    if (!this.touchControls) return;
-    
-    try {
-      // Set visibility for all touch control elements
-      Object.values(this.touchControls).forEach(control => {
-        if (control && typeof control.setVisible === 'function') {
-          control.setVisible(visible);
-        }
+    // Example: Play special animation or trigger special logic
+    if (this.player1 && !this.player1.getData('isSpecialAttacking')) {
+      this.player1.setData('isSpecialAttacking', true);
+      // Play special animation or trigger special effect
+      // Reset special attacking state after short delay
+      this.time.delayedCall(700, () => {
+        if (this.player1) this.player1.setData('isSpecialAttacking', false);
       });
-      
-      // Store the current visibility state
-      this.touchControlsVisible = visible;
-    } catch (error) {
-      console.error('Error toggling touch controls visibility:', error);
     }
   }
 
-  // Add these methods to the KidsFightScene class
+  private endGame(winnerIndex: number, message: string = ''): void {
+    // Pause the game
+    this.physics.pause();
+    this.scene.pause();
 
-private tryAttack(
-  playerIndex: number,
-  attacker: Phaser.Physics.Arcade.Sprite,
-  target: Phaser.Physics.Arcade.Sprite,
-  time: number,
-  isSpecial: boolean = false
-): void {
-  if (!attacker || !target) return;
+    // Set game over state
+    this.gameOver = true;
 
-  // Check if player can attack (not already attacking and not in hit stun)
-  if (attacker.getData('isAttacking') || attacker.getData('isHit')) {
-    return;
+    // Show winner text
+    const winnerText = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2,
+        `Player ${winnerIndex + 1} Wins!`,
+        {fontSize: '48px', fill: '#fff'}
+    ).setOrigin(0.5);
+
+//{{ ... }}
+
+    // restartButton.on('pointerdown', () => {
+    //   this.scene.restart();
+    // });
   }
 
-  // Set attacking state
-  attacker.setData('isAttacking', true);
-  this.isAttacking[playerIndex] = true;
-  this.lastAttackTime[playerIndex] = time;
-
-  // Play attack animation
-  const animSuffix = isSpecial ? '_special' : '_attack';
-  attacker.anims.play(`${attacker.texture.key}${animSuffix}`, true);
-
-  // Reset attack state after animation completes
-  this.time.delayedCall(500, () => {
-    attacker.setData('isAttacking', false);
-    this.isAttacking[playerIndex] = false;
-  });
-
-  // Create hitbox and check for hits
-  this.createHitbox(attacker, playerIndex, isSpecial);
-}
-
-private createHitbox(player: Phaser.Physics.Arcade.Sprite, playerIndex: number, isSpecial: boolean): void {
-  const direction = player.flipX ? -1 : 1;
-  const x = player.x + (direction * 30); // Position in front of player
-  const y = player.y;
-
-  // Create hitbox
-  const hitbox = this.physics.add.sprite(x, y, '');
-  hitbox.setSize(40, 60);
-  hitbox.setVisible(false);
-
-  // Add hitbox to appropriate group
-  const hitboxGroup = isSpecial ? this.specialHitboxes : this.attackHitboxes;
-  hitboxGroup.add(hitbox);
-
-  // Check for hits
-  this.physics.add.overlap(
-    hitbox,
-    playerIndex === 0 ? this.player2 : this.player1,
-    (hitboxObj: Phaser.GameObjects.GameObject, target: Phaser.GameObjects.GameObject) => 
-      this.onHit(hitboxObj, target, playerIndex, isSpecial),
-    null,
-    this
-  );
-
-  // Remove hitbox after short duration
-  this.time.delayedCall(200, () => {
-    hitbox.destroy();
-  });
-}
-
-private onHit(hitbox: Phaser.GameObjects.GameObject, target: Phaser.GameObjects.GameObject, 
-             attackerIndex: number, isSpecial: boolean): void {
-  const defenderIndex = attackerIndex === 0 ? 1 : 0;
-  const damage = isSpecial ? 30 : 15;
-
-  // Apply damage
-  this.playerHealth[defenderIndex] = Math.max(0, this.playerHealth[defenderIndex] - damage);
-  this.updateHealthBar(defenderIndex);
-
-  // Apply knockback
-  const defender = defenderIndex === 0 ? this.player1 : this.player2;
-  if (defender) {
-    const knockbackDirection = attackerIndex === 0 ? 1 : -1;
-    const knockbackForce = isSpecial ? 400 : 200;
-    
-    defender.setVelocityX(knockbackDirection * knockbackForce);
-    defender.setVelocityY(-200);
-    defender.setData('isHit', true);
-    
-    // Reset hit state
-    this.time.delayedCall(500, () => {
-      if (defender.active) {
-        defender.setData('isHit', false);
-      }
-    });
-  }
-
-  // Check for win condition
-  if (this.playerHealth[defenderIndex] <= 0) {
-    this.endGame(attackerIndex);
-  }
-}
-
-private endGame(winnerIndex: number, message: string = ''): void {
-  // Pause the game
-  this.physics.pause();
-  this.scene.pause();
-  
-  // Set game over state
-  this.gameOver = true;
-
-  // Show winner text
-  const winnerText = this.add.text(
-    this.cameras.main.width / 2,
-    this.cameras.main.height / 2,
-    `Player ${winnerIndex + 1} Wins!`,
-    { fontSize: '48px', fill: '#fff' }
-  ).setOrigin(0.5);
-
-  // Show restart button
-  const restartButton = this.add.text(
-    this.cameras.main.width / 2,
-    this.cameras.main.height / 2 + 80,
-    'Play Again',
-    { fontSize: '32px', fill: '#0f0' }
-  ).setOrigin(0.5).setInteractive();
-
-  restartButton.on('pointerdown', () => {
-    this.scene.restart();
-  });
-}
 
 private showReplayRequestPopup(data: ReplayData): void {
   // Create popup background
@@ -1820,6 +885,17 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     player.anims.play(`${player.texture.key}_idle`, true);
   }
 }
+
+private showTouchControls(visible: boolean): void {
+    // Show/hide all known touch control buttons if they exist
+    const buttons = ['leftButton', 'rightButton', 'jumpButton', 'attackButton', 'specialButton', 'blockButton'];
+    for (const btnName of buttons) {
+      const btn = (this as any)[btnName];
+      if (btn && typeof btn.setVisible === 'function') {
+        btn.setVisible(visible);
+      }
+    }
+  }
 
 }
 
