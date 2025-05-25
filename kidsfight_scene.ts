@@ -11,6 +11,7 @@ import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
 import player9RawImg from './sprites-d_isa.png';
 import { WebSocketManager } from './websocket_manager'; // This is a singleton instance, not a class
+import { tryAttack } from './gameUtils.cjs';
 
 interface PlayerProps {
   isAttacking: boolean;
@@ -617,10 +618,12 @@ class KidsFightScene extends Phaser.Scene {
     if (this.player1 && !this.player1.getData('isAttacking')) {
       this.player1.setData('isAttacking', true);
       // Play attack animation or trigger hitbox
+      // Actually perform attack logic (damage)
+      this.tryAction(0, 'attack', false);
       // Reset attacking state after short delay
-      this.time.delayedCall(500, () => {
+      setTimeout(() => {
         if (this.player1) this.player1.setData('isAttacking', false);
-      });
+      }, 300);
     }
   }
 
@@ -788,6 +791,36 @@ private tryAction(playerIndex: number, actionType: 'attack' | 'special', isSpeci
   }
 }
 
+private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, special: boolean) {
+  // Robustly determine defenderIdx
+  let defenderIdx = undefined;
+  if (defender === this.player1) defenderIdx = 0;
+  else if (defender === this.player2) defenderIdx = 1;
+  else {
+    console.error('[TRYATTACK] Could not determine defenderIdx!', defender, this.player1, this.player2);
+    return;
+  }
+  if (!attacker || !defender) return;
+  console.log('[TRYATTACK] BEFORE', {
+    playerIdx,
+    defenderIdx,
+    playerHealth: this.playerHealth.slice(),
+    player1Health: this.player1?.health,
+    player2Health: this.player2?.health
+  });
+  // Call the actual attack logic from gameUtils
+  tryAttack(this, playerIdx, attacker, defender, now, special);
+  console.log('[TRYATTACK] AFTER', {
+    playerIdx,
+    defenderIdx,
+    playerHealth: this.playerHealth.slice(),
+    player1Health: this.player1?.health,
+    player2Health: this.player2?.health
+  });
+  // Update health bar UI
+  this.updateHealthBar(defenderIdx);
+}
+
 private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: number): void {
   const player = playerIndex === 0 ? this.player1 : this.player2;
   if (!player) return;
@@ -823,6 +856,35 @@ private showTouchControls(visible: boolean): void {
     }
   }
 
+  private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, special: boolean) {
+    // Robustly determine defenderIdx
+    let defenderIdx = undefined;
+    if (defender === this.player1) defenderIdx = 0;
+    else if (defender === this.player2) defenderIdx = 1;
+    else {
+      console.error('[TRYATTACK] Could not determine defenderIdx!', defender, this.player1, this.player2);
+      return;
+    }
+    if (!attacker || !defender) return;
+    console.log('[TRYATTACK] BEFORE', {
+      playerIdx,
+      defenderIdx,
+      playerHealth: this.playerHealth.slice(),
+      player1Health: this.player1?.health,
+      player2Health: this.player2?.health
+    });
+    // Call the actual attack logic from gameUtils
+    tryAttack(this, playerIdx, attacker, defender, now, special);
+    console.log('[TRYATTACK] AFTER', {
+      playerIdx,
+      defenderIdx,
+      playerHealth: this.playerHealth.slice(),
+      player1Health: this.player1?.health,
+      player2Health: this.player2?.health
+    });
+    // Update health bar UI
+    this.updateHealthBar(defenderIdx);
+  }
 }
 
 export default KidsFightScene;
