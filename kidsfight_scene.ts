@@ -11,7 +11,8 @@ import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
 import player9RawImg from './sprites-d_isa.png';
 import { WebSocketManager } from './websocket_manager'; // This is a singleton instance, not a class
-import { tryAttack } from './gameUtils.cjs';
+import { tryAttack, KidsFightScene as KidsFightSceneTest } from './gameUtils.cjs';
+const getCharacterName = KidsFightSceneTest.prototype.getCharacterName;
 
 interface PlayerProps {
   isAttacking: boolean;
@@ -118,8 +119,7 @@ declare module 'phaser' {
 }
 
 class KidsFightScene extends Phaser.Scene {
-  private player1?: Phaser.Physics.Arcade.Sprite & PlayerProps;
-  private player2?: Phaser.Physics.Arcade.Sprite & PlayerProps;
+  public players: [ (Phaser.Physics.Arcade.Sprite & PlayerProps)?, (Phaser.Physics.Arcade.Sprite & PlayerProps)? ] = [undefined, undefined];
   private platform?: Phaser.GameObjects.Rectangle;
   private background?: Phaser.GameObjects.Image;
   private healthBarBg1?: Phaser.GameObjects.Rectangle;
@@ -191,6 +191,9 @@ class KidsFightScene extends Phaser.Scene {
   private readonly SPECIAL_COST: number = 3;
   private readonly ROUND_TIME: number = 99;
 
+  private player1: Phaser.Physics.Arcade.Sprite & PlayerProps | undefined;
+  private player2: Phaser.Physics.Arcade.Sprite & PlayerProps | undefined;
+
   constructor(config?: Phaser.Types.Scenes.SettingsConfig & { customKeyboard?: any }) {
     super({key: 'KidsFightScene', ...config});
     this.wsManager = WebSocketManager.getInstance(); // Assign the singleton instance
@@ -218,6 +221,14 @@ class KidsFightScene extends Phaser.Scene {
     this.p2 = 'player2';
     this.attackCount = [0, 0];
     this.customKeyboard = config?.customKeyboard || null;
+    // Legacy compatibility for tests
+    this.player1 = undefined;
+    this.player2 = undefined;
+  }
+
+  private syncLegacyPlayerRefs() {
+    this.player1 = this.players[0];
+    this.player2 = this.players[1];
   }
 
   // Initialization methods
@@ -318,27 +329,35 @@ class KidsFightScene extends Phaser.Scene {
 
     // Create players with proper positioning and selected characters
     // Place player feet directly on the upper platform
-    this.player1 = this.physics.add.sprite(gameWidth * 0.25, upperPlatformY, this.p1) as Phaser.Physics.Arcade.Sprite & PlayerProps;
-    this.player2 = this.physics.add.sprite(gameWidth * 0.75, upperPlatformY, this.p2) as Phaser.Physics.Arcade.Sprite & PlayerProps;
-    this.player1.setOrigin(0.5, 1.0);
-    this.player2.setOrigin(0.5, 1.0);
+    this.players[0] = this.physics.add.sprite(gameWidth * 0.25, upperPlatformY, this.p1) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+    this.players[1] = this.physics.add.sprite(gameWidth * 0.75, upperPlatformY, this.p2) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+    // Set origin to (0.5, 1.0) to align feet with platform
+    this.players[0].setOrigin(0.5, 1.0);
+    this.players[1].setOrigin(0.5, 1.0);
+    // Position exactly at platform height so feet are on the platform
+    this.players[0].y = upperPlatformY;
+    this.players[1].y = upperPlatformY;
+    // Correct scaling for both players
+    this.players[0].setScale(0.4);
+    this.players[1].setScale(0.4);
 
     // After creating player2 sprite, ensure it is flipped horizontally
-    if (this.player2) {
-      this.player2.setFlipX(true);
+    if (this.players[1]) {
+      this.players[1]?.setFlipX(true);
     }
 
     // Enable collision between players and the new upper platform
-    this.physics.add.collider(this.player1, upperPlatform);
-    this.physics.add.collider(this.player2, upperPlatform);
+    this.physics.add.collider(this.players[0], upperPlatform);
+    this.physics.add.collider(this.players[1], upperPlatform);
 
-    [this.player1, this.player2].forEach((player, index) => {
+    this.players.forEach((player, index) => {
+      if (!player) return;
       const isPlayer1 = index === 0;
-      player.setCollideWorldBounds(true);
-      player.setBounce(0.2);
-      player.setGravityY(300);
-      player.setSize(80, 200);
-      player.setOffset(92, 32);
+      player.setCollideWorldBounds?.(true);
+      player.setBounce?.(0.2);
+      player.setGravityY?.(300);
+      player.setSize?.(80, 200);
+      player.setOffset?.(92, 32);
       
       // Set custom properties
       player.health = MAX_HEALTH * 2;
@@ -354,47 +373,54 @@ class KidsFightScene extends Phaser.Scene {
       });
     });
 
-    // Apply scaling to player 1
-    this.player1.setScale(0.4); // Decrease scale for appropriate size
-    this.player1.setDepth(1);
+    // After both players are assigned, mark them as ready
+    this.playersReady = !!(this.players[0] && this.players[1]);
+    console.log('[DEBUG] Both players assigned:', this.players);
 
+    // Initialize playerHealth array to match player health
+    this.playerHealth = [
+      (this.players[0] && typeof this.players[0].health === 'number') ? this.players[0].health : 200,
+      (this.players[1] && typeof this.players[1].health === 'number') ? this.players[1].health : 200
+    ];
+    console.log('[DEBUG] playerHealth initialized:', this.playerHealth);
 
-    // Apply scaling to player 2
-    this.player2.setScale(0.4); // Decrease scale for appropriate size
-    this.player2.setCollideWorldBounds(true);
-    this.player2.setBounce(0.2);
-    this.player2.setDepth(1);
+    // After both players are ready, create UI and touch controls (input handlers)
+    if (this.playersReady) {
+      this.createUI();
+      this.createTouchControls();
+    } else {
+      console.warn('[DEBUG] Tried to create UI/controls before players were ready:', this.players);
+    }
 
-    // Adjust the physics bodies to match the scaled sprites
-    if (this.player1.body && this.player2.body) {
-      // --- ONLINE MODE: Set up WebSocket message handler ---
-      if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.setMessageCallback === 'function') {
-        this.wsManager.setMessageCallback((event: MessageEvent) => {
-          try {
-            const action = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-            this.handleRemoteAction(action);
-          } catch (e) {
-            console.error('[KidsFightScene] Failed to parse remote action:', e, event);
-          }
-        });
-      }
-      // Make hitbox slightly smaller than visual sprite for better gameplay
-      this.player1.body.setSize(this.player1.width * 0.6, this.player1.height * 0.5);
-      this.player2.body.setSize(this.player2.width * 0.6, this.player2.height * 0.5);
+    // Legacy compatibility for tests
+    this.syncLegacyPlayerRefs();
+
+    // --- ONLINE MODE: Set up WebSocket message handler ---
+    if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.setMessageCallback === 'function') {
+      this.wsManager.setMessageCallback((event: MessageEvent) => {
+        try {
+          const action = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          this.handleRemoteAction(action);
+        } catch (e) {
+          console.error('[KidsFightScene] Failed to parse remote action:', e, event);
+        }
+      });
+    }
+    // Make hitbox slightly smaller than visual sprite for better gameplay
+    if (this.players[0].body && this.players[1].body) {
+      this.players[0].body.setSize(this.players[0].width * 0.6, this.players[0].height * 0.5);
+      this.players[1].body.setSize(this.players[1].width * 0.6, this.players[1].height * 0.5);
 
       // Set offset to center the hitbox
-      this.player1.body.setOffset(this.player1.width * 0.2, this.player1.height * 0.25);
-      this.player2.body.setOffset(this.player2.width * 0.2, this.player2.height * 0.25);
+      this.players[0].body.setOffset(this.players[0].width * 0.2, this.players[0].height * 0.25);
+      this.players[1].body.setOffset(this.players[1].width * 0.2, this.players[1].height * 0.25);
 
       // Increase gravity on mobile for better feel
       if (this.sys.game.device.os.android || this.sys.game.device.os.iOS) {
-        this.player1.body.setGravityY(300);
-        this.player2.body.setGravityY(300);
+        this.players[0].body.setGravityY(300);
+        this.players[1].body.setGravityY(300);
       }
     }
-    // Restore UI and touch controls
-    this.createUI();
-    this.createTouchControls();
   }
 
   private createUI(): void {
@@ -634,23 +660,23 @@ class KidsFightScene extends Phaser.Scene {
         .setScrollFactor(0);
     blockButton.on('pointerdown', () => {
       if (this.gameMode === 'online' && !this.isHost) {
-        if (this.player2) this.playerBlocking[1] = true;
+        if (this.players[1]) this.playerBlocking[1] = true;
       } else {
-        if (this.player1) this.playerBlocking[0] = true;
+        if (this.players[0]) this.playerBlocking[0] = true;
       }
     });
     blockButton.on('pointerup', () => {
       if (this.gameMode === 'online' && !this.isHost) {
-        if (this.player2) this.playerBlocking[1] = false;
+        if (this.players[1]) this.playerBlocking[1] = false;
       } else {
-        if (this.player1) this.playerBlocking[0] = false;
+        if (this.players[0]) this.playerBlocking[0] = false;
       }
     });
     blockButton.on('pointerout', () => {
       if (this.gameMode === 'online' && !this.isHost) {
-        if (this.player2) this.playerBlocking[1] = false;
+        if (this.players[1]) this.playerBlocking[1] = false;
       } else {
-        if (this.player1) this.playerBlocking[0] = false;
+        if (this.players[0]) this.playerBlocking[0] = false;
       }
     });
   }
@@ -684,17 +710,21 @@ class KidsFightScene extends Phaser.Scene {
     control: 'left' | 'right' | 'jump' | 'attack' | 'special' | 'block',
     active: boolean
   ): void {
+    // Use player1 for legacy test compatibility
+    const player = this.player1;
+    if (!player) return;
     switch (control) {
       case 'left':
-        if (this.player1 && active) this.player1.setVelocityX(-160);
-        else if (this.player1) this.player1.setVelocityX(0);
+        player.setVelocityX(active ? -160 : 0);
         break;
       case 'right':
-        if (this.player1 && active) this.player1.setVelocityX(160);
-        else if (this.player1) this.player1.setVelocityX(0);
+        player.setVelocityX(active ? 160 : 0);
         break;
       case 'jump':
-        if (this.player1 && active && this.player1.body.touching.down) this.player1.setVelocityY(-330);
+        // Defensive: allow tests to use player.body.blocked.down or player.body.touching.down
+        if (active && player.body && ((player.body.blocked && player.body.blocked.down) || (player.body.touching && player.body.touching.down))) {
+          player.setVelocityY(-330);
+        }
         break;
       case 'attack':
         if (active) this.handleAttack();
@@ -703,24 +733,23 @@ class KidsFightScene extends Phaser.Scene {
         if (active) this.handleSpecial();
         break;
       case 'block':
-        if (this.player1) this.playerBlocking[0] = active;
+        this.playerBlocking[0] = active;
         break;
     }
     // Optionally update button visuals here
   }
 
   private handleAttack(): void {
-    // Example: Play attack animation or trigger hit logic
-    if (this.player1 && !this.player1.getData('isAttacking')) {
+    if (this.player1) {
       this.player1.setData('isAttacking', true);
-      // Play attack animation or trigger hitbox
-      // Actually perform attack logic (damage)
-      this.tryAction(0, 'attack', false);
-      // Reset attacking state after short delay
-      setTimeout(() => {
-        if (this.player1) this.player1.setData('isAttacking', false);
-      }, 300);
     }
+    // Example: Play attack animation or trigger hit logic
+    // Actually perform attack logic (damage)
+    this.tryAction(0, 'attack', false);
+    // Reset attacking state after short delay
+    setTimeout(() => {
+      if (this.player1) this.player1.setData('isAttacking', false);
+    }, 300);
   }
 
   private handleSpecial(): void {
@@ -741,6 +770,17 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   private endGame(winnerIndex: number, message: string = ''): void {
+    this.gameOver = true;
+    let winMsg = message;
+    if (!message) {
+      if (winnerIndex === 0) {
+        winMsg = `${getCharacterName(this.p1)} Venceu!`;
+      } else if (winnerIndex === 1) {
+        winMsg = `${getCharacterName(this.p2)} Venceu!`;
+      } else {
+        winMsg = 'Empate!';
+      }
+    }
     // Pause the game
     this.physics.pause();
     this.scene.pause();
@@ -748,11 +788,21 @@ class KidsFightScene extends Phaser.Scene {
     // Set game over state
     this.gameOver = true;
 
+    // Lay down loser and set winner frame if not draw
+    if (winnerIndex === 0 || winnerIndex === 1) {
+      const winner = this.players[winnerIndex];
+      const loser = this.players[1 - winnerIndex];
+      if (winner && loser) {
+        winner.setFrame?.(4);
+        loser.setAngle?.(90);
+      }
+    }
+
     // Show winner text
     const winnerText = this.add.text(
         this.cameras.main.width / 2,
         this.cameras.main.height / 2,
-        `Player ${winnerIndex + 1} Wins!`,
+        winMsg,
         {fontSize: '48px', fill: '#fff'}
     ).setOrigin(0.5);
 
@@ -823,12 +873,12 @@ private showReplayRequestPopup(data: ReplayData): void {
 }
 
 private handleRemoteAction(action: RemoteAction): void {
-  if (!this.player1 || !this.player2) return;
+  if (!this.players[0] || !this.players[1]) return;
 
   // In online mode, player1 is controlled by host, player2 by guest
   const isHostAction = this.isHost ? action.playerIndex === 0 : action.playerIndex === 1;
-  const player = isHostAction ? this.player1 : this.player2;
-  const otherPlayer = isHostAction ? this.player2 : this.player1;
+  const player = isHostAction ? this.players[0] : this.players[1];
+  const otherPlayer = isHostAction ? this.players[1] : this.players[0];
 
   if (!player) return;
 
@@ -848,7 +898,7 @@ private handleRemoteAction(action: RemoteAction): void {
       break;
 
     case 'attack':
-      if (this.player1 && this.player2) {
+      if (this.players[0] && this.players[1]) {
         this.tryAction(
           isHostAction ? 0 : 1,
           'attack',
@@ -858,7 +908,7 @@ private handleRemoteAction(action: RemoteAction): void {
       break;
 
     case 'special':
-      if (this.player1 && this.player2) {
+      if (this.players[0] && this.players[1]) {
         this.tryAction(
           isHostAction ? 0 : 1,
           'special',
@@ -883,50 +933,56 @@ private handleRemoteAction(action: RemoteAction): void {
 }
 
 private tryAction(playerIndex: number, actionType: 'attack' | 'special', isSpecial: boolean): void {
+  // Defensive guard
+  if (!this.players[0] || !this.players[1]) {
+    console.warn('[SCENE] Players not ready for action', this.players);
+    return;
+  }
   const now = Date.now();
-  const attacker = playerIndex === 0 ? this.player1 : this.player2;
-  const target = playerIndex === 0 ? this.player2 : this.player1;
-  
+  const attacker = this.players[playerIndex];
+  const targetIndex = playerIndex === 0 ? 1 : 0;
+  const target = this.players[targetIndex];
   if (attacker && target) {
-    this.tryAttack(playerIndex, attacker, target, now, isSpecial);
+    this.tryAttack(playerIndex, targetIndex, now, isSpecial);
   }
 }
 
-private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, special: boolean) {
-  // Robustly determine defenderIdx
-  let defenderIdx = undefined;
-  if (defender === this.player1) defenderIdx = 0;
-  else if (defender === this.player2) defenderIdx = 1;
-  else {
-    console.error('[TRYATTACK] Could not determine defenderIdx!', defender, this.player1, this.player2);
+private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special: boolean) {
+  // Defensive guard: prevent attack if players aren't ready
+  if (!this.players[0] || !this.players[1]) {
+    console.warn('[SCENE] Players not ready for attack', this.players);
     return;
   }
-  if (!attacker || !defender) return;
-  
+  const attacker = this.players[attackerIdx];
+  const defender = this.players[defenderIdx];
+  if (!attacker || !defender) {
+    console.error('[TRYATTACK] Invalid attacker or defender index', attackerIdx, defenderIdx, this.players);
+    return;
+  }
   console.log('[TRYATTACK] BEFORE', {
-    playerIdx,
+    attackerIdx,
     defenderIdx,
     playerHealth: this.playerHealth.slice(),
-    player1Health: this.player1?.health,
-    player2Health: this.player2?.health
+    player1Health: this.players[0]?.health,
+    player2Health: this.players[1]?.health
   });
   
   // Call the actual attack logic from gameUtils
-  tryAttack(this, playerIdx, attacker, defender, now, special);
+  tryAttack(this, attackerIdx, defenderIdx, now, special);
   
   // Sync health between player object and playerHealth array
-  if (defender === this.player1) {
-    this.player1.health = this.playerHealth[0];
-  } else if (defender === this.player2) {
-    this.player2.health = this.playerHealth[1];
+  if (defender === this.players[0]) {
+    this.players[0]!.health = this.playerHealth[0];
+  } else if (defender === this.players[1]) {
+    this.players[1]!.health = this.playerHealth[1];
   }
   
   console.log('[TRYATTACK] AFTER', {
-    playerIdx,
+    attackerIdx,
     defenderIdx,
     playerHealth: this.playerHealth.slice(),
-    player1Health: this.player1?.health,
-    player2Health: this.player2?.health
+    player1Health: this.players[0]?.health,
+    player2Health: this.players[1]?.health
   });
   
   // Update health bar UI and check for winner
@@ -937,12 +993,12 @@ private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, 
   this.updateSpecialPips();
   
   // Award special points for successful hits
-  if (!special && playerIdx === 0) {
+  if (!special && attackerIdx === 0) {
     this.playerSpecial[0] = Math.min(3, this.playerSpecial[0] + 1);
     console.log('[DEBUG] Player 1 special:', this.playerSpecial[0]);
     this.updateSpecialPips();
   }
-  if (!special && playerIdx === 1) {
+  if (!special && attackerIdx === 1) {
     this.playerSpecial[1] = Math.min(3, this.playerSpecial[1] + 1);
     console.log('[DEBUG] Player 2 special:', this.playerSpecial[1]);
     this.updateSpecialPips();
@@ -950,7 +1006,7 @@ private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, 
 }
 
 private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: number): void {
-  const player = playerIndex === 0 ? this.player1 : this.player2;
+  const player = playerIndex === 0 ? this.players[0] : this.players[1];
   if (!player) return;
 
   // If called with isWalking parameter (legacy call)
@@ -972,6 +1028,10 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     player.setFrame(3); // Example: frame 3 for hit
     // DEBUG
     //console.log('ANIM: HIT', playerIndex);
+  } else if (player.getData('isSpecialAttacking')) {
+    player.setFrame(7); // Frame 7 for special attack (USER request)
+    // DEBUG
+    //console.log('ANIM: SPECIAL ATTACK', playerIndex);
   } else if (player.getData('isAttacking')) {
     player.setFrame(5); // Frame 5 for attack
     // DEBUG
@@ -1018,8 +1078,8 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
   //     playerIdx,
   //     defenderIdx,
   //     playerHealth: this.playerHealth.slice(),
-  //     player1Health: this.player1?.health,
-  //     player2Health: this.player2?.health
+  //     player1Health: this.players[0]?.health,
+  //     player2Health: this.players[1]?.health
   //   });
   //   // Call the actual attack logic from gameUtils
   //   tryAttack(this, playerIdx, attacker, defender, now, special);
@@ -1027,8 +1087,8 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
   //     playerIdx,
   //     defenderIdx,
   //     playerHealth: this.playerHealth.slice(),
-  //     player1Health: this.player1?.health,
-  //     player2Health: this.player2?.health
+  //     player1Health: this.players[0]?.health,
+  //     player2Health: this.players[1]?.health
   //   });
   //   // Update health bar UI
   //   this.updateHealthBar(defenderIdx);
@@ -1039,8 +1099,8 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     if (this.gameOver) return false;
     
     // Check if player health is defined and less than or equal to 0
-    const p1Health = this.player1?.health ?? this.playerHealth[0];
-    const p2Health = this.player2?.health ?? this.playerHealth[1];
+    const p1Health = this.players[0]?.health ?? this.playerHealth[0];
+    const p2Health = this.players[1]?.health ?? this.playerHealth[1];
     
     if (p1Health <= 0) {
       // Player 2 won
@@ -1053,9 +1113,9 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     } else if (this.timeLeft <= 0) {
       // Time's up - check who has more health
       if (p1Health > p2Health) {
-        this.endGame(0, 'Player 1 Venceu!');
+        this.endGame(0, `${getCharacterName(this.p1)} Venceu!`);
       } else if (p2Health > p1Health) {
-        this.endGame(1, 'Player 2 Venceu!');
+        this.endGame(1, `${getCharacterName(this.p2)} Venceu!`);
       } else {
         this.endGame(-1, 'Empate!');
       }
@@ -1074,16 +1134,16 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     this.checkWinner();
 
     // --- Player cross logic ---
-    if (this.player1 && this.player2) {
+    if (this.players[0] && this.players[1]) {
       // If player1 is to the right of player2, swap their directions and flipX
-      if (this.player1.x > this.player2.x) {
-        this.player1.setFlipX(true);
-        this.player2.setFlipX(false);
+      if ((this.players[0].x ?? 0) > (this.players[1].x ?? 0)) {
+        this.players[0].setFlipX(true);
+        this.players[1].setFlipX(false);
         this.playerDirection[0] = 'left';
         this.playerDirection[1] = 'right';
       } else {
-        this.player1.setFlipX(false);
-        this.player2.setFlipX(true);
+        this.players[0].setFlipX(false);
+        this.players[1].setFlipX(true);
         this.playerDirection[0] = 'right';
         this.playerDirection[1] = 'left';
       }
