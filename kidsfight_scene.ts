@@ -605,76 +605,53 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   private createTouchControls(): void {
-    // Restore all touch controls with real game logic (no debug logs)
     const gameWidth = this.sys.game.canvas.width;
     const gameHeight = this.sys.game.canvas.height;
-    const buttonSize = 80;
-    const leftSideCenter = gameWidth * 0.25;
-    const rightSideCenter = gameWidth * 0.75;
-    const leftButtonX = leftSideCenter - buttonSize;
-    const rightButtonX = leftSideCenter + buttonSize;
-    const jumpButtonX = leftSideCenter;
-    const attackButtonX = rightSideCenter - buttonSize;
-    const specialButtonX = rightSideCenter;
-    const blockButtonX = rightSideCenter + buttonSize;
-    const buttonY = gameHeight - (buttonSize / 2) - 10;
+    const buttonSize = Math.floor(gameWidth * 0.13); // Responsive sizing
+    const margin = Math.floor(gameWidth * 0.03);
+    const bottomY = gameHeight - buttonSize/2 - margin;
 
-    // LEFT
-    const leftButton = this.add.rectangle(leftButtonX, buttonY, buttonSize, buttonSize, 0x4444ff)
-        .setAlpha(0.7)
-        .setDepth(1000)
-        .setInteractive()
-        .setScrollFactor(0);
+    // D-Pad (left bottom corner):
+    const dpadCenterX = buttonSize/2 + margin;
+    const dpadCenterY = bottomY;
+    // Left
+    const leftButton = this.add.circle(dpadCenterX - buttonSize * 0.6, dpadCenterY, buttonSize * 0.45, 0x4444ff)
+      .setAlpha(0.7).setDepth(1000).setInteractive().setScrollFactor(0);
     leftButton.on('pointerdown', this.handleLeftDown, this);
     leftButton.on('pointerup', this.handleLeftUp, this);
     leftButton.on('pointerout', this.handleLeftUp, this);
-
-    // RIGHT
-    const rightButton = this.add.rectangle(rightButtonX, buttonY, buttonSize, buttonSize, 0x4444ff)
-        .setAlpha(0.7)
-        .setDepth(1000)
-        .setInteractive()
-        .setScrollFactor(0);
+    // Right
+    const rightButton = this.add.circle(dpadCenterX + buttonSize * 0.6, dpadCenterY, buttonSize * 0.45, 0x4444ff)
+      .setAlpha(0.7).setDepth(1000).setInteractive().setScrollFactor(0);
     rightButton.on('pointerdown', this.handleRightDown, this);
     rightButton.on('pointerup', this.handleRightUp, this);
     rightButton.on('pointerout', this.handleRightUp, this);
-
-    // JUMP
-    const jumpButton = this.add.rectangle(jumpButtonX, buttonY - buttonSize - 10, buttonSize, buttonSize, 0x44ff44)
-        .setAlpha(0.7)
-        .setDepth(1000)
-        .setInteractive()
-        .setScrollFactor(0);
+    // Jump (above D-Pad)
+    const jumpButton = this.add.circle(dpadCenterX, dpadCenterY - buttonSize * 0.9, buttonSize * 0.45, 0x44ff44)
+      .setAlpha(0.7).setDepth(1000).setInteractive().setScrollFactor(0);
     jumpButton.on('pointerdown', this.handleJumpDown, this);
     jumpButton.on('pointerup', this.handleJumpUp, this);
     jumpButton.on('pointerout', this.handleJumpUp, this);
 
-    // ATTACK
-    const attackButton = this.add.rectangle(attackButtonX, buttonY, buttonSize, buttonSize, 0xff4444)
-        .setAlpha(0.7)
-        .setDepth(1000)
-        .setInteractive()
-        .setScrollFactor(0);
+    // Action buttons (right bottom corner, arc layout):
+    const actionArcCenterX = gameWidth - buttonSize/2 - margin;
+    const actionArcCenterY = bottomY;
+    const arcRadius = buttonSize * 0.9;
+    // Attack (red, rightmost)
+    const attackButton = this.add.circle(actionArcCenterX, actionArcCenterY, buttonSize * 0.45, 0xff4444)
+      .setAlpha(0.7).setDepth(1000).setInteractive().setScrollFactor(0);
     attackButton.on('pointerdown', () => this.handleAttack());
     attackButton.on('pointerup', () => this.updateTouchControlState('attack', false));
     attackButton.on('pointerout', () => this.updateTouchControlState('attack', false));
-
-    // SPECIAL
-    const specialButton = this.add.rectangle(specialButtonX, buttonY, buttonSize, buttonSize, 0xff44ff)
-        .setAlpha(0.7)
-        .setDepth(1000)
-        .setInteractive()
-        .setScrollFactor(0);
+    // Special (purple, above right)
+    const specialButton = this.add.circle(actionArcCenterX - arcRadius * Math.cos(Math.PI/4), actionArcCenterY - arcRadius * Math.sin(Math.PI/4), buttonSize * 0.42, 0xff44ff)
+      .setAlpha(0.7).setDepth(1000).setInteractive().setScrollFactor(0);
     specialButton.on('pointerdown', () => this.handleSpecial());
     specialButton.on('pointerup', () => this.updateTouchControlState('special', false));
     specialButton.on('pointerout', () => this.updateTouchControlState('special', false));
-
-    // BLOCK
-    const blockButton = this.add.rectangle(blockButtonX, buttonY, buttonSize, buttonSize, 0xffff44)
-        .setAlpha(0.7)
-        .setDepth(1000)
-        .setInteractive()
-        .setScrollFactor(0);
+    // Block (yellow, above left)
+    const blockButton = this.add.circle(actionArcCenterX - arcRadius * Math.cos(3*Math.PI/4), actionArcCenterY - arcRadius * Math.sin(3*Math.PI/4), buttonSize * 0.42, 0xffff44)
+      .setAlpha(0.7).setDepth(1000).setInteractive().setScrollFactor(0);
     blockButton.on('pointerdown', () => {
       if (this.gameMode === 'online' && !this.isHost) {
         if (this.players[1]) this.playerBlocking[1] = true;
@@ -696,6 +673,14 @@ class KidsFightScene extends Phaser.Scene {
         if (this.players[0]) this.playerBlocking[0] = false;
       }
     });
+
+    // Optional: Add icons/labels for clarity
+    this.add.text(leftButton.x, leftButton.y, '<', { fontSize: `${buttonSize*0.5}px`, color: '#fff' }).setOrigin(0.5).setDepth(1001);
+    this.add.text(rightButton.x, rightButton.y, '>', { fontSize: `${buttonSize*0.5}px`, color: '#fff' }).setOrigin(0.5).setDepth(1001);
+    this.add.text(jumpButton.x, jumpButton.y, '⭡', { fontSize: `${buttonSize*0.45}px`, color: '#fff' }).setOrigin(0.5).setDepth(1001);
+    this.add.text(attackButton.x, attackButton.y, 'A', { fontSize: `${buttonSize*0.5}px`, color: '#fff' }).setOrigin(0.5).setDepth(1001);
+    this.add.text(specialButton.x, specialButton.y, 'S', { fontSize: `${buttonSize*0.45}px`, color: '#fff' }).setOrigin(0.5).setDepth(1001);
+    this.add.text(blockButton.x, blockButton.y, 'B', { fontSize: `${buttonSize*0.45}px`, color: '#222' }).setOrigin(0.5).setDepth(1001);
   }
 
   // --- Touch Button Handlers ---
