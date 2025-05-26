@@ -32,8 +32,7 @@ type KidsFightSceneTest = {
   selectedScenario: string;
   p1: string;
   p2: string;
-  player1: any;
-  player2: any;
+  players: any[];
   background: any;
   init: (data: any) => void;
   preload: () => void;
@@ -42,8 +41,6 @@ type KidsFightSceneTest = {
 
 describe('Character and Scenario Selection', () => {
   let scene: KidsFightSceneTest;
-  let mockPlayer1: any;
-  let mockPlayer2: any;
   let mockBackground: any;
 
   function createMockSprite() {
@@ -101,9 +98,8 @@ describe('Character and Scenario Selection', () => {
     // Reset all mocks before each test
     jest.clearAllMocks();
 
-    // Use robust player mocks
-    mockPlayer1 = createMockSprite();
-    mockPlayer2 = createMockSprite();
+    scene = {} as KidsFightSceneTest;
+    scene.players = [createMockSprite(), createMockSprite()];
     // Explicitly mock all required methods for both players
     const methodsToMock = [
       'setCollideWorldBounds',
@@ -117,8 +113,8 @@ describe('Character and Scenario Selection', () => {
       'setFlipX',
     ];
     methodsToMock.forEach((method) => {
-      mockPlayer1[method] = jest.fn().mockReturnThis();
-      mockPlayer2[method] = jest.fn().mockReturnThis();
+      scene.players[0][method] = jest.fn().mockReturnThis();
+      scene.players[1][method] = jest.fn().mockReturnThis();
     });
 
     mockBackground = {
@@ -134,10 +130,10 @@ describe('Character and Scenario Selection', () => {
     // Patch: Always return the same mockPlayer1 and mockPlayer2 for player1 and player2
     scene.physics.add.sprite = jest.fn((x: number, y: number, key: string) => {
       if (key === 'player3') {
-        return mockPlayer1;
+        return scene.players[0];
       }
       if (key === 'player4') {
-        return mockPlayer2;
+        return scene.players[1];
       }
       // fallback for other keys
       return createMockSprite();
@@ -147,7 +143,7 @@ describe('Character and Scenario Selection', () => {
     scene.add = {
       image: jest.fn().mockReturnValue(mockBackground),
       sprite: jest.fn().mockImplementation((x, y, key) => {
-        return key === scene.p1 ? mockPlayer1 : mockPlayer2;
+        return key === scene.p1 ? scene.players[0] : scene.players[1];
       }),
       graphics: jest.fn().mockReturnValue({
         fillStyle: jest.fn().mockReturnThis(),
@@ -292,7 +288,7 @@ describe('Character and Scenario Selection', () => {
       scene.create();
 
       // Assert (spy on the actual player1 instance created by the scene)
-      const player1 = scene.player1;
+      const player1 = scene.players[0];
       const spyCollide = jest.spyOn(player1, 'setCollideWorldBounds');
       const spyBounce = jest.spyOn(player1, 'setBounce');
       const spyGravity = jest.spyOn(player1, 'setGravityY');
@@ -307,7 +303,7 @@ describe('Character and Scenario Selection', () => {
       expect(spyGravity).toHaveBeenCalledWith(300);
       expect(spySize).toHaveBeenCalledWith(80, 200);
       
-      expect(scene.player2.direction).toBe('left');
+      expect(scene.players[1].direction).toBe('left');
     });
 
     // Patch wsManager for all online mode tests

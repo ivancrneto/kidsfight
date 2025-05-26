@@ -143,18 +143,16 @@ function createOnlineTestScene({ isHost }: { isHost: boolean }) {
   scene.physics = { add: {}, pause: jest.fn() };
   scene.gameMode = 'online';
   scene.isHost = isHost;
-  const player1 = createMockPlayer();
-  const player2 = createMockPlayer();
-  player1.x = 100;
-  player1.y = 300;
-  player2.x = 500;
-  player2.y = 300;
-  scene.player1 = player1;
-  scene.player2 = player2;
-  ensureBlockedDown(scene.player1);
-  ensureBlockedDown(scene.player2);
-  ensureSetFrame(scene.player1);
-  ensureSetFrame(scene.player2);
+  const players = [createMockPlayer(), createMockPlayer()];
+  players[0].x = 100;
+  players[0].y = 300;
+  players[1].x = 500;
+  players[1].y = 300;
+  scene.players = players;
+  ensureBlockedDown(scene.players[0]);
+  ensureBlockedDown(scene.players[1]);
+  ensureSetFrame(scene.players[0]);
+  ensureSetFrame(scene.players[1]);
   scene.wsManager = mockWebSocketManager;
   scene.keys = {
     left: { isDown: false },
@@ -181,8 +179,7 @@ function createOnlineTestScene({ isHost }: { isHost: boolean }) {
 // Create a test scene class that extends KidsFightScene for testing
 class TestKidsFightScene extends KidsFightScene {
   // Override private properties to make them accessible for testing
-  public player1: Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
-  public player2: Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
+  public players: Array<Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body }> = [];
   public wsManager: any;
   public isHost: boolean;
   public gameMode: string;
@@ -219,12 +216,11 @@ class TestKidsFightScene extends KidsFightScene {
     };
     
     // Initialize players with required properties
-    this.player1 = createMockPlayer();
-    this.player2 = createMockPlayer();
-    ensureBlockedDown(this.player1);
-    ensureBlockedDown(this.player2);
-    ensureSetFrame(this.player1);
-    ensureSetFrame(this.player2);
+    this.players = [createMockPlayer(), createMockPlayer()];
+    ensureBlockedDown(this.players[0]);
+    ensureBlockedDown(this.players[1]);
+    ensureSetFrame(this.players[0]);
+    ensureSetFrame(this.players[1]);
     
     // Set up WebSocket manager mock
     this.wsManager = mockWebSocketManager;
@@ -275,7 +271,7 @@ describe('KidsFightScene - Online Mode', () => {
       setOrigin: jest.fn(),
       setDepth: jest.fn(),
       anims: { play: jest.fn() },
-      texture: { key: 'player1' }
+      texture: { key: 'players[0]' }
     };
     const mockPlayer2 = {
       setVelocityX: jest.fn(),
@@ -299,14 +295,14 @@ describe('KidsFightScene - Online Mode', () => {
       setOrigin: jest.fn(),
       setDepth: jest.fn(),
       anims: { play: jest.fn() },
-      texture: { key: 'player2' }
+      texture: { key: 'players[1]' }
     };
-    scene.player1 = mockPlayer1;
-    scene.player2 = mockPlayer2;
-    ensureBlockedDown(scene.player1);
-    ensureBlockedDown(scene.player2);
-    ensureSetFrame(scene.player1);
-    ensureSetFrame(scene.player2);
+    scene.players[0] = mockPlayer1;
+    scene.players[1] = mockPlayer2;
+    ensureBlockedDown(scene.players[0]);
+    ensureBlockedDown(scene.players[1]);
+    ensureSetFrame(scene.players[0]);
+    ensureSetFrame(scene.players[1]);
     scene.wsManager = { sendGameAction: jest.fn() };
     
     // Setup keys
@@ -390,32 +386,32 @@ describe('KidsFightScene - Online Mode', () => {
   });
   
   describe('Player Movement', () => {
-    it('should allow player1 movement as guest in online mode', () => {
+    it('should allow players[0] movement as guest in online mode', () => {
       scene.isHost = false;
       scene.gameMode = 'online';
-      scene.player1.setVelocityX = jest.fn();
-      scene.player1.setFlipX = jest.fn();
-      scene.player1.setData = jest.fn();
-      scene.player1.getData = jest.fn();
+      scene.players[0].setVelocityX = jest.fn();
+      scene.players[0].setFlipX = jest.fn();
+      scene.players[0].setData = jest.fn();
+      scene.players[0].getData = jest.fn();
       scene.handleRemoteAction({ type: 'move', playerIndex: 1, direction: 1 });
-      expect(scene.player1.setVelocityX).toHaveBeenCalledWith(160);
-      expect(scene.player1.setFlipX).toHaveBeenCalledWith(false);
+      expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(160);
+      expect(scene.players[0].setFlipX).toHaveBeenCalledWith(false);
     });
     
-    it('should NOT move player2 as host in online mode', () => {
+    it('should NOT move players[1] as host in online mode', () => {
       scene.isHost = true;
       scene.gameMode = 'online';
-      scene.player2.setVelocityX = jest.fn();
-      scene.player2.setFlipX = jest.fn();
-      scene.player2.setData = jest.fn();
-      scene.player2.getData = jest.fn();
+      scene.players[1].setVelocityX = jest.fn();
+      scene.players[1].setFlipX = jest.fn();
+      scene.players[1].setData = jest.fn();
+      scene.players[1].getData = jest.fn();
       scene.keys.right.isDown = true;
       scene.update(0, 1000);
-      expect(scene.player2.setVelocityX).not.toHaveBeenCalled();
+      expect(scene.players[1].setVelocityX).not.toHaveBeenCalled();
     });
     
     it('should handle remote movement actions', () => {
-      // Simulate receiving a remote movement action for player1 (host)
+      // Simulate receiving a remote movement action for players[0] (host)
       const moveAction = {
         type: 'move',
         playerIndex: 0,
@@ -425,13 +421,13 @@ describe('KidsFightScene - Online Mode', () => {
       // Call handleRemoteAction directly
       scene.handleRemoteAction(moveAction);
       
-      // Should update player1 velocity based on remote action
-      expect(scene.player1.setVelocityX).toHaveBeenCalledWith(160);
-      expect(scene.player1.setFlipX).toHaveBeenCalledWith(false);
+      // Should update players[0] velocity based on remote action
+      expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(160);
+      expect(scene.players[0].setFlipX).toHaveBeenCalledWith(false);
     });
     
     it('should handle remote jump actions', () => {
-      // Simulate receiving a remote jump action for player1 (host)
+      // Simulate receiving a remote jump action for players[0] (host)
       const jumpAction = {
         type: 'jump',
         playerIndex: 0
@@ -440,8 +436,8 @@ describe('KidsFightScene - Online Mode', () => {
       // Call handleRemoteAction directly
       scene.handleRemoteAction(jumpAction);
       
-      // Should make player1 jump
-      expect(scene.player1.setVelocityY).toHaveBeenCalledWith(-330);
+      // Should make players[0] jump
+      expect(scene.players[0].setVelocityY).toHaveBeenCalledWith(-330);
     });
   });
   
@@ -451,7 +447,7 @@ describe('KidsFightScene - Online Mode', () => {
       const originalTryAttack = scene['tryAttack'];
       scene['tryAttack'] = jest.fn();
       
-      // Simulate receiving a remote attack action for player1 (host)
+      // Simulate receiving a remote attack action for players[0] (host)
       const attackAction = {
         type: 'attack',
         playerIndex: 0
@@ -462,9 +458,8 @@ describe('KidsFightScene - Online Mode', () => {
       
       // Should call tryAttack with correct parameters
       expect(scene['tryAttack']).toHaveBeenCalledWith(
-        0,
-        scene.player1,
-        scene.player2,
+        0, // attacker index
+        1, // defender index
         expect.any(Number),
         false
       );
@@ -474,7 +469,7 @@ describe('KidsFightScene - Online Mode', () => {
     });
     
     it('should handle remote block actions', () => {
-      // Simulate receiving a remote block action for player1 (host)
+      // Simulate receiving a remote block action for players[0] (host)
       const blockAction = {
         type: 'block',
         playerIndex: 0,
@@ -484,8 +479,8 @@ describe('KidsFightScene - Online Mode', () => {
       // Call handleRemoteAction directly
       scene.handleRemoteAction(blockAction);
       
-      // Should update player1's blocking state
-      expect(scene.player1.setData).toHaveBeenCalledWith('isBlocking', true);
+      // Should update players[0]'s blocking state
+      expect(scene.players[0].setData).toHaveBeenCalledWith('isBlocking', true);
     });
   });
 });

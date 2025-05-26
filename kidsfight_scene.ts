@@ -574,6 +574,7 @@ class KidsFightScene extends Phaser.Scene {
     // Create player name texts with proper scaling
     const fontSize = Math.max(16, Math.floor(24 * scaleY)); // Ensure minimum readable size
 
+    // Use the selected character names (p1 and p2)
     const playerName1 = this.add.text(
         10 * scaleX, 70 * scaleY, this.p1, {
           fontSize: `${fontSize}px`,

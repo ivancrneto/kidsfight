@@ -24,6 +24,20 @@ global.Phaser = {
 
 import KidsFightScene from '../kidsfight_scene';
 import * as Phaser from 'phaser';
+// Inline PlayerProps for test compatibility (not exported from main file)
+type PlayerProps = {
+  isAttacking: boolean;
+  isBlocking: boolean;
+  health: number;
+  special: number;
+  direction: 'left' | 'right';
+  walkAnimData?: {
+    frameTime: number;
+    currentFrame: number;
+    frameDelay: number;
+  };
+  playerIndex: 0 | 1;
+};
 
 // Import MockTime and MockText from test-utils
 import { MockTime, MockText } from './test-utils';
@@ -795,7 +809,7 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     player1Char?: string;
     player2Char?: string;
     selectedScenario: string;
-    gameMode: 'single' | 'online' | 'local';
+    gameMode: 'single' | 'online';
     roomCode?: string;
     isHost?: boolean;
   };
@@ -808,7 +822,7 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     player1Char: 'bento',
     player2Char: 'davi',
     selectedScenario: 'dojo',
-    gameMode: 'local',
+    gameMode: 'single',
     roomCode: 'TEST123',
     isHost: true
   };
@@ -833,22 +847,35 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     testScene.testWinnerText = mockText;
     testScene.winnerText = mockText;
     testScene.players = [
-      createMockPlayer(),
-      createMockPlayer()
+      {
+        ...createMockPlayer(),
+        isAttacking: false,
+        isBlocking: false,
+        direction: 'right',
+        walkAnimData: undefined,
+        health: 100,
+        special: 0,
+        body: {}, // minimal Sprite field
+        playerIndex: 0,
+      } as any,
+      {
+        ...createMockPlayer(),
+        isAttacking: false,
+        isBlocking: false,
+        direction: 'left',
+        walkAnimData: undefined,
+        health: 100,
+        special: 0,
+        body: {}, // minimal Sprite field
+        playerIndex: 1,
+      } as any
     ];
     testScene.gameOver = false;
     testScene.timeRemaining = 99;
-    testScene.specialPips1 = [];
-    testScene.specialPips2 = [];
+    // testScene.specialPips1 = [];
+    // testScene.specialPips2 = [];
 
-    // Mock protected methods
-    testScene.createPlayerAnimations = jest.fn();
-    testScene.createPlatforms = jest.fn();
-    testScene.createBackground = jest.fn();
-    testScene.createHealthBars = jest.fn();
-    testScene.createSpecialBars = jest.fn();
-    testScene.createPlayerNames = jest.fn();
-    testScene.createTouchControls = jest.fn();
+    // Protected methods should be mocked by subclassing, not by assignment here.
 
     return testScene;
     testScene.testTime = 0;
@@ -875,26 +902,26 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     testScene.players = [
       {
         health: 100,
-        maxHealth: 100,
         special: 0,
-        maxSpecial: 100,
-        setHealth: jest.fn(),
-        setSpecial: jest.fn(),
-        updateHealthBar: jest.fn(),
-        updateSpecialBar: jest.fn(),
-        destroy: jest.fn()
-      },
+        isAttacking: false,
+        isBlocking: false,
+        direction: 'right',
+        walkAnimData: undefined,
+        destroy: jest.fn(),
+        body: {},
+        playerIndex: 0,
+      } as any,
       {
         health: 100,
-        maxHealth: 100,
         special: 0,
-        maxSpecial: 100,
-        setHealth: jest.fn(),
-        setSpecial: jest.fn(),
-        updateHealthBar: jest.fn(),
-        updateSpecialBar: jest.fn(),
-        destroy: jest.fn()
-      }
+        isAttacking: false,
+        isBlocking: false,
+        direction: 'left',
+        walkAnimData: undefined,
+        destroy: jest.fn(),
+        body: {},
+        playerIndex: 1,
+      } as any
     ];
 
     // Mock camera
@@ -1015,24 +1042,46 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
 
     beforeEach(() => {
       scene = createTestScene();
+      scene.players = [
+        {
+          health: 100,
+          special: 0,
+          isAttacking: false,
+          isBlocking: false,
+          direction: 'right',
+          walkAnimData: undefined,
+          destroy: jest.fn(),
+          body: {},
+          playerIndex: 0,
+        } as any,
+        {
+          health: 100,
+          special: 0,
+          isAttacking: false,
+          isBlocking: false,
+          direction: 'left',
+          walkAnimData: undefined,
+          destroy: jest.fn(),
+          body: {},
+          playerIndex: 1,
+        } as any
+      ];
     });
 
     it('should return -1 when no player has won', () => {
-      const player1 = { health: 100, isAlive: true };
-      const player2 = { health: 100, isAlive: true };
-      expect(scene.testCheckWinner(player1, player2)).toBe(-1);
+      expect(scene.testCheckWinner(scene.players[0], scene.players[1])).toBe(-1);
     });
 
     it('should return 0 when player 1 wins', () => {
-      const player1 = { health: 100, isAlive: true };
-      const player2 = { health: 0, isAlive: false };
-      expect(scene.testCheckWinner(player1, player2)).toBe(0);
+      scene.players[0].health = 100;
+      scene.players[1].health = 0;
+      expect(scene.testCheckWinner(scene.players[0], scene.players[1])).toBe(0);
     });
 
     it('should return 1 when player 2 wins', () => {
-      const player1 = { health: 0, isAlive: false };
-      const player2 = { health: 100, isAlive: true };
-      expect(scene.testCheckWinner(player1, player2)).toBe(1);
+      scene.players[0].health = 0;
+      scene.players[1].health = 100;
+      expect(scene.testCheckWinner(scene.players[0], scene.players[1])).toBe(1);
     });
   });
 
@@ -1043,9 +1092,17 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
 });
 
 class TestKidsFightScene extends KidsFightScene {
+  // Override protected methods for testing
+  protected createPlayerAnimations(): void {}
+  protected createPlatforms(): void {}
+  protected createBackground(): void {}
+  protected createHealthBars(): void {}
+  protected createSpecialBars(): void {}
+  protected createPlayerNames(): void {}
+  protected createTouchControls(): void {}
   // Test state
   testWinnerText: MockText;
-  testTime: number;
+  testTime!: number;
   testGameTimer: MockTimerEvent;
 
   // Mock game state
@@ -1065,19 +1122,14 @@ class TestKidsFightScene extends KidsFightScene {
   mockCreatePlayerAnimations: jest.Mock;
   mockCreatePlatforms: jest.Mock;
   mockCreateBackground: jest.Mock;
+  // mockCreateHealthBars: jest.Mock; // Removed: createHealthBars is private in base class
+  mockCreateSpecialBars!: jest.Mock;
+  mockCreatePlayerNames!: jest.Mock;
+  // mockCreateTouchControls: jest.Mock; // Removed: touchControls is private in base class
   mockUpdateHealthBar: jest.Mock;
   mockUpdateSpecialPips: jest.Mock;
   mockCheckWinner: jest.Mock;
   mockEndGame: jest.Mock;
-
-  // Add public accessors for private properties
-  getPlayer1(): any;
-  getPlayer2(): any;
-  getPlayerHealth(playerIndex: number): number;
-  getPlayerSpecial(playerIndex: number): number;
-  getPlayerDirection(playerIndex: number): 'right' | 'left';
-  getIsAttacking(playerIndex: number): boolean;
-  getPlayerBlocking(playerIndex: number): boolean;
 
   // Mock game objects
   public timeText = new MockText();
@@ -1086,37 +1138,20 @@ class TestKidsFightScene extends KidsFightScene {
   public gameTimer = new MockTimerEvent();
   public winnerText = new MockText();
   public gameOverText = new MockText();
-  public scoreText = new MockText();
 
   // Player related
-  public player1: any;
-  public player2: any;
-  public players: any[] = [];
+  public players: [((Phaser.Physics.Arcade.Sprite & PlayerProps) | undefined)?, ((Phaser.Physics.Arcade.Sprite & PlayerProps) | undefined)?] = [undefined, undefined];
   public player1Char = 'player1';
   public player2Char = 'player2';
 
   // Add public properties for tests
   public timeRemaining: number = 99;
-  public specialPips1: any[] = [];
-  public specialPips2: any[] = [];
-
-
-  // Game state
-  public score = 0;
-  public timeLeft = 60;
 
   // UI elements
-  public healthBar1: any;
-  public healthBar2: any;
   public specialBar1: any;
   public specialBar2: any;
-  public touchControls: any;
 
-  // Input
-  public cursors: any;
-  public wasd: any;
-  public space: any;
-  public enter: any;
+  // ... (rest of the code remains the same)
 
   // Mock Phaser systems
   public physics = {
@@ -1160,17 +1195,7 @@ class TestKidsFightScene extends KidsFightScene {
   private timerEvents: MockTimerEvent[] = [];
 
   // Mock methods
-  protected createPlayerAnimations(): void { this.mockCreatePlayerAnimations(); }
-  protected createPlatforms(): void { this.mockCreatePlatforms(); }
-  protected createBackground(): void { this.mockCreateBackground(); }
-  protected createHealthBars(): void {}
-  protected createSpecialBars(): void {}
-  protected createPlayerNames(): void {}
-  protected createTouchControls(): void {}
-  protected updateHealthBar(playerIndex: number): void { this.mockUpdateHealthBar(playerIndex); }
-  protected updateSpecialPips(): void { this.mockUpdateSpecialPips(0); }
-  protected checkWinner(): boolean { return this.mockCheckWinner(); }
-  protected endGame(winnerIndex: number, message?: string): Promise<void> { return this.mockEndGame(winnerIndex, message); }
+
 
   constructor() {
     super({
@@ -1190,31 +1215,7 @@ class TestKidsFightScene extends KidsFightScene {
       addEvent: jest.fn().mockReturnValue(this.testGameTimer),
       now: 0,
       delayedCall: jest.fn(),
-      removeAllEvents: jest.fn(),
-      clearPendingEvents: jest.fn()
     };
-
-    // Initialize players with mock implementations
-    this.player1 = {
-      health: 100,
-      special: 0,
-      setHealth: (value: number) => { this.player1.health = value; },
-      setSpecial: (value: number) => { this.player1.special = value; },
-      destroy: jest.fn()
-    };
-
-    this.player2 = {
-      health: 100,
-      special: 0,
-      setHealth: (value: number) => { this.player2.health = value; },
-      setSpecial: (value: number) => { this.player2.special = value; },
-      destroy: jest.fn()
-    };
-
-    this.players = [this.player1, this.player2];
-
-    // Initialize test time reference
-    this.testTime = this.time;
   }
 
   // Helper method to test checkWinner logic
@@ -1304,7 +1305,7 @@ class TestKidsFightScene extends KidsFightScene {
       loop: true
     });
   }
-};
+}
 
 // Export the test scene type
 export { TestKidsFightScene };

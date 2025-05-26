@@ -14,22 +14,17 @@ interface GameObject extends Phaser.GameObjects.GameObject {
 interface GameScene extends Phaser.Scene {
   scale: Phaser.Scale.ScaleManager;
   isReady?: boolean;
-  player1?: GameObject;
-  player2?: GameObject;
+  players?: GameObject[];
   platform?: GameObject;
   background?: GameObject;
-  healthBar1?: GameObject;
-  healthBar2?: GameObject;
   healthBarBg1?: GameObject;
   healthBarBg2?: GameObject;
-  specialBar1?: GameObject;
-  specialBar2?: GameObject;
+  healthBar1?: GameObject;
+  healthBar2?: GameObject;
   specialBarBg1?: GameObject;
   specialBarBg2?: GameObject;
-  p1Health?: number;
-  p2Health?: number;
-  p1Special?: number;
-  p2Special?: number;
+  specialBar1?: GameObject;
+  specialBar2?: GameObject;
   p1Name?: Phaser.GameObjects.Text;
   p2Name?: Phaser.GameObjects.Text;
   p1HealthText?: Phaser.GameObjects.Text;
@@ -87,18 +82,18 @@ export function updateSceneLayout(scene: any): void {
   const platformHeight = h * 0.045;
   const platformY = playerY + platformHeight / 2;
 
-  if (scene.player1 && scene.player1.setPosition) {
+  if (scene.players && scene.players[0] && scene.players[0].setPosition) {
     console.log('DEBUG:updateSceneLayout: calling player1.setPosition with', w * 0.3, playerY);
-    scene.player1.setPosition(w * 0.3, playerY);
+    scene.players[0].setPosition(w * 0.3, playerY);
   } else {
-    console.log('DEBUG:updateSceneLayout: player1 or setPosition missing', scene.player1);
+    console.log('DEBUG:updateSceneLayout: player1 or setPosition missing', scene.players);
   }
   
-  if (scene.player2 && scene.player2.setPosition) {
+  if (scene.players && scene.players[1] && scene.players[1].setPosition) {
     console.log('DEBUG:updateSceneLayout: calling player2.setPosition with', w * 0.7, playerY);
-    scene.player2.setPosition(w * 0.7, playerY);
+    scene.players[1].setPosition(w * 0.7, playerY);
   } else {
-    console.log('DEBUG:updateSceneLayout: player2 or setPosition missing', scene.player2);
+    console.log('DEBUG:updateSceneLayout: player2 or setPosition missing', scene.players);
   }
   
   if (scene.platform && scene.platform.setPosition && scene.platform.setSize) {
@@ -149,19 +144,19 @@ export function updateSceneLayout(scene: any): void {
   }
   
   if (scene.healthBar1 && scene.healthBar1.setPosition && scene.healthBar1.setSize) {
-    console.log('DEBUG:updateSceneLayout: calling healthBar1.setPosition with', p1X - barWidth/2 + (barWidth * (scene.p1Health || 0))/200, barY);
-    scene.healthBar1.setPosition(p1X - barWidth/2 + (barWidth * (scene.p1Health || 0))/200, barY);
-    console.log('DEBUG:updateSceneLayout: calling healthBar1.setSize with', barWidth * (scene.p1Health || 0)/100, barHeight);
-    scene.healthBar1.setSize?.(barWidth * (scene.p1Health || 0)/100, barHeight);
+    console.log('DEBUG:updateSceneLayout: calling healthBar1.setPosition with', p1X - barWidth/2 + (barWidth * (scene.players[0].health || 0))/200, barY);
+    scene.healthBar1.setPosition(p1X - barWidth/2 + (barWidth * (scene.players[0].health || 0))/200, barY);
+    console.log('DEBUG:updateSceneLayout: calling healthBar1.setSize with', barWidth * (scene.players[0].health || 0)/100, barHeight);
+    scene.healthBar1.setSize?.(barWidth * (scene.players[0].health || 0)/100, barHeight);
   } else {
     console.log('DEBUG:updateSceneLayout: healthBar1 or setPosition/setSize missing', scene.healthBar1);
   }
   
   if (scene.healthBar2 && scene.healthBar2.setPosition && scene.healthBar2.setSize) {
-    console.log('DEBUG:updateSceneLayout: calling healthBar2.setPosition with', p2X - barWidth/2 + (barWidth * (scene.p2Health || 0))/200, barY);
-    scene.healthBar2.setPosition(p2X - barWidth/2 + (barWidth * (scene.p2Health || 0))/200, barY);
-    console.log('DEBUG:updateSceneLayout: calling healthBar2.setSize with', barWidth * (scene.p2Health || 0)/100, barHeight);
-    scene.healthBar2.setSize?.(barWidth * (scene.p2Health || 0)/100, barHeight);
+    console.log('DEBUG:updateSceneLayout: calling healthBar2.setPosition with', p2X - barWidth/2 + (barWidth * (scene.players[1].health || 0))/200, barY);
+    scene.healthBar2.setPosition(p2X - barWidth/2 + (barWidth * (scene.players[1].health || 0))/200, barY);
+    console.log('DEBUG:updateSceneLayout: calling healthBar2.setSize with', barWidth * (scene.players[1].health || 0)/100, barHeight);
+    scene.healthBar2.setSize?.(barWidth * (scene.players[1].health || 0)/100, barHeight);
   } else {
     console.log('DEBUG:updateSceneLayout: healthBar2 or setPosition/setSize missing', scene.healthBar2);
   }
@@ -188,19 +183,19 @@ export function updateSceneLayout(scene: any): void {
   }
   
   if (scene.specialBar1 && scene.specialBar1.setPosition && scene.specialBar1.setSize) {
-    console.log('DEBUG:updateSceneLayout: calling specialBar1.setPosition with', p1X - barWidth/2 + (barWidth * (scene.p1Special || 0))/200, specialBarY);
-    scene.specialBar1.setPosition(p1X - barWidth/2 + (barWidth * (scene.p1Special || 0))/200, specialBarY);
-    console.log('DEBUG:updateSceneLayout: calling specialBar1.setSize with', barWidth * (scene.p1Special || 0)/100, barHeight/2);
-    scene.specialBar1.setSize?.(barWidth * (scene.p1Special || 0)/100, barHeight/2);
+    console.log('DEBUG:updateSceneLayout: calling specialBar1.setPosition with', p1X - barWidth/2 + (barWidth * (scene.players[0].special || 0))/200, specialBarY);
+    scene.specialBar1.setPosition(p1X - barWidth/2 + (barWidth * (scene.players[0].special || 0))/200, specialBarY);
+    console.log('DEBUG:updateSceneLayout: calling specialBar1.setSize with', barWidth * (scene.players[0].special || 0)/100, barHeight/2);
+    scene.specialBar1.setSize?.(barWidth * (scene.players[0].special || 0)/100, barHeight/2);
   } else {
     console.log('DEBUG:updateSceneLayout: specialBar1 or setPosition/setSize missing', scene.specialBar1);
   }
   
   if (scene.specialBar2 && scene.specialBar2.setPosition && scene.specialBar2.setSize) {
-    console.log('DEBUG:updateSceneLayout: calling specialBar2.setPosition with', p2X - barWidth/2 + (barWidth * (scene.p2Special || 0))/200, specialBarY);
-    scene.specialBar2.setPosition(p2X - barWidth/2 + (barWidth * (scene.p2Special || 0))/200, specialBarY);
-    console.log('DEBUG:updateSceneLayout: calling specialBar2.setSize with', barWidth * (scene.p2Special || 0)/100, barHeight/2);
-    scene.specialBar2.setSize?.(barWidth * (scene.p2Special || 0)/100, barHeight/2);
+    console.log('DEBUG:updateSceneLayout: calling specialBar2.setPosition with', p2X - barWidth/2 + (barWidth * (scene.players[1].special || 0))/200, specialBarY);
+    scene.specialBar2.setPosition(p2X - barWidth/2 + (barWidth * (scene.players[1].special || 0))/200, specialBarY);
+    console.log('DEBUG:updateSceneLayout: calling specialBar2.setSize with', barWidth * (scene.players[1].special || 0)/100, barHeight/2);
+    scene.specialBar2.setSize?.(barWidth * (scene.players[1].special || 0)/100, barHeight/2);
   } else {
     console.log('DEBUG:updateSceneLayout: specialBar2 or setPosition/setSize missing', scene.specialBar2);
   }
@@ -295,9 +290,8 @@ export function updateSceneLayout(scene: any): void {
 
 interface AttackOptions {
   scene: GameScene;
-  playerIdx: number;
-  attacker: GameObject;
-  defender: GameObject;
+  attackerIdx: number;
+  defenderIdx: number;
   now: number;
   special?: boolean;
 }
@@ -305,34 +299,34 @@ interface AttackOptions {
 // Function to try an attack
 export function tryAttack({
   scene,
-  playerIdx,
-  attacker,
-  defender,
+  attackerIdx,
+  defenderIdx,
   now,
   special = false
 }: AttackOptions): boolean {
-  if (!scene || !attacker || !defender) return false;
-
+  if (!scene || !scene.players || !scene.players[attackerIdx] || !scene.players[defenderIdx]) {
+    console.error('[TRYATTACK] scene.players or player objects are missing', scene?.players, attackerIdx, defenderIdx);
+    return false;
+  }
+  const attacker = scene.players[attackerIdx];
+  const defender = scene.players[defenderIdx];
   // Get health and special values
-  const health = playerIdx === 1 ? scene.p1Health : scene.p2Health;
-  const specialValue = playerIdx === 1 ? scene.p1Special : scene.p2Special;
+  const defenderHealth = defender.health;
+  const attackerSpecial = attacker.special;
 
   // Check if attack is possible
-  if (health === undefined || health <= 0) return false;
-  if (special && (!specialValue || specialValue < 100)) return false;
+  if (defenderHealth === undefined || defenderHealth <= 0) return false;
+  if (special && (!attackerSpecial || attackerSpecial < 100)) return false;
 
   // Calculate attack values
   const damage = special ? 30 : 10;
   const knockback = special ? 300 : 100;
 
   // Apply damage and knockback
-  if (playerIdx === 1) {
-    if (scene.p2Health) scene.p2Health = Math.max(0, scene.p2Health - damage);
-    if (special && scene.p1Special) scene.p1Special = 0;
-  } else {
-    if (scene.p1Health) scene.p1Health = Math.max(0, scene.p1Health - damage);
-    if (special && scene.p2Special) scene.p2Special = 0;
-  }
+  defender.health = Math.max(0, defender.health - damage);
+  if (special) attacker.special = 0;
+
+  // Optionally, apply knockback or other effects here
 
   return true;
 }

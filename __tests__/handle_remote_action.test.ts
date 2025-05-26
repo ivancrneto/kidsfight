@@ -30,80 +30,124 @@ describe('handleRemoteAction', () => {
 
   beforeEach(() => {
     // Create a simple mock for players with animation support
-    mockPlayer1 = {
-      setVelocityX: jest.fn(),
-      setVelocityY: jest.fn(),
-      setFlipX: jest.fn(),
-      setFrame: jest.fn(),
-      setData: jest.fn(),
-      body: {
-        blocked: {
-          down: true,  // Simulate being on the ground by default
-          left: false,
-          right: false,
-          up: false,
-          none: false
+    const playerMocks = [
+      {
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+        setFlipX: jest.fn(),
+        setFrame: jest.fn(),
+        setData: jest.fn(),
+        body: {
+          blocked: {
+            down: true,  // Simulate being on the ground by default
+            left: false,
+            right: false,
+            up: false,
+            none: false
+          },
+          touching: { down: true, left: false, right: false, up: false, none: false },
+          velocity: { x: 0, y: 0 },
+          setVelocityX: jest.fn().mockImplementation(function(this: any, x: number) {
+            this.velocity.x = x;
+          }),
+          setVelocityY: jest.fn().mockImplementation(function(this: any, y: number) {
+            this.velocity.y = y;
+          }),
+          setGravityY: jest.fn(),
+          setCollideWorldBounds: jest.fn(),
+          on: jest.fn()
         },
-        touching: { down: true, left: false, right: false, up: false, none: false },
-        velocity: { x: 0, y: 0 },
-        setVelocityX: jest.fn().mockImplementation(function(this: any, x: number) {
-          this.velocity.x = x;
+        getData: jest.fn().mockImplementation(function(this: any, key: string) {
+          if (!this._data) {
+            this._data = {
+              'isHit': false,
+              'isAttacking': false,
+              'isBlocking': false,
+              'specialCooldown': 0,
+              'attackCooldown': 0,
+              'health': 100,
+              'specialMeter': 0,
+              'lastDirection': 1,
+              'isJumping': false,
+              'isDucking': false
+            };
+          }
+          return this._data[key];
         }),
-        setVelocityY: jest.fn().mockImplementation(function(this: any, y: number) {
-          this.velocity.y = y;
+        anims: {
+          play: jest.fn()
+        },
+        texture: {
+          key: 'player1'
+        },
+        width: 32,
+        height: 64,
+        // Add health and special meter properties
+        health: 100,
+        specialMeter: 0,
+        x: 0,
+        y: 0
+      },
+      {
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+        setFlipX: jest.fn(),
+        setFrame: jest.fn(),
+        setData: jest.fn(),
+        body: {
+          blocked: {
+            down: true,
+            left: false,
+            right: false,
+            up: false,
+            none: false
+          },
+          touching: { down: true, left: false, right: false, up: false, none: false },
+          velocity: { x: 0, y: 0 },
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          setGravityY: jest.fn(),
+          setCollideWorldBounds: jest.fn(),
+          on: jest.fn()
+        },
+        getData: jest.fn().mockImplementation(function(this: any, key: string) {
+          if (!this._data) {
+            this._data = {
+              'isHit': false,
+              'isAttacking': false,
+              'isBlocking': false,
+              'specialCooldown': 0,
+              'attackCooldown': 0,
+              'health': 100,
+              'specialMeter': 0,
+              'lastDirection': 1,
+              'isJumping': false,
+              'isDucking': false
+            };
+          }
+          return this._data[key];
         }),
-        setGravityY: jest.fn(),
-        setCollideWorldBounds: jest.fn(),
-        on: jest.fn()
-      },
-      getData: jest.fn().mockImplementation(function(this: any, key: string) {
-        if (!this._data) {
-          this._data = {
-            'isHit': false,
-            'isAttacking': false,
-            'isBlocking': false,
-            'specialCooldown': 0,
-            'attackCooldown': 0,
-            'health': 100,
-            'specialMeter': 0,
-            'lastDirection': 1,
-            'isJumping': false,
-            'isDucking': false
-          };
-        }
-        return this._data[key];
-      }),
-      anims: {
-        play: jest.fn()
-      },
-      texture: {
-        key: 'player1'
-      },
-      width: 32,
-      height: 64,
-      // Add health and special meter properties
-      health: 100,
-      specialMeter: 0,
-      x: 0,
-      y: 0
-    };
-    
-    mockPlayer2 = {
-      ...mockPlayer1,
-      texture: {
-        key: 'player2'
-      },
-      // Position player2 next to player1
-      x: 100,
-      y: 0
-    };
-    
-    // Create scene instance
+        anims: {
+          play: jest.fn()
+        },
+        texture: {
+          key: 'player2'
+        },
+        width: 32,
+        height: 64,
+        // Add health and special meter properties
+        health: 100,
+        specialMeter: 0,
+        x: 100,
+        y: 0
+      }
+    ];
     scene = new TestableKidsFightScene();
+    scene.players = playerMocks;
+    mockPlayer1 = playerMocks[0];
+    mockPlayer2 = playerMocks[1];
     
     // Set up test environment
-    (scene as any).player1 = mockPlayer1;
-    (scene as any).player2 = mockPlayer2;
     (scene as any).isHost = true;
     (scene as any).gameMode = 'online';
     (scene as any).playerDirection = ['right', 'left'];
@@ -119,55 +163,55 @@ describe('handleRemoteAction', () => {
   it('should handle move action for player 1', () => {
     // Test moving right
     scene.testHandleRemoteAction({ type: 'move', playerIndex: 0, direction: 1 });
-    expect(mockPlayer1.setVelocityX).toHaveBeenCalledWith(160);
-    expect(mockPlayer1.setFlipX).toHaveBeenCalledWith(false);
+    expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(160);
+    expect(scene.players[0].setFlipX).toHaveBeenCalledWith(false);
     expect((scene as any).playerDirection[0]).toBe('right');
     
     // Test moving left
     jest.clearAllMocks();
     scene.testHandleRemoteAction({ type: 'move', playerIndex: 0, direction: -1 });
-    expect(mockPlayer1.setVelocityX).toHaveBeenCalledWith(-160);
-    expect(mockPlayer1.setFlipX).toHaveBeenCalledWith(true);
+    expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(-160);
+    expect(scene.players[0].setFlipX).toHaveBeenCalledWith(true);
     expect((scene as any).playerDirection[0]).toBe('left');
     
     // Test stop
     jest.clearAllMocks();
     scene.testHandleRemoteAction({ type: 'move', playerIndex: 0, direction: 0 });
-    expect(mockPlayer1.setVelocityX).toHaveBeenCalledWith(0);
+    expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(0);
     // setFlipX is called with false when direction is 0, which is fine
   });
 
   it('should handle move action for player 2', () => {
     // Test moving right
     scene.testHandleRemoteAction({ type: 'move', playerIndex: 1, direction: 1 });
-    expect(mockPlayer2.setVelocityX).toHaveBeenCalledWith(160);
-    expect(mockPlayer2.setFlipX).toHaveBeenCalledWith(false);
+    expect(scene.players[1].setVelocityX).toHaveBeenCalledWith(160);
+    expect(scene.players[1].setFlipX).toHaveBeenCalledWith(false);
     expect((scene as any).playerDirection[1]).toBe('right');
   });
 
   it('should handle jump action', () => {
     // Test jump when on ground
-    mockPlayer1.body.touching.down = true;
+    scene.players[0].body.touching.down = true;
     scene.testHandleRemoteAction({ type: 'jump', playerIndex: 0 });
-    expect(mockPlayer1.setVelocityY).toHaveBeenCalledWith(-330);
+    expect(scene.players[0].setVelocityY).toHaveBeenCalledWith(-330);
     
     // Test jump when in air (should not jump)
     jest.clearAllMocks();
-    mockPlayer1.body.touching.down = false;
+    scene.players[0].body.touching.down = false;
     scene.testHandleRemoteAction({ type: 'jump', playerIndex: 0 });
-    expect(mockPlayer1.setVelocityY).not.toHaveBeenCalled();
+    expect(scene.players[0].setVelocityY).not.toHaveBeenCalled();
   });
 
   it('should handle block action', () => {
     // Test blocking
     scene.testHandleRemoteAction({ type: 'block', playerIndex: 0, active: true });
-    expect(mockPlayer1.setData).toHaveBeenCalledWith('isBlocking', true);
+    expect(scene.players[0].setData).toHaveBeenCalledWith('isBlocking', true);
     expect((scene as any).playerBlocking[0]).toBe(true);
     
     // Test unblocking
     jest.clearAllMocks();
     scene.testHandleRemoteAction({ type: 'block', playerIndex: 0, active: false });
-    expect(mockPlayer1.setData).toHaveBeenCalledWith('isBlocking', false);
+    expect(scene.players[0].setData).toHaveBeenCalledWith('isBlocking', false);
     expect((scene as any).playerBlocking[0]).toBe(false);
   });
 
@@ -225,16 +269,16 @@ describe('handleRemoteAction', () => {
     (scene as any).gameOver = true;
     
     scene.testHandleRemoteAction({ type: 'move', playerIndex: 0, direction: 1 });
-    expect(mockPlayer1.body.setVelocityX).not.toHaveBeenCalled();
+    expect(scene.players[0].body.setVelocityX).not.toHaveBeenCalled();
     
     scene.testHandleRemoteAction({ type: 'jump', playerIndex: 0 });
-    expect(mockPlayer1.body.setVelocityY).not.toHaveBeenCalled();
+    expect(scene.players[0].body.setVelocityY).not.toHaveBeenCalled();
   });
   
   it('should not process actions when not in online mode', () => {
     (scene as any).gameMode = 'single';
     
     scene.testHandleRemoteAction({ type: 'move', playerIndex: 0, direction: 1 });
-    expect(mockPlayer1.body.setVelocityX).not.toHaveBeenCalled();
+    expect(scene.players[0].body.setVelocityX).not.toHaveBeenCalled();
   });
 });

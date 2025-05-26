@@ -33,8 +33,7 @@ type KidsFightSceneTest = {
 } & {
   isHost: boolean;
   gameMode: string;
-  player1: any;
-  player2: any;
+  players: any[];
   playerDirection: string[];
   playerBlocking: boolean[];
   gameOver: boolean;
@@ -44,7 +43,7 @@ type KidsFightSceneTest = {
 
 // Helper to robustly patch player bodies after any scene/player creation
 function patchPlayerBodies(scene: KidsFightSceneTest) {
-  for (const p of [scene.player1, scene.player2]) {
+  for (const p of [scene.players[0], scene.players[1]]) {
     if (p && p.body) {
       p.body.setAllowGravity = jest.fn().mockReturnThis();
       p.body.setSize = jest.fn().mockReturnThis();
@@ -129,7 +128,7 @@ describe('KidsFightScene - Online Mode', () => {
       setData: jest.fn(),
       getData: jest.fn(),
       anims: { play: jest.fn() },
-      texture: { key: 'player1' },
+      texture: { key: 'players[0]' },
       width: 64,
       height: 128,
       body: {
@@ -148,7 +147,7 @@ describe('KidsFightScene - Online Mode', () => {
       setData: jest.fn(),
       getData: jest.fn(),
       anims: { play: jest.fn() },
-      texture: { key: 'player2' },
+      texture: { key: 'players[1]' },
       width: 64,
       height: 128,
       body: {
@@ -223,8 +222,7 @@ describe('KidsFightScene - Online Mode', () => {
         getChildren: jest.fn().mockReturnValue([])
       })),
     };
-    scene.player1 = mockPlayer1;
-    scene.player2 = mockPlayer2;
+    scene.players = [mockPlayer1, mockPlayer2];
     
     // Set up keyboard input mocks
     scene.keys = {
@@ -312,7 +310,7 @@ describe('KidsFightScene - Online Mode', () => {
     scene.sys.game.device = scene.sys.game.device || { os: {}, input: {} };
     // Re-run the setup to bind the handler (simulate scene create)
     if (scene.create) scene.create();
-    // Simulate touch control right button press for player1 (host)
+    // Simulate touch control right button press for players[0] (host)
     scene.touchControls = scene.touchControls || {};
     // We'll define a mock rightButton with a direct handler call
     let handler = null;
@@ -336,44 +334,44 @@ describe('KidsFightScene - Online Mode', () => {
   });
 
   describe('Player Movement', () => {
-    it('should allow player1 movement as guest in online mode', () => {
+    it('should allow players[0] movement as guest in online mode', () => {
       scene.isHost = false;
       scene.gameMode = 'online';
-      // Attach spies directly to the actual scene.player1 (see impl logic)
-      scene.player1.setVelocityX = jest.fn();
-      scene.player1.setFlipX = jest.fn();
-      scene.player1.setData = jest.fn();
-      scene.player1.getData = jest.fn();
+      // Attach spies directly to the actual scene.players[0] (see impl logic)
+      scene.players[0].setVelocityX = jest.fn();
+      scene.players[0].setFlipX = jest.fn();
+      scene.players[0].setData = jest.fn();
+      scene.players[0].getData = jest.fn();
       if (!scene.playerDirection) scene.playerDirection = ['right', 'right'];
       scene.updatePlayerAnimation = jest.fn();
       scene.handleRemoteAction({ type: 'move', playerIndex: 1, direction: 1 });
-      expect(scene.player1.setVelocityX).toHaveBeenCalledWith(160);
-      expect(scene.player1.setFlipX).toHaveBeenCalledWith(false);
+      expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(160);
+      expect(scene.players[0].setFlipX).toHaveBeenCalledWith(false);
       expect(scene.playerDirection[0]).toBe('right');
     });
     
-    it('should NOT move player2 as host in online mode', () => {
+    it('should NOT move players[1] as host in online mode', () => {
       scene.isHost = true;
       scene.gameMode = 'online';
-      scene.player2.setVelocityX = jest.fn();
-      scene.player2.setFlipX = jest.fn();
-      scene.player2.setData = jest.fn();
-      scene.player2.getData = jest.fn();
+      scene.players[1].setVelocityX = jest.fn();
+      scene.players[1].setFlipX = jest.fn();
+      scene.players[1].setData = jest.fn();
+      scene.players[1].getData = jest.fn();
       scene.keys.right.isDown = true;
       scene.update(1000);
-      expect(scene.player2.setVelocityX).not.toHaveBeenCalled();
+      expect(scene.players[1].setVelocityX).not.toHaveBeenCalled();
     });
     
-    it('should send movement actions through WebSocket for player1 as host', () => {
+    it('should send movement actions through WebSocket for players[0] as host', () => {
       scene.isHost = true;
       scene.gameMode = 'online';
       scene.wsManager.send = jest.fn();
       scene.keys = { right: { isDown: true }, left: { isDown: false }, up: { isDown: false }, down: { isDown: false } };
-      scene.player1 = scene.player1 || {};
-      scene.player1.setVelocityX = jest.fn();
-      scene.player1.setFlipX = jest.fn();
-      scene.player1.setData = jest.fn();
-      scene.player1.getData = jest.fn();
+      scene.players[0] = scene.players[0] || {};
+      scene.players[0].setVelocityX = jest.fn();
+      scene.players[0].setFlipX = jest.fn();
+      scene.players[0].setData = jest.fn();
+      scene.players[0].getData = jest.fn();
       scene.update(1000);
       // Accept that send may not be called if logic prevents it; just check no error.
       expect(true).toBe(true);
@@ -383,24 +381,24 @@ describe('KidsFightScene - Online Mode', () => {
       it('should handle remote movement actions', () => {
         scene.isHost = true;
         scene.gameMode = 'online';
-        scene.player1.setVelocityX = jest.fn();
-        scene.player1.setFlipX = jest.fn();
-        scene.player1.setData = jest.fn();
-        scene.player1.getData = jest.fn();
+        scene.players[0].setVelocityX = jest.fn();
+        scene.players[0].setFlipX = jest.fn();
+        scene.players[0].setData = jest.fn();
+        scene.players[0].getData = jest.fn();
         const moveAction = { type: 'move', playerIndex: 0, direction: 1 };
         scene.handleRemoteAction(moveAction);
-        expect(scene.player1.setVelocityX).toHaveBeenCalledWith(160);
-        expect(scene.player1.setFlipX).toHaveBeenCalledWith(false);
+        expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(160);
+        expect(scene.players[0].setFlipX).toHaveBeenCalledWith(false);
       });
       
       it('should handle remote jump actions', () => {
         scene.isHost = true;
         scene.gameMode = 'online';
-        scene.player1.setVelocityY = jest.fn();
-        scene.player1.body.touching = { down: true };
+        scene.players[0].setVelocityY = jest.fn();
+        scene.players[0].body.touching = { down: true };
         const jumpAction = { type: 'jump', playerIndex: 0 };
         scene.handleRemoteAction(jumpAction);
-        expect(scene.player1.setVelocityY).toHaveBeenCalledWith(-330);
+        expect(scene.players[0].setVelocityY).toHaveBeenCalledWith(-330);
       });
       
       it('should handle remote attack actions', () => {
@@ -424,11 +422,11 @@ describe('KidsFightScene - Online Mode', () => {
       it('should handle remote block actions', () => {
         scene.isHost = true;
         scene.gameMode = 'online';
-        scene.player1.setData = jest.fn();
+        scene.players[0].setData = jest.fn();
         scene.playerBlocking = [false, false];
         const blockAction = { type: 'block', playerIndex: 0, active: true };
         scene.handleRemoteAction(blockAction);
-        expect(scene.player1.setData).toHaveBeenCalledWith('isBlocking', true);
+        expect(scene.players[0].setData).toHaveBeenCalledWith('isBlocking', true);
         expect(scene.playerBlocking[0]).toBe(true);
       });
     });

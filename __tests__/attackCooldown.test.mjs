@@ -17,12 +17,13 @@ describe('Attack Cooldown Logic', () => {
       healthBar1: { width: 200 },
       healthBar2: { width: 200 },
     };
+    scene.players = [scene.player1, scene.player2];
   });
 
   it('should allow attack if cooldown has passed and in range', () => {
     const now = 1000;
     scene.lastAttackTime[1] = 0;
-    tryAttack(scene, 1, scene.player2, scene.player1, now, false);
+    tryAttack(scene, 1, 0, now, false);
     expect(scene.playerHealth[0]).toBe(90);
     expect(scene.lastAttackTime[1]).toBe(now);
     expect(scene.attackCount[1]).toBe(1);
@@ -32,7 +33,7 @@ describe('Attack Cooldown Logic', () => {
     const now = 1000;
     scene.lastAttackTime[1] = 900;
     scene.playerHealth[0] = 100;
-    tryAttack(scene, 1, scene.player2, scene.player1, now, false);
+    tryAttack(scene, 1, 0, now, false);
     expect(scene.playerHealth[0]).toBe(100); // No change
     expect(scene.attackCount[1]).toBe(0);
   });
@@ -42,7 +43,7 @@ describe('Attack Cooldown Logic', () => {
     scene.player2.x = 100;
     scene.player1.x = 300; // Out of range
     scene.playerHealth[0] = 100;
-    tryAttack(scene, 1, scene.player2, scene.player1, now, false);
+    tryAttack(scene, 1, 0, now, false);
     expect(scene.playerHealth[0]).toBe(100); // No change
     expect(scene.attackCount[1]).toBe(0);
   });
@@ -53,8 +54,8 @@ describe('Attack Cooldown Logic', () => {
     scene.player2.x = 110;
     scene.playerHealth[0] = 100;
     scene.playerHealth[1] = 100;
-    tryAttack(scene, 0, scene.player1, scene.player2, now, false);
-    tryAttack(scene, 1, scene.player2, scene.player1, now, false);
+    tryAttack(scene, 0, 1, now, false);
+    tryAttack(scene, 1, 0, now, false);
     expect(scene.playerHealth[0]).toBe(90);
     expect(scene.playerHealth[1]).toBe(90);
     expect(scene.attackCount[0]).toBe(1);

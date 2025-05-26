@@ -190,31 +190,37 @@ function applyGameCss() {
 // The correct version is defined earlier in this file.
 
 // Redundant module.exports removed. The main one is at the end of the file.
-function tryAttack(scene, playerIdx, attacker, defender, now, special) {
-  // Robustly determine defenderIdx
-  let defenderIdx = undefined;
-  if (defender === scene.player1) defenderIdx = 0;
-  else if (defender === scene.player2) defenderIdx = 1;
-  else {
-    console.error('[TRYATTACK] Could not determine defenderIdx!', defender, scene.player1, scene.player2);
+function tryAttack(scene, attackerIdx, defenderIdx, now, special) {
+  if (
+    typeof attackerIdx !== 'number' ||
+    typeof defenderIdx !== 'number' ||
+    attackerIdx < 0 ||
+    defenderIdx < 0 ||
+    !scene.players ||
+    !scene.players[attackerIdx] ||
+    !scene.players[defenderIdx]
+  ) {
+    console.error('[TRYATTACK] Invalid indices or players', { attackerIdx, defenderIdx, players: scene.players });
     return;
   }
-  console.log('[TRYATTACK] defenderIdx:', defenderIdx, 'playerHealth before:', scene.playerHealth[defenderIdx]);
-  if (!attacker || !defender) return;
+  const attacker = scene.players[attackerIdx];
+  const defender = scene.players[defenderIdx];
+  if (!attacker || !defender) {
+    console.error('[TRYATTACK] Invalid attacker or defender', attackerIdx, defenderIdx, scene.players);
+    return;
+  }
   const ATTACK_RANGE = 180;
   const ATTACK_COOLDOWN = 500;
   if (!scene.lastAttackTime) scene.lastAttackTime = [0, 0];
   if (!scene.attackCount) scene.attackCount = [0, 0];
-  if (now - scene.lastAttackTime[playerIdx] < ATTACK_COOLDOWN) {
-    // console.log('[DEBUG] tryAttack: Attack on cooldown for player', playerIdx);
+  if (now - scene.lastAttackTime[attackerIdx] < ATTACK_COOLDOWN) {
     return;
   }
   if (Math.abs(attacker.x - defender.x) > ATTACK_RANGE) {
-    // console.log('[DEBUG] tryAttack: Out of range. Attacker x:', attacker.x, 'Defender x:', defender.x);
     return;
   }
-  scene.lastAttackTime[playerIdx] = now;
-  scene.attackCount[playerIdx]++;
+  scene.lastAttackTime[attackerIdx] = now;
+  scene.attackCount[attackerIdx]++;
   scene.playerHealth[defenderIdx] = Math.max(0, (typeof scene.playerHealth[defenderIdx] === 'number' ? scene.playerHealth[defenderIdx] : 100) - (special ? 30 : 10));
   console.log('[TRYATTACK] playerHealth after:', scene.playerHealth[defenderIdx]);
   if (scene.cameras && scene.cameras.main && typeof scene.cameras.main.shake === 'function') {

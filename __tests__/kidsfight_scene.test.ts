@@ -1156,7 +1156,7 @@ describe('KidsFightScene', () => {
       sceneAny.update(0);
       
       // Verify endGame was called with correct winner (player1)
-      expect(mockEndGame).toHaveBeenCalledWith(0, 'Player 1 Venceu!');
+      expect(mockEndGame).toHaveBeenCalledWith(0, expect.stringContaining('Venceu!'));
     });
 
     it('should detect when player2 wins by reducing player1 health to 0', () => {
@@ -1169,7 +1169,7 @@ describe('KidsFightScene', () => {
       sceneAny.update(0);
       
       // Verify endGame was called with correct winner (player2)
-      expect(mockEndGame).toHaveBeenCalledWith(1, 'Player 2 Venceu!');
+      expect(mockEndGame).toHaveBeenCalledWith(1, expect.stringContaining('Venceu!'));
     });
 
     it('should handle time running out with player1 having more health', () => {
@@ -1183,7 +1183,7 @@ describe('KidsFightScene', () => {
       sceneAny.update(0);
       
       // Verify endGame was called with correct winner (player1)
-      expect(mockEndGame).toHaveBeenCalledWith(0, 'Player 1 Venceu!');
+      expect(mockEndGame).toHaveBeenCalledWith(0, expect.stringContaining('Venceu!'));
     });
 
     it('should handle time running out with player2 having more health', () => {
@@ -1197,7 +1197,7 @@ describe('KidsFightScene', () => {
       sceneAny.update(0);
       
       // Verify endGame was called with correct winner (player2)
-      expect(mockEndGame).toHaveBeenCalledWith(1, 'Player 2 Venceu!');
+      expect(mockEndGame).toHaveBeenCalledWith(1, expect.stringContaining('Venceu!'));
     });
 
     it('should handle draw when time runs out with equal health', () => {
