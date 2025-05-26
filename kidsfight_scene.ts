@@ -574,15 +574,31 @@ class KidsFightScene extends Phaser.Scene {
     // Create player name texts with proper scaling
     const fontSize = Math.max(16, Math.floor(24 * scaleY)); // Ensure minimum readable size
 
-    // Use the selected character names (p1 and p2)
+    // Prefer character display names if available
+    const getDisplayName = (key: string) => {
+      // Map known keys to real names, fallback to key if not found
+      const nameMap: Record<string, string> = {
+        player1: 'Bento',
+        player2: 'Davir',
+        player3: 'José',
+        player4: 'Davis',
+        player5: 'Carol',
+        player6: 'Roni',
+        player7: 'Jacqueline',
+        player8: 'Ivan',
+        player9: 'D. Isa',
+      };
+      return nameMap[key] || key;
+    };
+
     const playerName1 = this.add.text(
-        10 * scaleX, 70 * scaleY, this.p1, {
+        10 * scaleX, 70 * scaleY, getDisplayName(this.p1), {
           fontSize: `${fontSize}px`,
           color: '#000000'
         }) as Phaser.GameObjects.Text;
 
     const playerName2 = this.add.text(
-        gameWidth - (210 * scaleX), 70 * scaleY, this.p2, {
+        gameWidth - (210 * scaleX), 70 * scaleY, getDisplayName(this.p2), {
           fontSize: `${fontSize}px`,
           color: '#000000'
         }) as Phaser.GameObjects.Text;
@@ -794,7 +810,7 @@ class KidsFightScene extends Phaser.Scene {
       const winner = this.players[winnerIndex];
       const loser = this.players[1 - winnerIndex];
       if (winner && loser) {
-        winner.setFrame?.(4);
+        winner.setFrame?.(3);
         loser.setAngle?.(90);
       }
     }
@@ -1030,11 +1046,11 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     // DEBUG
     //console.log('ANIM: HIT', playerIndex);
   } else if (player.getData('isSpecialAttacking')) {
-    player.setFrame(7); // Frame 7 for special attack (USER request)
+    player.setFrame(6); // Frame 6 for special attack (last valid frame)
     // DEBUG
     //console.log('ANIM: SPECIAL ATTACK', playerIndex);
   } else if (player.getData('isAttacking')) {
-    player.setFrame(5); // Frame 5 for attack
+    player.setFrame(4); // Frame 4 for attack
     // DEBUG
     //console.log('ANIM: ATTACK', playerIndex);
   } else if (player.body && !player.body.blocked.down) {
