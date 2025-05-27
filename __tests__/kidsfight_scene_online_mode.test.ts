@@ -386,16 +386,16 @@ describe('KidsFightScene - Online Mode', () => {
   });
   
   describe('Player Movement', () => {
-    it('should allow players[0] movement as guest in online mode', () => {
+    it('should allow players[1] movement as guest in online mode', () => {
       scene.isHost = false;
       scene.gameMode = 'online';
-      scene.players[0].setVelocityX = jest.fn();
-      scene.players[0].setFlipX = jest.fn();
-      scene.players[0].setData = jest.fn();
-      scene.players[0].getData = jest.fn();
+      scene.players[1].setVelocityX = jest.fn();
+      scene.players[1].setFlipX = jest.fn();
+      scene.players[1].setData = jest.fn();
+      scene.players[1].getData = jest.fn();
       scene.handleRemoteAction({ type: 'move', playerIndex: 1, direction: 1 });
-      expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(160);
-      expect(scene.players[0].setFlipX).toHaveBeenCalledWith(false);
+      expect(scene.players[1].setVelocityX).toHaveBeenCalledWith(160);
+      expect(scene.players[1].setFlipX).toHaveBeenCalledWith(false);
     });
     
     it('should NOT move players[1] as host in online mode', () => {

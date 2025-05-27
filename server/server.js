@@ -70,14 +70,17 @@ server.on('connection', (ws) => {
           break;
 
         case 'player_selected':
+        case 'playerSelected':
           const selRoom = gameRooms.get(roomCode);
           if (!selRoom) return;
           // Forward selection to the other player
           const selTarget = isHost ? selRoom.client : selRoom.host;
           if (selTarget) {
             selTarget.send(JSON.stringify({
-            type: 'player_selected',
-              data: data.data // forward the player and character fields as-is
+              type: 'player_selected',
+              player: data.player,
+              character: data.character,
+              roomCode: roomCode // optional, for debugging or client logic
             }));
           }
           break;
@@ -92,19 +95,6 @@ server.on('connection', (ws) => {
         //     charRoom.gameState.p1.character = characterKey;
         //   } else {
         //     charRoom.gameState.p2.character = characterKey;
-        //   }
-        //
-        //   // Forward character selection to the other player
-        //   const charTarget = isHost ? charRoom.client : charRoom.host;
-        //   if (charTarget) {
-        //     charTarget.send(JSON.stringify({
-        //       type: 'playerer_selected',
-        //       character: data.character,
-        //       playerNum: isHost ? 1 : 2
-        //     }));
-        //   }
-        //   break;
-          
         case 'scenario_selected':
           const scRoom = gameRooms.get(roomCode);
           if (!scRoom) return;

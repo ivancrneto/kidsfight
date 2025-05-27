@@ -11,6 +11,13 @@ describe('KidsFightScene Touch Controls', () => {
     // Mock Phaser methods and properties
     scene.sys = { game: { canvas: { width: 800, height: 600 }, device: { os: { android: false, iOS: false } } } } as any;
     scene.add = {
+  circle: jest.fn().mockReturnValue({
+    setAlpha: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis(),
+    setInteractive: jest.fn().mockReturnThis(),
+    setScrollFactor: jest.fn().mockReturnThis(),
+    on: jest.fn().mockReturnThis(),
+  }),
       rectangle: jest.fn(() => ({
         setAlpha: jest.fn().mockReturnThis(),
         setDepth: jest.fn().mockReturnThis(),

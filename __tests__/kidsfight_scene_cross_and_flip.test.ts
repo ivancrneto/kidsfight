@@ -15,6 +15,8 @@ describe('KidsFightScene player cross and flip logic', () => {
         body: { velocity: { x: 0 }, blocked: { down: true } },
         setFrame: jest.fn(),
         getData: jest.fn(() => false),
+        texture: { key: 'player1' },
+        frame: { name: 0 },
       },
       {
         x: 200,
@@ -23,6 +25,8 @@ describe('KidsFightScene player cross and flip logic', () => {
         body: { velocity: { x: 0 }, blocked: { down: true } },
         setFrame: jest.fn(),
         getData: jest.fn(() => false),
+        texture: { key: 'player2' },
+        frame: { name: 0 },
       }
     ];
     scene.players = playerMocks;
@@ -63,47 +67,47 @@ describe('KidsFightScene sprite frame size loading', () => {
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player1',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 300, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player2',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 300, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player3',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 340, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player4',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 340, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player5',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 400, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player6',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 400, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player7',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 400, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player8',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 400, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
     expect(scene.load.spritesheet).toHaveBeenCalledWith(
       'player9',
       expect.anything(),
-      expect.objectContaining({ frameWidth: 510, frameHeight: 512 })
+      expect.objectContaining({ frameWidth: 410, frameHeight: 512 })
     );
   });
 });

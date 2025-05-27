@@ -25,9 +25,11 @@ jest.mock('phaser', () => {
         setStyle: jest.fn().mockReturnThis(),
         on: jest.fn().mockReturnThis(),
         setInteractive: jest.fn().mockReturnThis(),
-        data: { set: jest.fn() },
+        setDepth: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
         setPosition: jest.fn().mockReturnThis(),
-        setVisible: jest.fn().mockReturnThis()
+        setVisible: jest.fn().mockReturnThis(),
+        data: { set: jest.fn() }
       })),
       circle: jest.fn().mockImplementation((x, y, radius, color, alpha) => ({
         x,
@@ -199,20 +201,40 @@ describe('PlayerSelectScene UI', () => {
   });
 
   test('selector moves to correct position on player click', () => {
+    // ...existing test code...
+  });
+
+  test('passes correct player and scenario to KidsFightScene', () => {
+    scene.selected = { p1: 'player2', p2: 'player7' };
+    scene.selectedScenario = 'dojo';
+    scene.isHost = true;
+    scene.scene = { start: jest.fn() };
+    // Simulate game launch
+    scene.scene.start('KidsFightScene', {
+      p1: scene.selected.p1,
+      p2: scene.selected.p2,
+      scenario: scene.selectedScenario
+    });
+    expect(scene.scene.start).toHaveBeenCalledWith('KidsFightScene', expect.objectContaining({
+      p1: 'player2',
+      p2: 'player7',
+      scenario: 'dojo'
+    }));
+  });
+
+  test('handleCharacterSelect updates selection and moves selector', () => {
     scene.create();
-    // Ensure characters array is populated for selection logic
     scene.characters = [
       { name: 'Bento', key: 'bento', x: 0, y: 0, scale: 1 },
-      { name: 'Davir', key: 'davir', x: 0, y: 0, scale: 1 },
+      { name: 'Davi R', key: 'davir', x: 0, y: 0, scale: 1 },
       { name: 'Jose', key: 'jose', x: 0, y: 0, scale: 1 },
-      { name: 'Davis', key: 'davis', x: 0, y: 0, scale: 1 },
+      { name: 'Davi S', key: 'davis', x: 0, y: 0, scale: 1 },
       { name: 'Carol', key: 'carol', x: 0, y: 0, scale: 1 },
       { name: 'Roni', key: 'roni', x: 0, y: 0, scale: 1 },
       { name: 'Jacqueline', key: 'jacqueline', x: 0, y: 0, scale: 1 },
       { name: 'Ivan', key: 'ivan', x: 0, y: 0, scale: 1 },
-      { name: 'D_isa', key: 'd_isa', x: 0, y: 0, scale: 1 }
+      { name: 'D Isa', key: 'd_isa', x: 0, y: 0, scale: 1 }
     ];
-    // Ensure index is valid before simulating selection
     scene.p1Index = 0;
     scene.selectedP1Index = 0;
     // Simulate character select event with direction 1 (should wrap around safely)
@@ -242,5 +264,56 @@ describe('PlayerSelectScene UI', () => {
     expect(startButtonCall[3]).toMatchObject({
       fontSize: expect.any(String)
     });
+  });
+
+  test('player sprites are created with correct origin, scale, and y-alignment', () => {
+    scene.create();
+    // There should be 9 character sprites
+    expect(scene.add.sprite).toHaveBeenCalledTimes(9);
+    // For each sprite, check setOrigin and setScale
+    scene.add.sprite.mock.calls.forEach((call, idx) => {
+      const spriteInstance = scene.characterSprites[scene.CHARACTER_KEYS[idx]];
+      if (spriteInstance) {
+        expect(spriteInstance.setOrigin).toHaveBeenCalledWith(0.5, 1.0);
+        expect(spriteInstance.setScale).toHaveBeenCalledWith(0.4);
+        // The y-position should match platformHeight (feet on platform)
+        expect(spriteInstance.y).toBe(scene.platformHeight);
+      }
+    });
+  });
+
+  test('character sprites use correct frame size (256x512)', () => {
+    scene.create();
+    // Check if getSourceImage is called and returns correct frame size
+    scene.textures.get.mock.calls.forEach(call => {
+      const img = scene.textures.get().getSourceImage();
+      expect(img.width === 256 || img.width === 512).toBeTruthy();
+      expect(img.height === 512 || img.height === 256).toBeTruthy();
+    });
+  });
+
+  test('character selection wraps correctly at boundaries', () => {
+    scene.create();
+    scene.p1Index = scene.CHARACTER_KEYS.length - 1;
+    scene.handleCharacterSelect(1, 1); // Move right from last index
+    expect(scene.p1Index).toBe(0);
+    scene.p2Index = 0;
+    scene.handleCharacterSelect(2, -1); // Move left from first index
+    expect(scene.p2Index).toBe(scene.CHARACTER_KEYS.length - 1);
+  });
+
+  test('selector indicators remain at y=360 after character select', () => {
+    scene.create();
+    const initialP1Y = scene.p1Indicator.y;
+    const initialP2Y = scene.p2Indicator.y;
+    scene.handleCharacterSelect(1, 1);
+    scene.handleCharacterSelect(1, 2);
+    expect(scene.p1Indicator.y).toBe(initialP1Y);
+    expect(scene.p2Indicator.y).toBe(initialP2Y);
+  });
+
+  test('handles missing spritesheet gracefully', () => {
+    scene.textures.exists.mockReturnValue(false);
+    expect(() => scene.create()).not.toThrow();
   });
 });

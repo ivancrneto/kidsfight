@@ -121,46 +121,86 @@ describe('KidsFightScene - Online Mode', () => {
 
   beforeEach(() => {
     // Create fresh mock players for each test
-    mockPlayer1 = {
-      setVelocityX: jest.fn(),
-      setVelocityY: jest.fn(),
-      setFlipX: jest.fn(),
-      setData: jest.fn(),
-      getData: jest.fn(),
-      anims: { play: jest.fn() },
-      texture: { key: 'players[0]' },
-      width: 64,
-      height: 128,
-      body: {
+    const playerMocks = [
+      {
         setVelocityX: jest.fn(),
         setVelocityY: jest.fn(),
-        setSize: jest.fn(),
+        setFlipX: jest.fn(),
+        setFrame: jest.fn(),
+        setData: jest.fn(),
+        body: {
+          blocked: {
+            down: true,  // Simulate being on the ground by default
+            left: false,
+            right: false,
+            up: false,
+            none: false
+          },
+          touching: { down: true, left: false, right: false, up: false, none: false },
+          velocity: { x: 0, y: 0 },
+          setVelocityX: jest.fn().mockImplementation(function(this: any, x: number) {
+            this.velocity.x = x;
+          }),
+          setVelocityY: jest.fn().mockImplementation(function(this: any, y: number) {
+            this.velocity.y = y;
+          }),
+          setGravityY: jest.fn(),
+          setCollideWorldBounds: jest.fn(),
+          on: jest.fn()
+        },
+        getData: jest.fn().mockImplementation(function(this: any, key: string) {
+          if (!this._data) {
+            this._data = {};
+          }
+          return this._data[key];
+        }),
+        texture: { key: 'players[0]' },
+        width: 64,
+        height: 128,
+      },
+      {
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+        setFlipX: jest.fn(),
+        setFrame: jest.fn(),
+        setData: jest.fn(),
+        body: {
+          blocked: {
+            down: true,  // Simulate being on the ground by default
+            left: false,
+            right: false,
+            up: false,
+            none: false
+          },
+          touching: { down: true, left: false, right: false, up: false, none: false },
+          velocity: { x: 0, y: 0 },
+          setVelocityX: jest.fn().mockImplementation(function(this: any, x: number) {
+            this.velocity.x = x;
+          }),
+          setVelocityY: jest.fn().mockImplementation(function(this: any, y: number) {
+            this.velocity.y = y;
+          }),
+          setGravityY: jest.fn(),
+          setCollideWorldBounds: jest.fn(),
+          on: jest.fn()
+        },
+        getData: jest.fn().mockImplementation(function(this: any, key: string) {
+          if (!this._data) {
+            this._data = {};
+          }
+          return this._data[key];
+        }),
+        texture: { key: 'players[1]' },
+        width: 64,
+        height: 128,
         setOffset: jest.fn(),
         touching: { down: true }
       }
-    };
-    
-    mockPlayer2 = {
-      setVelocityX: jest.fn(),
-      setVelocityY: jest.fn(),
-      setFlipX: jest.fn(),
-      setData: jest.fn(),
-      getData: jest.fn(),
-      anims: { play: jest.fn() },
-      texture: { key: 'players[1]' },
-      width: 64,
-      height: 128,
-      body: {
-        setVelocityX: jest.fn(),
-        setVelocityY: jest.fn(),
-        setSize: jest.fn(),
-        setOffset: jest.fn(),
-        touching: { down: true }
-      }
-    };
+    ];
     
     // Create scene and set up test environment
     scene = new KidsFightScene();
+    scene.players = playerMocks;
     // Ensure physics.add has all required mocks: existing, sprite, collider
     if (scene && scene.physics) {
       scene.physics.add = createMockPhysicsAdd();
@@ -261,6 +301,13 @@ describe('KidsFightScene - Online Mode', () => {
     scene.updatePlayerAnimation = jest.fn();
     // Patch: Combine all scene.add mocks into one object
     scene.add = {
+  circle: jest.fn().mockReturnValue({
+    setAlpha: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis(),
+    setInteractive: jest.fn().mockReturnThis(),
+    setScrollFactor: jest.fn().mockReturnThis(),
+    on: jest.fn().mockReturnThis(),
+  }),
       image: jest.fn(() => ({
         setOrigin: jest.fn().mockReturnThis(),
         setDisplaySize: jest.fn().mockReturnThis(),
@@ -334,20 +381,20 @@ describe('KidsFightScene - Online Mode', () => {
   });
 
   describe('Player Movement', () => {
-    it('should allow players[0] movement as guest in online mode', () => {
+    it('should allow players[1] movement as guest in online mode', () => {
       scene.isHost = false;
       scene.gameMode = 'online';
-      // Attach spies directly to the actual scene.players[0] (see impl logic)
-      scene.players[0].setVelocityX = jest.fn();
-      scene.players[0].setFlipX = jest.fn();
-      scene.players[0].setData = jest.fn();
-      scene.players[0].getData = jest.fn();
+      // Attach spies directly to the actual scene.players[1] (see impl logic)
+      scene.players[1].setVelocityX = jest.fn();
+      scene.players[1].setFlipX = jest.fn();
+      scene.players[1].setData = jest.fn();
+      scene.players[1].getData = jest.fn();
       if (!scene.playerDirection) scene.playerDirection = ['right', 'right'];
       scene.updatePlayerAnimation = jest.fn();
       scene.handleRemoteAction({ type: 'move', playerIndex: 1, direction: 1 });
-      expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(160);
-      expect(scene.players[0].setFlipX).toHaveBeenCalledWith(false);
-      expect(scene.playerDirection[0]).toBe('right');
+      expect(scene.players[1].setVelocityX).toHaveBeenCalledWith(160);
+      expect(scene.players[1].setFlipX).toHaveBeenCalledWith(false);
+      expect(scene.playerDirection[1]).toBe('right');
     });
     
     it('should NOT move players[1] as host in online mode', () => {

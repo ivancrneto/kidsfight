@@ -47,13 +47,13 @@ export default class BootDebugScene extends Phaser.Scene {
     this.players[1].direction = 'left';
 
     // After loading, go directly to KidsFightScene with chosen players/scenario
-    this.scene.start('KidsFightScene', {
-      selected: { p1: 'player1', p2: 'player2' },
-      p1: 'player1',
-      p2: 'player2',
-      selectedScenario: 'scenario1',
-      gameMode: 'single',
-      isHost: true
-    });
+    // this.scene.start('KidsFightScene', {
+    //   selected: { p1: 'player1', p2: 'player2' },
+    //   p1: 'player1',
+    //   p2: 'player2',
+    //   selectedScenario: 'scenario1',
+    //   gameMode: 'single',
+    //   isHost: true
+    // });
   }
 }

@@ -455,22 +455,27 @@ type KidsFightScenePrivate = PrivateAccess<{
 class MockPhaserText extends Phaser.GameObjects.Text {
   static RENDER_MASK = 1;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, text: string, style: Phaser.Types.GameObjects.Text.TextStyle) {
-    super(scene, x, y, text, style);
-  }
+constructor(scene: Phaser.Scene, x: number, y: number, text: string, style: Phaser.Types.GameObjects.Text.TextStyle) {
+super(scene, x, y, text, style);
+}
 
-  setText = jest.fn().mockReturnThis();
-  setVisible = jest.fn().mockReturnThis();
-  setTextOrigin = jest.fn().mockReturnThis();
-  setScrollFactor = jest.fn().mockReturnThis();
-  setDepth = jest.fn().mockReturnThis();
-  setFontSize = jest.fn().mockReturnThis();
-  setColor = jest.fn().mockReturnThis();
-  setOrigin = jest.fn().mockReturnThis();
-  setPosition = jest.fn().mockReturnThis();
-  setAlpha = jest.fn().mockReturnThis();
-  setTint = jest.fn().mockReturnThis();
-  setInteractive = jest.fn().mockReturnThis();
+setText = jest.fn().mockImplementation((x, y, text, style) => ({
+x,
+y,
+text,
+style,
+setOrigin: jest.fn().mockReturnThis(),
+setStroke: jest.fn().mockReturnThis(),
+setStyle: jest.fn().mockReturnThis(),
+on: jest.fn().mockReturnThis(),
+setInteractive: jest.fn().mockReturnThis(),
+setDepth: jest.fn().mockReturnThis(),
+setPosition: jest.fn().mockReturnThis(),
+setVisible: jest.fn().mockReturnThis()
+}));
+setAlpha = jest.fn().mockReturnThis();
+setTint = jest.fn().mockReturnThis();
+setInteractive = jest.fn().mockReturnThis();
 }
 
 // Simple mock for TimerEvent (do not extend Phaser.Time.TimerEvent)
@@ -816,11 +821,11 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
 
   // Define mockDataForCreate for test scene initialization
   const mockDataForCreate = {
-    selected: { p1: 'bento', p2: 'davi' },
+    selected: { p1: 'bento', p2: 'Davi R' },
     p1: 'bento',
-    p2: 'davi',
+    p2: 'Davi R',
     player1Char: 'bento',
-    player2Char: 'davi',
+    player2Char: 'Davi R',
     selectedScenario: 'dojo',
     gameMode: 'single',
     roomCode: 'TEST123',
@@ -998,28 +1003,10 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
 
     // Mock add methods
     testScene.add = {
-      text: jest.fn().mockReturnValue(new MockText()),
-      sprite: jest.fn().mockReturnValue({
-        setOrigin: jest.fn(),
-        setScale: jest.fn(),
-        setScrollFactor: jest.fn(),
-        setDepth: jest.fn(),
-        play: jest.fn()
-      }),
-      rectangle: jest.fn().mockReturnValue({
-        setOrigin: jest.fn(),
-        setFillStyle: jest.fn(),
-        setScrollFactor: jest.fn(),
-        setDepth: jest.fn(),
-        setAlpha: jest.fn(),
-        setInteractive: jest.fn(),
-        on: jest.fn(),
-        setVisible: jest.fn()
-      }),
-      container: jest.fn().mockReturnValue({
-        setScrollFactor: jest.fn(),
-        setDepth: jest.fn(),
-        add: jest.fn()
+      text: jest.fn().mockImplementation((x: number, y: number, text: string, style: any) => {
+        const txt = new MockText();
+        txt.setText(text);
+        return txt;
       })
     };
 
@@ -1088,6 +1075,128 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
   // Reset mocks before each test
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+});
+
+describe('KidsFightScene endGame visual and message logic', () => {
+  let scene: TestKidsFightScene;
+
+  beforeEach(() => {
+    scene = new TestKidsFightScene();
+    scene.p1 = 'player1'; // Bento
+    scene.p2 = 'player2'; // Davi R
+    scene.players = [
+      { setFrame: jest.fn(), setAngle: jest.fn() } as any,
+      { setFrame: jest.fn(), setAngle: jest.fn() } as any
+    ];
+    scene.add = {
+      circle: jest.fn().mockReturnValue({
+        setAlpha: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis(),
+      }),
+      text: jest.fn().mockImplementation(() => {
+        const mockText = {
+          setOrigin: jest.fn().mockReturnThis(),
+          setInteractive: jest.fn().mockReturnThis(),
+          setDepth: jest.fn().mockReturnThis(),
+          setVisible: jest.fn().mockReturnThis(),
+          setText: jest.fn().mockReturnThis(),
+          destroy: jest.fn(),
+          on: jest.fn().mockReturnThis(),
+        };
+        // Ensure all chainable methods return the mockText instance
+        mockText.setOrigin.mockReturnValue(mockText);
+        mockText.setInteractive.mockReturnValue(mockText);
+        mockText.setDepth.mockReturnValue(mockText);
+        mockText.setVisible.mockReturnValue(mockText);
+        mockText.setText.mockReturnValue(mockText);
+        mockText.on.mockReturnValue(mockText);
+        return mockText;
+      })
+    } as any;
+    scene.physics = { pause: jest.fn() } as any;
+    scene.scene = { pause: jest.fn() } as any;
+    scene.cameras = { main: { width: 800, height: 600 } } as any;
+  });
+
+  it('shows the winner name in Portuguese for player 1', () => {
+    scene.endGame(0);
+    expect(scene.add.text).toHaveBeenCalledWith(
+      400,
+      300,
+      'Bento Venceu!',
+      expect.objectContaining({ fontSize: '48px' })
+    );
+  });
+
+  it('shows the winner name in Portuguese for player 2', () => {
+    scene.endGame(1);
+    expect(scene.add.text).toHaveBeenCalledWith(
+      400,
+      300,
+      'Davi R Venceu!',
+      expect.objectContaining({ fontSize: '48px' })
+    );
+  });
+
+  it('maps all player keys to correct display names', () => {
+    const getDisplayName = (key: string) => {
+      const nameMap: Record<string, string> = {
+        player1: 'Bento',
+        player2: 'Davi R',
+        player3: 'José',
+        player4: 'Davi S',
+        player5: 'Carol',
+        player6: 'Roni',
+        player7: 'Jacqueline',
+        player8: 'Ivan',
+        player9: 'D. Isa',
+      };
+      return nameMap[key] || key;
+    };
+    expect(getDisplayName('player1')).toBe('Bento');
+    expect(getDisplayName('player2')).toBe('Davi R');
+    expect(getDisplayName('player3')).toBe('José');
+    expect(getDisplayName('player4')).toBe('Davi S');
+    expect(getDisplayName('player5')).toBe('Carol');
+    expect(getDisplayName('player6')).toBe('Roni');
+    expect(getDisplayName('player7')).toBe('Jacqueline');
+    expect(getDisplayName('player8')).toBe('Ivan');
+    expect(getDisplayName('player9')).toBe('D. Isa');
+    expect(getDisplayName('unknown')).toBe('unknown');
+  });
+
+  it('shows Empate! for draw', () => {
+    scene.endGame(-1);
+    expect(scene.add.text).toHaveBeenCalledWith(
+      400,
+      300,
+      'Empate!',
+      expect.objectContaining({ fontSize: '48px' })
+    );
+  });
+
+  it('sets winner frame to 3 and loser angle to 90 (player 1 win)', () => {
+    scene.endGame(0);
+    expect(scene.players[0].setFrame).toHaveBeenCalledWith(3);
+    expect(scene.players[1].setAngle).toHaveBeenCalledWith(90);
+  });
+
+  it('sets winner frame to 3 and loser angle to 90 (player 2 win)', () => {
+    scene.endGame(1);
+    expect(scene.players[1].setFrame).toHaveBeenCalledWith(3);
+    expect(scene.players[0].setAngle).toHaveBeenCalledWith(90);
+  });
+
+  it('does not set frames or angles for draw', () => {
+    scene.endGame(-1);
+    expect(scene.players[0].setFrame).not.toHaveBeenCalled();
+    expect(scene.players[1].setFrame).not.toHaveBeenCalled();
+    expect(scene.players[0].setAngle).not.toHaveBeenCalled();
+    expect(scene.players[1].setAngle).not.toHaveBeenCalled();
   });
 });
 

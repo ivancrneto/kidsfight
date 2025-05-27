@@ -73,7 +73,7 @@ describe('WebSocket Scene Communication', () => {
     // Initialize scenes with online mode data
     playerSelectScene['mode'] = 'online';
     playerSelectScene['roomCode'] = 'TEST123';
-    playerSelectScene['selected'] = { p1: 'player1', p2: 'player2' };
+    playerSelectScene['selected'] = { p1: 'bento', p2: 'davir' };
   });
   
   describe('WebSocket Manager Passing Between Scenes', () => {
@@ -99,7 +99,7 @@ describe('WebSocket Scene Communication', () => {
       scenarioSelectScene['isHost'] = true;
       scenarioSelectScene['mode'] = 'online';
       scenarioSelectScene['roomCode'] = 'TEST123';
-      scenarioSelectScene['selected'] = { p1: 'player1', p2: 'player2' };
+      scenarioSelectScene['selected'] = { p1: 'bento', p2: 'davir' };
       scenarioSelectScene['selectedScenario'] = 0; // First scenario
       
       // Mock SCENARIOS array
@@ -142,16 +142,18 @@ describe('WebSocket Scene Communication', () => {
           
           scenarioSelectScene['wsManager'].send({
             type: 'game_start',
-            p1Char: 'player1',
-            p2Char: 'player2',
+            p1Char: 'bento',
+            p2Char: 'davir',
             scenario: 'scenario1',
             roomCode: 'TEST123'
           });
           
           scenarioSelectScene.scene.start('KidsFightScene', {
+            gameMode: 'online',
             mode: 'online',
-            selected: { p1: 'player1', p2: 'player2' },
-            scenario: 'scenario1',
+            p1: 'bento',
+            p2: 'davir',
+            selectedScenario: 'scenario1',
             roomCode: 'TEST123',
             isHost: true
           });
@@ -164,14 +166,23 @@ describe('WebSocket Scene Communication', () => {
       // Verify game_start message was sent
       expect(wsManager.send).toHaveBeenCalledWith(expect.objectContaining({
         type: 'game_start',
-        p1Char: 'player1',
-        p2Char: 'player2',
+        p1Char: 'bento',
+        p2Char: 'davir',
         scenario: 'scenario1',
         roomCode: 'TEST123'
       }));
       
       // Verify transition to KidsFightScene
       expect(startedScene?.key).toBe('KidsFightScene');
+      expect(startedScene?.data).toEqual(expect.objectContaining({
+        gameMode: 'online',
+        mode: 'online',
+        p1: 'bento',
+        p2: 'davir',
+        selectedScenario: 'scenario1',
+        roomCode: 'TEST123',
+        isHost: true
+      }));
     });
   });
   
@@ -190,8 +201,8 @@ describe('WebSocket Scene Communication', () => {
       const gameStartMessage = {
         data: JSON.stringify({
           type: 'game_start',
-          p1Char: 'player1',
-          p2Char: 'player2',
+          p1Char: 'bento',
+          p2Char: 'davir',
           scenario: 'scenario1',
           roomCode: 'TEST123'
         })
@@ -202,7 +213,7 @@ describe('WebSocket Scene Communication', () => {
       
       // Verify transition to KidsFightScene with correct data
       expect(startedScene?.key).toBe('KidsFightScene');
-      expect(startedScene?.data.selected).toEqual({ p1: 'player1', p2: 'player2' });
+      expect(startedScene?.data.selected).toEqual({ p1: 'bento', p2: 'davir' });
       expect(startedScene?.data.scenario).toBe('scenario1');
       expect(startedScene?.data.roomCode).toBe('TEST123');
     });
@@ -251,8 +262,8 @@ describe('WebSocket Scene Communication', () => {
       const snakeCaseMessage = { 
         data: JSON.stringify({ 
           type: 'game_start', 
-          p1Char: 'player1',
-          p2Char: 'player2',
+          p1Char: 'bento',
+          p2Char: 'davir',
           scenario: 'scenario1',
           roomCode: 'TEST123'
         })
@@ -262,13 +273,20 @@ describe('WebSocket Scene Communication', () => {
       playerSelectScene.messageCallback(snakeCaseMessage);
       
       // Verify scene.start was called with the correct parameters
-      expect(playerSelectScene.scene.start).toHaveBeenCalledWith(
-        'KidsFightScene',
-        expect.objectContaining({
-          selected: { p1: 'player1', p2: 'player2' },
-          scenario: 'scenario1'
-        })
+      const kidsFightSceneCall = playerSelectScene.scene.start.mock.calls.find(
+        call => call[0] === 'KidsFightScene'
       );
+      expect(kidsFightSceneCall).toBeDefined();
+      expect(kidsFightSceneCall[1]).toEqual(expect.objectContaining({
+        gameMode: 'online',
+        mode: 'online',
+        p1: 'bento',
+        p2: 'davir',
+        roomCode: 'TEST123',
+        scenario: 'scenario1',
+        selected: { p1: 'bento', p2: 'davir' },
+        isHost: false
+      }));
       
       // Reset for next test
       jest.clearAllMocks();
@@ -278,8 +296,8 @@ describe('WebSocket Scene Communication', () => {
       const camelCaseMessage = { 
         data: JSON.stringify({ 
           type: 'gameStart', 
-          p1Char: 'player1',
-          p2Char: 'player2',
+          p1Char: 'bento',
+          p2Char: 'davir',
           scenario: 'scenario1',
           roomCode: 'TEST123'
         })
@@ -289,13 +307,20 @@ describe('WebSocket Scene Communication', () => {
       playerSelectScene.messageCallback(camelCaseMessage);
       
       // Verify scene.start was called with the correct parameters
-      expect(playerSelectScene.scene.start).toHaveBeenCalledWith(
-        'KidsFightScene',
-        expect.objectContaining({
-          selected: { p1: 'player1', p2: 'player2' },
-          scenario: 'scenario1'
-        })
+      const kidsFightSceneCall2 = playerSelectScene.scene.start.mock.calls.find(
+        call => call[0] === 'KidsFightScene'
       );
+      expect(kidsFightSceneCall2).toBeDefined();
+      expect(kidsFightSceneCall2[1]).toEqual(expect.objectContaining({
+        gameMode: 'online',
+        mode: 'online',
+        p1: 'bento',
+        p2: 'davir',
+        roomCode: 'TEST123',
+        scenario: 'scenario1',
+        selected: { p1: 'bento', p2: 'davir' },
+        isHost: false
+      }));
     });
   });
   

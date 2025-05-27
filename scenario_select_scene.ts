@@ -245,10 +245,11 @@ class ScenarioSelectScene extends Phaser.Scene {
         this.scene.start('KidsFightScene', {
           gameMode: 'online',
           mode: this.mode,
-          selected: this.selected,
+          p1: this.selected.p1.replace('_select', ''),
+          p2: this.selected.p2.replace('_select', ''),
           scenario: SCENARIOS[this.selectedScenario].key,
           roomCode: this.roomCode,
-          isHost: this.isHost
+          isHost: true
         });
       });
     } else if (this.mode === 'local') {
@@ -265,18 +266,18 @@ class ScenarioSelectScene extends Phaser.Scene {
 
   private rescalePreview(): void {
     if (!this.preview) return;
-
+  
     const { width, height } = this.cameras.main;
     const maxWidth = width * 0.6;
     const maxHeight = height * 0.6;
-    
+  
     const scaleX = maxWidth / this.preview.width;
     const scaleY = maxHeight / this.preview.height;
     const scale = Math.min(scaleX, scaleY);
-    
+  
     this.preview.setScale(scale);
   }
-
+    
   private startGame(): void {
     this.scene.start('KidsFightScene', {
       mode: this.mode,

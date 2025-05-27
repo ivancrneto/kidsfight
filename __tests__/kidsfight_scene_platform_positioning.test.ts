@@ -42,6 +42,13 @@ describe('KidsFightScene - Platform & Player Positioning', () => {
       }
     } as any;
     scene.add = {
+  circle: jest.fn().mockReturnValue({
+    setAlpha: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis(),
+    setInteractive: jest.fn().mockReturnThis(),
+    setScrollFactor: jest.fn().mockReturnThis(),
+    on: jest.fn().mockReturnThis(),
+  }),
       rectangle: jest.fn(() => ({
         setDepth: jest.fn().mockReturnThis(),
         setAlpha: jest.fn().mockReturnThis(),

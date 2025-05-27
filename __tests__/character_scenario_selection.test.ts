@@ -141,6 +141,13 @@ describe('Character and Scenario Selection', () => {
     
     // Mock Phaser methods
     scene.add = {
+  circle: jest.fn().mockReturnValue({
+    setAlpha: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis(),
+    setInteractive: jest.fn().mockReturnThis(),
+    setScrollFactor: jest.fn().mockReturnThis(),
+    on: jest.fn().mockReturnThis(),
+  }),
       image: jest.fn().mockReturnValue(mockBackground),
       sprite: jest.fn().mockImplementation((x, y, key) => {
         return key === scene.p1 ? scene.players[0] : scene.players[1];

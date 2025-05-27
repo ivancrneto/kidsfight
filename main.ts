@@ -16,7 +16,7 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: 'game-container',
   backgroundColor: '#222222',
   scene: [
-    BootDebugScene,
+    //BootDebugScene, // Make sure debug scene is not loaded
     RotatePromptScene,
     GameModeScene,
     PlayerSelectScene,
@@ -27,7 +27,7 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { y: 1000 },
+      gravity: { y: 200 }, // Lower gravity for much higher jumps
       debug: false
     }
   }
