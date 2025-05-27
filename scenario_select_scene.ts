@@ -281,6 +281,8 @@ class ScenarioSelectScene extends Phaser.Scene {
   private startGame(): void {
     this.scene.start('KidsFightScene', {
       mode: this.mode,
+      p1: this.selected.p1,
+      p2: this.selected.p2,
       selected: this.selected,
       scenario: SCENARIOS[this.selectedScenario].key,
       roomCode: this.roomCode,

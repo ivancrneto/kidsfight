@@ -166,15 +166,15 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
   preload(): void {
     // Load character sprites as spritesheets (assuming 96x96 frame size)
-    this.load.spritesheet('player1', player1RawImg, { frameWidth: 296, frameHeight: 296 });
-    this.load.spritesheet('player2', player2RawImg, { frameWidth: 296, frameHeight: 296 });
-    this.load.spritesheet('player3', player3RawImg, { frameWidth: 296, frameHeight: 296 });
-    this.load.spritesheet('player4', player4RawImg, { frameWidth: 296, frameHeight: 296 });
-    this.load.spritesheet('player5', player5RawImg, { frameWidth: 296, frameHeight: 296 });
-    this.load.spritesheet('player6', player6RawImg, { frameWidth: 296, frameHeight: 296 });
-    this.load.spritesheet('player7', player7RawImg, { frameWidth: 296, frameHeight: 296 });
-    this.load.spritesheet('player8', player8RawImg, { frameWidth: 296, frameHeight: 296 });
-    this.load.spritesheet('player9', player9RawImg, { frameWidth: 296, frameHeight: 296 });
+    this.load.spritesheet('player1', player1RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player2', player2RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player3', player3RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player4', player4RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player5', player5RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player6', player6RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player7', player7RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player8', player8RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player9', player9RawImg, { frameWidth: 410, frameHeight: 512 });
     
     // Note: Removed selector.png and will use Phaser shapes instead
     
@@ -255,6 +255,11 @@ export default class PlayerSelectScene extends Phaser.Scene {
       const bgCircle = this.add.circle(char.x, char.y + bgCircleOffsetY, 60, 0x222222, 1);
       char.bgCircle = bgCircle;
       char.bgCircleOffsetY = bgCircleOffsetY;
+      // Fine-tuned crop values for better alignment (head+shoulders, avoid cutting off chins)
+      const cropX = 30;    // left offset
+      const cropY = 40;    // top offset
+      const cropW = 300;   // width of visible area
+      const cropH = 250;   // height of visible area
       // Show only frame 0 and crop to head+shoulders area (classic style)
       const sprite = this.add.sprite(char.x, char.y + 40, char.key, 0);
       // Responsive scale: base scale for 296x296, shrink to 0.4 for default 1280x720, scale with min(screenW,screenH)
@@ -264,8 +269,34 @@ export default class PlayerSelectScene extends Phaser.Scene {
       const scale = 0.4 * Math.min(screenW, screenH) / 720; // 0.4 at 720p, smaller for smaller screens
       sprite.setScale(scale);
       sprite.setInteractive({ useHandCursor: true });
-      sprite.setCrop(0, 0, 296, 296); // crop to square head+shoulders for new frame size
-      sprite.setOrigin(0.5, 0.4);
+      // Center origin at the middle of the cropped area (to align all heads)
+      sprite.setOrigin(0.5, (cropY + cropH / 2) / sprite.height);
+      sprite.setCrop(cropX, cropY, cropW, cropH);
+      // Allow host/guest to select their player with left click
+      sprite.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        console.log('[DEBUG] pointerdown', { isHost: this.isHost, mode: this.mode, pointer, charKey: char.key });
+        if (this.mode === 'online') {
+          if (this.isHost) {
+            // Host: left click selects for player 1
+            if (pointer.leftButtonDown()) {
+              this.setSelectorToCharacter(1, i);
+            }
+          } else {
+            // Guest: left click selects for player 2
+            if (pointer.leftButtonDown()) {
+              this.setSelectorToCharacter(2, i);
+            }
+          }
+        } else {
+          // Local mode: left click selects for player 1, right click for player 2
+          if (pointer.leftButtonDown()) {
+            this.setSelectorToCharacter(1, i);
+          }
+          if (pointer.rightButtonDown()) {
+            this.setSelectorToCharacter(2, i);
+          }
+        }
+      });
       // Store sprite reference
       this.characterSprites[char.key] = sprite;
       // Add name label and keep reference
@@ -281,6 +312,8 @@ export default class PlayerSelectScene extends Phaser.Scene {
         }
       ).setOrigin(0.5);
       char.nameLabel = label;
+      // Align selector circle with the center of the cropped sprite
+      bgCircle.setPosition(char.x, char.y + 40 + cropH / 2 - 10); // adjust -10 for visual centering
     });
   }
 
@@ -339,7 +372,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
           const playerKey = player === 1 ? 'p1' : 'p2';
           const characterKey = this.characters[newIndex].key;
           this.wsManager.send({
-            type: 'playerSelected',
+            type: 'player_selected', // CHANGED to underscore
             player: playerKey,
             character: characterKey
           });
@@ -499,24 +532,30 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private handlePlayerSelected(data: PlayerSelectWebSocketMessage): void {
+    console.log('[PlayerSelectScene] Received message:', data);
+    console.log('[PlayerSelectScene] Characters keys:', this.characters.map(c => c.key));
     if (data.player === 'p1' && data.character) {
       this.selected.p1 = data.character;
+      const idx = this.characters.findIndex(c => c.key === data.character);
+      if (idx === -1) {
+        console.warn('[PlayerSelectScene] Could not find character key in characters:', data.character, this.characters.map(c => c.key));
+      }
       if (DEV) {
         console.log(`[PlayerSelectScene] Player 1 selected: ${data.character}`);
       }
+      this.p1Index = idx;
+      this.selectedP1Index = idx;
     } else if (data.player === 'p2' && data.character) {
       this.selected.p2 = data.character;
-      // Update p2Index and selectedP2Index
       const idx = this.characters.findIndex(c => c.key === data.character);
-      console.log(`[PlayerSelectScene] [SYNC] Received p2 selection: ${data.character}, found index: ${idx}`);
-      if (idx !== -1) {
-        this.p2Index = this.selectedP2Index = idx;
-      } else {
-        console.warn(`[PlayerSelectScene] [SYNC] Character key not found for p2: ${data.character}`);
+      if (idx === -1) {
+        console.warn('[PlayerSelectScene] Could not find character key in characters:', data.character, this.characters.map(c => c.key));
       }
       if (DEV) {
         console.log(`[PlayerSelectScene] Player 2 selected: ${data.character}`);
       }
+      this.p2Index = idx;
+      this.selectedP2Index = idx;
     } else {
       console.warn('[PlayerSelectScene] [SYNC] handlePlayerSelected called with unknown player or missing character:', data);
     }
@@ -638,29 +677,32 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private setSelectorToCharacter(player: 1 | 2, charIndex: number): void {
-    // In online mode, host can only move p1, guest can only move p2
+    console.log('[DEBUG] setSelectorToCharacter', { player, charIndex, isHost: this.isHost, mode: this.mode, charKey: this.characters[charIndex]?.key });
+    // Restrict: host can only select for player 1, guest can only select for player 2 in online mode
     if (this.mode === 'online') {
       if ((player === 1 && !this.isHost) || (player === 2 && this.isHost)) {
+        console.log('[DEBUG] selection ignored due to role restriction', { player, isHost: this.isHost });
         return;
       }
     }
     if (player === 1) {
-      this.p1Index = charIndex;
       this.selected.p1 = this.characters[charIndex].key;
       this.selectedP1Index = charIndex;
+      this.p1Index = charIndex;
     } else {
-      this.p2Index = charIndex;
       this.selected.p2 = this.characters[charIndex].key;
       this.selectedP2Index = charIndex;
+      this.p2Index = charIndex;
     }
     this.updateSelectionIndicators();
     this.updateReadyUI();
     // Notify the server of the selection in online mode
     if (this.mode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
+      console.log('[DEBUG] wsManager.send', { player, charIndex, isHost: this.isHost, mode: this.mode, charKey: this.characters[charIndex]?.key });
       const playerKey = player === 1 ? 'p1' : 'p2';
       const characterKey = this.characters[charIndex].key;
       this.wsManager.send({
-        type: 'playerSelected',
+        type: 'player_selected',
         player: playerKey,
         character: characterKey
       });
