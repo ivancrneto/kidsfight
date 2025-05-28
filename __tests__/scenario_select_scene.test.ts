@@ -6,6 +6,7 @@ describe('ScenarioSelectScene (online mode)', () => {
   let wsManagerMock: any;
   let sentMessages: any[];
   let startedScene: any;
+  let readyButtonMock: any;
 
   beforeEach(() => {
     sentMessages = [];
@@ -14,11 +15,40 @@ describe('ScenarioSelectScene (online mode)', () => {
       send: jest.fn((msg) => { sentMessages.push(msg); }),
       setMessageCallback: jest.fn(),
     };
+    readyButtonMock = {
+      on: jest.fn(),
+      emit: jest.fn(function (event, ...args) {
+        if (event === 'pointerdown') {
+          const handler = (readyButtonMock.on as jest.Mock).mock.calls.find(([evt]) => evt === 'pointerdown')?.[1];
+          if (handler) handler(...args);
+        }
+      }),
+      setInteractive: jest.fn().mockReturnThis(),
+      setOrigin: jest.fn().mockReturnThis(),
+      setBackgroundColor: jest.fn().mockReturnThis(),
+      disableInteractive: jest.fn().mockReturnThis(),
+    };
     scene = new ScenarioSelectScene(wsManagerMock);
     // Mock Phaser methods
     scene.add = {
-      text: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setInteractive: jest.fn().mockReturnThis(), on: jest.fn().mockReturnThis(), setBackgroundColor: jest.fn().mockReturnThis() })),
-      image: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis(), setScale: jest.fn().mockReturnThis() })),
+      text: jest.fn((x, y, text, style) => {
+        if (text === 'Pronto!') return readyButtonMock;
+        // Return a generic mock for other buttons
+        return {
+          on: jest.fn(),
+          emit: jest.fn(),
+          setInteractive: jest.fn().mockReturnThis(),
+          setOrigin: jest.fn().mockReturnThis(),
+          setBackgroundColor: jest.fn().mockReturnThis(),
+          disableInteractive: jest.fn().mockReturnThis(),
+        };
+      }),
+      image: jest.fn(() => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        setScale: jest.fn().mockReturnThis(),
+        setTexture: jest.fn().mockReturnThis(),
+      })),
       rectangle: jest.fn(() => ({})),
     } as any;
     scene.cameras = { main: { width: 800, height: 600 } } as any;
@@ -30,91 +60,144 @@ describe('ScenarioSelectScene (online mode)', () => {
     scene['selected'] = { p1: 'player1', p2: 'player2' };
     scene['roomCode'] = 'ROOM123';
     scene['isHost'] = true;
+    // Mock waitingText for setText
+    scene.waitingText = { setText: jest.fn() } as any;
+    scene.readyButton = readyButtonMock as any;
   });
 
-  it('host sends scenario_selected and transitions to KidsFightScene', () => {
-    scene.createActionButtons();
+  it('host sends player_ready and transitions to KidsFightScene only after both players are ready (game_start sent)', () => {
+    scene.init({
+      mode: 'online',
+      selected: { p1: 'player1', p2: 'player2' },
+      roomCode: 'ROOM123',
+      isHost: true,
+      wsManager: wsManagerMock
+    });
+    scene.create();
+    const messageCallback1 = wsManagerMock.setMessageCallback.mock.calls[0][0];
     // Simulate click on readyButton
     const readyBtn = scene.readyButton;
-    // Find pointerdown handler
     const pointerDown = (readyBtn.on as jest.Mock).mock.calls.find(([event]) => event === 'pointerdown')[1];
     pointerDown();
-    // Should send scenario_selected (as an object, not a string)
-    expect(wsManagerMock.send).toHaveBeenCalledWith(expect.objectContaining({
+    // Should send player_ready (not scenario_selected)
+    expect(wsManagerMock.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      type: 'player_ready',
+      player: 'host',
+      roomCode: 'ROOM123'
+    }));
+    // Should NOT start KidsFightScene yet
+    expect(startedScene).toBeNull();
+    // Simulate host receiving their own player_ready
+    messageCallback1({
+      data: JSON.stringify({
+        type: 'player_ready',
+        player: 'host',
+        roomCode: 'ROOM123'
+      })
+    });
+    // Simulate guest sending player_ready
+    messageCallback1({
+      data: JSON.stringify({
+        type: 'player_ready',
+        player: 'guest',
+        roomCode: 'ROOM123'
+      })
+    });
+    // Debug output after host ready
+    // eslint-disable-next-line no-console
+    console.error('[DEBUG after host]', {
+      hostReady: scene['hostReady'],
+      guestReady: scene['guestReady'],
+      gameStarted: scene['gameStarted']
+    });
+    // Debug output for wsManagerMock.send calls
+    // eslint-disable-next-line no-console
+    console.log('wsManagerMock.send.mock.calls:', wsManagerMock.send.mock.calls);
+    // Should send scenario_selected as the second message
+    expect(wsManagerMock.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
       type: 'scenario_selected',
       scenario: 'scenario1',
       roomCode: 'ROOM123'
     }));
-    // Should start KidsFightScene
-    expect(startedScene.key).toBe('KidsFightScene');
-    expect(startedScene.data.scenario).toBe('scenario1');
+    // Simulate guest sending player_ready
+    messageCallback1({
+      data: JSON.stringify({
+        type: 'player_ready',
+        player: 'guest',
+        roomCode: 'ROOM123'
+      })
+    });
+    // Should send game_start as the third message
+    expect(wsManagerMock.send).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      type: 'game_start',
+      scenario: 'scenario1',
+      roomCode: 'ROOM123'
+    }));
+    expect(startedScene?.key).toBe('KidsFightScene');
+    expect(startedScene?.data.scenario).toBe('scenario1');
   });
 
-  it('guest transitions to KidsFightScene on scenario_selected message', () => {
+  it('guest transitions to KidsFightScene on game_start message', () => {
     // Setup scene as guest
     scene['isHost'] = false;
     scene['mode'] = 'online';
     scene['roomCode'] = 'ROOM123';
     scene['selected'] = { p1: 'player1', p2: 'player2' };
-    
-    // Initialize startedScene variable
     startedScene = null;
-    
-    // Mock scene.start
-    scene.scene.start = jest.fn((key, data) => {
-      startedScene = { key, data };
-    });
-    
-    // Mock wsManager
+    scene.scene.start = jest.fn((key, data) => { startedScene = { key, data }; });
     scene['wsManager'] = wsManagerMock;
-    
-    // Capture the callback
-    let messageCallback: Function;
-    wsManagerMock.setMessageCallback = jest.fn((callback) => {
-      messageCallback = callback;
-    });
-    
-    // Call create to set up the message handlers
+    let messageCallback;
+    wsManagerMock.setMessageCallback = jest.fn((callback) => { messageCallback = callback; });
     scene.create();
-    
-    // Simulate receiving scenario_selected message as a string (as it would be from WebSocket)
+    // Simulate receiving game_start message
     messageCallback({
       data: JSON.stringify({
-        type: 'scenario_selected',
+        type: 'game_start',
         scenario: 'scenario1',
-        roomCode: 'ROOM123'
+        roomCode: 'ROOM123',
+        p1Char: 'player1',
+        p2Char: 'player2'
       })
     });
-    
-    // Should start KidsFightScene
     expect(startedScene?.key).toBe('KidsFightScene');
     expect(startedScene?.data.scenario).toBe('scenario1');
   });
 
   it('host sends scenario_selected and game_start messages when ready button is clicked', () => {
-    scene.createActionButtons();
-    // Simulate click on readyButton
-    const readyBtn = scene.readyButton;
-    // Find pointerdown handler
-    const pointerDown = (readyBtn.on as jest.Mock).mock.calls.find(([event]) => event === 'pointerdown')[1];
-    pointerDown();
-    
-    // Should send scenario_selected without JSON.stringify
-    expect(wsManagerMock.send).toHaveBeenCalledWith(expect.objectContaining({
+    scene.create();
+    // Capture the registered message callback
+    let messageCallback2: any;
+    wsManagerMock.setMessageCallback.mock.calls.forEach(([cb]: [any]) => { messageCallback2 = cb; });
+    // Simulate host clicking the ready button
+    scene.readyButton.emit('pointerdown');
+    // Should send player_ready as the first call
+    expect(wsManagerMock.send).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      type: 'player_ready',
+      player: 'host',
+      roomCode: 'ROOM123'
+    }));
+    // Should send scenario_selected as the second call
+    expect(wsManagerMock.send).toHaveBeenNthCalledWith(2, expect.objectContaining({
       type: 'scenario_selected',
       scenario: 'scenario1',
       roomCode: 'ROOM123'
     }));
-    
-    // Should send game_start without JSON.stringify
-    expect(wsManagerMock.send).toHaveBeenCalledWith(expect.objectContaining({
+    // Simulate guest sending player_ready
+    messageCallback2({
+      data: JSON.stringify({
+        type: 'player_ready',
+        player: 'guest',
+        roomCode: 'ROOM123'
+      })
+    });
+    // Should send game_start as the third call
+    expect(wsManagerMock.send).toHaveBeenNthCalledWith(3, expect.objectContaining({
       type: 'game_start',
       p1Char: 'player1',
       p2Char: 'player2',
       scenario: 'scenario1',
       roomCode: 'ROOM123'
     }));
-    
     // Should start KidsFightScene
     expect(startedScene.key).toBe('KidsFightScene');
     expect(startedScene.data.scenario).toBe('scenario1');

@@ -239,8 +239,20 @@ class KidsFightScene extends Phaser.Scene {
   init(data: SceneData): void {
     console.log('KidsFightScene init with data:', data);
     this.selected = data.selected || {p1: 'player1', p2: 'player2'};
-    this.p1 = data.p1 || 'player1';
-    this.p2 = data.p2 || 'player2';
+    this.p1 = data.p1 || (this.selected.p1 || 'player1');
+    this.p2 = data.p2 || (this.selected.p2 || 'player2');
+    // DEBUG: Log incoming player keys
+    console.log('[DEBUG][KidsFightScene.init] incoming p1:', this.p1, 'p2:', this.p2);
+    // Fallback: if p1 or p2 is not a valid sprite key, set default
+    const validKeys = ['player1','player2','player3','player4','player5','player6','player7','player8','player9'];
+    if (!validKeys.includes(this.p1)) {
+      console.warn('[KidsFightScene] Invalid p1 key:', this.p1, 'Defaulting to player1');
+      this.p1 = 'player1';
+    }
+    if (!validKeys.includes(this.p2)) {
+      console.warn('[KidsFightScene] Invalid p2 key:', this.p2, 'Defaulting to player2');
+      this.p2 = 'player2';
+    }
     this.selectedScenario = data.selectedScenario || 'scenario1';
     this.gameMode = data.gameMode || 'single';
     this.roomCode = data.roomCode;
@@ -774,25 +786,13 @@ class KidsFightScene extends Phaser.Scene {
     const blockButton = this.add.circle(actionArcCenterX - arcRadius * Math.cos(3*Math.PI/4), actionArcCenterY - arcRadius * Math.sin(3*Math.PI/4), buttonSize * 0.42, 0xffff44)
       .setAlpha(0.7).setDepth(1000).setInteractive().setScrollFactor(0);
     blockButton.on('pointerdown', () => {
-      if (this.gameMode === 'online' && !this.isHost) {
-        if (this.players[1]) this.playerBlocking[1] = true;
-      } else {
-        if (this.players[0]) this.playerBlocking[0] = true;
-      }
+      this.playerBlocking[this.localPlayerIndex] = true;
     });
     blockButton.on('pointerup', () => {
-      if (this.gameMode === 'online' && !this.isHost) {
-        if (this.players[1]) this.playerBlocking[1] = false;
-      } else {
-        if (this.players[0]) this.playerBlocking[0] = false;
-      }
+      this.playerBlocking[this.localPlayerIndex] = false;
     });
     blockButton.on('pointerout', () => {
-      if (this.gameMode === 'online' && !this.isHost) {
-        if (this.players[1]) this.playerBlocking[1] = false;
-      } else {
-        if (this.players[0]) this.playerBlocking[0] = false;
-      }
+      this.playerBlocking[this.localPlayerIndex] = false;
     });
 
     // Optional: Add icons/labels for clarity
@@ -849,12 +849,12 @@ class KidsFightScene extends Phaser.Scene {
     this.updateTouchControlState('jump', false);
   }
 
-  private updateTouchControlState(
+  public updateTouchControlState(
     control: 'left' | 'right' | 'jump' | 'attack' | 'special' | 'block',
     active: boolean
   ): void {
-    // Use player1 for legacy test compatibility
-    const player = this.player1;
+    // Use correct player index in all modes
+    const player = this.players[this.localPlayerIndex];
     if (!player) return;
     switch (control) {
       case 'left':
@@ -864,9 +864,8 @@ class KidsFightScene extends Phaser.Scene {
         player.setVelocityX(active ? 160 : 0);
         break;
       case 'jump':
-        // Defensive: allow tests to use player.body.blocked.down or player.body.touching.down
         if (active && player.body && ((player.body.blocked && player.body.blocked.down) || (player.body.touching && player.body.touching.down))) {
-          player.setVelocityY(-330); // Standard jump
+          player.setVelocityY(-330);
         }
         break;
       case 'attack':
@@ -876,54 +875,46 @@ class KidsFightScene extends Phaser.Scene {
         if (active) this.handleSpecial();
         break;
       case 'block':
-        this.playerBlocking[0] = active;
+        this.playerBlocking[this.localPlayerIndex] = active;
         break;
     }
     // Optionally update button visuals here
   }
 
   private handleAttack(): void {
-    if (this.player1) {
-      this.player1.setData('isAttacking', true);
+    const player = this.players[this.localPlayerIndex];
+    if (player) {
+      player.setData('isAttacking', true);
     }
-    // Example: Play attack animation or trigger hit logic
-    // Actually perform attack logic (damage)
-    this.tryAction(0, 'attack', false);
-    // Send attack action if online
+    this.tryAction(this.localPlayerIndex, 'attack', false);
     if (this.gameMode === 'online' && this.wsManager) {
       this.wsManager.send({
         type: 'attack',
         playerIndex: this.localPlayerIndex
       });
     }
-    // Reset attacking state after short delay
     setTimeout(() => {
-      if (this.player1) this.player1.setData('isAttacking', false);
+      const p = this.players[this.localPlayerIndex];
+      if (p) p.setData('isAttacking', false);
     }, 300);
   }
 
   private handleSpecial(): void {
-    // Only allow if enough special points
-    if (this.player1 && this.playerSpecial[0] >= this.SPECIAL_COST && !this.player1.getData('isSpecialAttacking')) {
-      this.player1.setData('isSpecialAttacking', true);
-      // Spend special points
-      this.playerSpecial[0] -= this.SPECIAL_COST;
-      if (this.playerSpecial[0] < 0) this.playerSpecial[0] = 0;
-      this.updateSpecialPips();
-      // Actually perform special attack logic
-      this.tryAction(0, 'special', true);
-      // Send special action if online
-      if (this.gameMode === 'online' && this.wsManager) {
-        this.wsManager.send({
-          type: 'special',
-          playerIndex: this.localPlayerIndex
-        });
-      }
-      // Reset special attacking state after short delay
-      this.time.delayedCall(700, () => {
-        if (this.player1) this.player1.setData('isSpecialAttacking', false);
+    const player = this.players[this.localPlayerIndex];
+    if (player) {
+      player.setData('isSpecialAttacking', true);
+    }
+    this.tryAction(this.localPlayerIndex, 'special', true);
+    if (this.gameMode === 'online' && this.wsManager) {
+      this.wsManager.send({
+        type: 'special',
+        playerIndex: this.localPlayerIndex
       });
     }
+    setTimeout(() => {
+      const p = this.players[this.localPlayerIndex];
+      if (p) p.setData('isSpecialAttacking', false);
+    }, 300);
   }
 
   private endGame(winnerIndex: number, message: string = ''): void {

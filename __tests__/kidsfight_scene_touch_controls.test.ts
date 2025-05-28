@@ -8,16 +8,17 @@ describe('KidsFightScene Touch Controls', () => {
 
   beforeEach(() => {
     scene = new KidsFightScene();
+    scene.localPlayerIndex = 0;
     // Mock Phaser methods and properties
     scene.sys = { game: { canvas: { width: 800, height: 600 }, device: { os: { android: false, iOS: false } } } } as any;
     scene.add = {
-  circle: jest.fn().mockReturnValue({
-    setAlpha: jest.fn().mockReturnThis(),
-    setDepth: jest.fn().mockReturnThis(),
-    setInteractive: jest.fn().mockReturnThis(),
-    setScrollFactor: jest.fn().mockReturnThis(),
-    on: jest.fn().mockReturnThis(),
-  }),
+      circle: jest.fn().mockReturnValue({
+        setAlpha: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis(),
+      }),
       rectangle: jest.fn(() => ({
         setAlpha: jest.fn().mockReturnThis(),
         setDepth: jest.fn().mockReturnThis(),
@@ -33,37 +34,55 @@ describe('KidsFightScene Touch Controls', () => {
     scene.cameras = { main: { setBounds: jest.fn(), width: 800, height: 600 } } as any;
     scene.input = { keyboard: { createCursorKeys: jest.fn(() => ({ left: {}, right: {}, up: {} })), addKey: jest.fn() } } as any;
     scene.time = { delayedCall: jest.fn((delay, cb) => cb()) } as any;
-    scene.player1 = { setVelocityX: jest.fn(), setVelocityY: jest.fn(), body: { touching: { down: true } }, getData: jest.fn(() => false), setData: jest.fn() } as any;
+    // Properly mock players array
+    scene.players = [
+      {
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+        body: { touching: { down: true }, blocked: { down: true } },
+        getData: jest.fn(() => false),
+        setData: jest.fn()
+      },
+      undefined
+    ];
     scene.playerBlocking = [false, false];
     scene.playerHealth = [100, 100];
     scene.TOTAL_HEALTH = 100;
   });
 
   it('should call setVelocityX(-160) when left button is pressed', () => {
+    const spy = jest.spyOn(scene.players[0], 'setVelocityX');
+    console.log('Calling updateTouchControlState("left", true)');
     scene.updateTouchControlState('left', true);
-    expect(scene.player1.setVelocityX).toHaveBeenCalledWith(-160);
+    console.log('scene.players[0].setVelocityX calls:', spy.mock.calls);
+    expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(-160);
   });
 
   it('should call setVelocityX(160) when right button is pressed', () => {
+    const spy = jest.spyOn(scene.players[0], 'setVelocityX');
+    console.log('Calling updateTouchControlState("right", true)');
     scene.updateTouchControlState('right', true);
-    expect(scene.player1.setVelocityX).toHaveBeenCalledWith(160);
+    console.log('scene.players[0].setVelocityX calls:', spy.mock.calls);
+    expect(scene.players[0].setVelocityX).toHaveBeenCalledWith(160);
   });
 
   it('should call setVelocityY(-330) when jump button is pressed and player is on the ground', () => {
     scene.updateTouchControlState('jump', true);
-    expect(scene.player1.setVelocityY).toHaveBeenCalledWith(-330);
+    expect(scene.players[0].setVelocityY).toHaveBeenCalledWith(-330);
   });
 
   it('should call handleAttack when attack button is pressed', () => {
     const spy = jest.spyOn(scene, 'handleAttack');
     scene.updateTouchControlState('attack', true);
     expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it('should call handleSpecial when special button is pressed', () => {
     const spy = jest.spyOn(scene, 'handleSpecial');
     scene.updateTouchControlState('special', true);
     expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it('should set playerBlocking[0] to true when block is pressed', () => {
@@ -77,6 +96,23 @@ describe('KidsFightScene Touch Controls', () => {
     expect(scene.playerBlocking[0]).toBe(false);
   });
 
+  it('should not throw if player is undefined', () => {
+    scene.players[0] = undefined;
+    expect(() => scene.updateTouchControlState('left', true)).not.toThrow();
+  });
+
+  it('should trigger attack logic in handleAttack()', () => {
+    scene.players[0].setData = jest.fn();
+    scene.handleAttack();
+    expect(scene.players[0].setData).toHaveBeenCalledWith('isAttacking', true);
+  });
+
+  it('should trigger special logic in handleSpecial()', () => {
+    scene.players[0].setData = jest.fn();
+    scene.handleSpecial();
+    expect(scene.players[0].setData).toHaveBeenCalledWith('isSpecialAttacking', true);
+  });
+
   it('should not throw if player1 is undefined', () => {
     scene.player1 = undefined;
     expect(() => scene.updateTouchControlState('left', true)).not.toThrow();
@@ -87,21 +123,6 @@ describe('KidsFightScene Touch Controls', () => {
 
   it('should not throw if control is invalid', () => {
     expect(() => scene.updateTouchControlState('invalid' as any, true)).not.toThrow();
-  });
-
-  it('should trigger attack logic in handleAttack()', () => {
-    scene.player1.getData = jest.fn(() => false);
-    scene.player1.setData = jest.fn();
-    scene.handleAttack();
-    expect(scene.player1.setData).toHaveBeenCalledWith('isAttacking', true);
-  });
-
-  it('should trigger special logic in handleSpecial()', () => {
-    scene.playerSpecial[0] = scene.SPECIAL_COST;
-    scene.player1.getData = jest.fn((key) => key === 'isSpecialAttacking' ? false : false);
-    scene.player1.setData = jest.fn();
-    scene.handleSpecial();
-    expect(scene.player1.setData).toHaveBeenCalledWith('isSpecialAttacking', true);
   });
 
   it('should call setVisible on all buttons in showTouchControls', () => {

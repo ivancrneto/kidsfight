@@ -84,17 +84,25 @@ server.on('connection', (ws) => {
             }));
           }
           break;
-        // case 'player_selected':
-        //   const charRoom = gameRooms.get(roomCode);
-        //   if (!charRoom) return;
-        //
-        //   // Convert character index to key
-        //   const CHARACTER_KEYS = ['player1', 'player2', 'player3', 'player4', 'player5', 'player6', 'player7', 'player8'];
-        //   const characterKey = CHARACTER_KEYS[parseInt(data.character)];
-        //   if (isHost) {
-        //     charRoom.gameState.p1.character = characterKey;
-        //   } else {
-        //     charRoom.gameState.p2.character = characterKey;
+        case 'player_ready':
+          const readyRoom = gameRooms.get(roomCode);
+          if (!readyRoom) return;
+          // Broadcast to both host and client if present
+          if (readyRoom.host) {
+            readyRoom.host.send(JSON.stringify({
+              type: 'player_ready',
+              player: isHost ? 'host' : 'guest',
+              roomCode: roomCode
+            }));
+          }
+          if (readyRoom.client) {
+            readyRoom.client.send(JSON.stringify({
+              type: 'player_ready',
+              player: isHost ? 'host' : 'guest',
+              roomCode: roomCode
+            }));
+          }
+          break;
         case 'scenario_selected':
           const scRoom = gameRooms.get(roomCode);
           if (!scRoom) return;

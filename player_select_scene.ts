@@ -59,7 +59,7 @@ interface CharacterInfo {
 export default class PlayerSelectScene extends Phaser.Scene {
   // Properties made public for testability
   public CHARACTER_KEYS: string[] = [
-    'bento', 'davir', 'jose', 'davis', 
+    'bento', 'davir', 'jose', 'davis',
     'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'
   ];
   public p1Index = 0;
@@ -108,6 +108,10 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
   init(data: SceneData): void {
     console.log('[PlayerSelectScene] Initializing with data:', data);
+    // DEBUG: Show mode and isHost after init
+    setTimeout(() => {
+      console.log('[DEBUG] After init: mode =', this.mode, 'isHost =', this.isHost);
+    }, 0);
     // ORIENTATION CHANGE PROTECTION: Check if this scene was triggered by an orientation change
     const now = Date.now();
     const lastOrientationTime = (window as any).lastOrientationChangeTime || 0;
@@ -186,6 +190,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   create(): void {
+    console.log('[DEBUG] PlayerSelectScene.create() called, mode =', this.mode, 'isHost =', this.isHost);
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
 
@@ -218,10 +223,27 @@ export default class PlayerSelectScene extends Phaser.Scene {
     // Setup WebSocket handlers for online mode
     if (this.mode === 'online') {
       this.setupWebSocketHandlers();
+      this.setupWebSocketDebug();
     }
 
     // Responsive layout update on resize
     this.scale.on('resize', this.updateLayout, this);
+  }
+
+  private setupWebSocketDebug(): void {
+    if (!this.wsManager) return;
+    this.wsManager.setMessageCallback((event: MessageEvent) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        console.log('[DEBUG][PlayerSelectScene] Incoming WebSocket message:', data);
+        if (data.type === 'game_start' || data.type === 'gameStart') {
+          console.log('[DEBUG][PlayerSelectScene] Triggering scene.start("KidsFightScene") with:', data);
+        }
+        // Add more debug points for other message types if needed
+      } catch (e) {
+        console.error('[DEBUG][PlayerSelectScene] Error parsing incoming WebSocket message:', e, event);
+      }
+    });
   }
 
   private setupCharacters(): void {
@@ -269,8 +291,8 @@ export default class PlayerSelectScene extends Phaser.Scene {
       const scale = 0.4 * Math.min(screenW, screenH) / 720; // 0.4 at 720p, smaller for smaller screens
       sprite.setScale(scale);
       sprite.setInteractive({ useHandCursor: true });
-      // Center origin at the middle of the cropped area (to align all heads)
-      sprite.setOrigin(0.5, (cropY + cropH / 2) / sprite.height);
+      // Center origin at the feet (bottom of the sprite) for correct alignment
+      sprite.setOrigin(0.5, 1.0);
       sprite.setCrop(cropX, cropY, cropW, cropH);
       // Allow host/guest to select their player with left click
       sprite.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -317,19 +339,10 @@ export default class PlayerSelectScene extends Phaser.Scene {
     });
   }
 
-  private handleCharacterSelect(player: 1 | 2, direction: -1 | 1): void {
-    // DEBUG: Print all relevant state before any logic
+  public handleCharacterSelect(player: 1 | 2, direction: -1 | 1): void {
     const currentIndex = player === 1 ? this.p1Index : this.p2Index;
     let newIndex = (currentIndex + direction + this.CHARACTER_KEYS.length) % this.CHARACTER_KEYS.length;
-    console.log('[DEBUG][handleCharacterSelect] player:', player, 'direction:', direction);
-    console.log('[DEBUG][handleCharacterSelect] currentIndex:', currentIndex, 'newIndex:', newIndex);
-    console.log('[DEBUG][handleCharacterSelect] CHARACTER_KEYS.length:', this.CHARACTER_KEYS.length, 'characters.length:', this.characters.length);
-    console.log('[DEBUG][handleCharacterSelect] CHARACTER_KEYS:', this.CHARACTER_KEYS);
-    console.log('[DEBUG][handleCharacterSelect] characters.keys:', this.characters.map(c => c.key));
-    if (newIndex < 0 || newIndex >= this.characters.length) {
-      throw new Error(`[DEBUG][handleCharacterSelect] newIndex out of bounds! newIndex=${newIndex}, characters.length=${this.characters.length}`);
-    }
-    // Set the index and selected key directly for local mode
+
     if (this.mode !== 'online') {
       if (player === 1) {
         this.p1Index = newIndex;
@@ -345,22 +358,13 @@ export default class PlayerSelectScene extends Phaser.Scene {
     } else {
       // Online mode: only allow the local player to move their selector
       if ((player === 1 && this.isHost) || (player === 2 && !this.isHost)) {
-        let newIndex;
         if (player === 1) {
-          if (this.p1Index === -1) {
-            newIndex = 0;
-          } else {
-            newIndex = (this.p1Index + 1) % this.CHARACTER_KEYS.length;
-          }
+          newIndex = (this.p1Index + 1) % this.CHARACTER_KEYS.length;
           this.p1Index = newIndex;
           this.selected.p1 = this.characters[newIndex].key;
           this.selectedP1Index = newIndex;
         } else {
-          if (this.p2Index === -1) {
-            newIndex = 0;
-          } else {
-            newIndex = (this.p2Index + 1) % this.CHARACTER_KEYS.length;
-          }
+          newIndex = (this.p2Index + 1) % this.CHARACTER_KEYS.length;
           this.p2Index = newIndex;
           this.selected.p2 = this.characters[newIndex].key;
           this.selectedP2Index = newIndex;
@@ -372,14 +376,14 @@ export default class PlayerSelectScene extends Phaser.Scene {
           const playerKey = player === 1 ? 'p1' : 'p2';
           const characterKey = this.characters[newIndex].key;
           this.wsManager.send({
-            type: 'player_selected', // CHANGED to underscore
+            type: 'player_selected',
             player: playerKey,
             character: characterKey
           });
         }
       }
       // Otherwise, ignore
-    }  
+    }
   }
 
   private updateLayout(): void {
@@ -402,13 +406,27 @@ export default class PlayerSelectScene extends Phaser.Scene {
     if (data.type !== 'gameStart' || !('p1Char' in data) || !('p2Char' in data)) return;
 
     const gameData = data as GameStartWebSocketMessage;
-    this.scene.start('GameScene', {
-      player1Character: gameData.p1Char,
-      player2Character: gameData.p2Char,
-      mode: 'online' as const,
-      roomCode: gameData.roomCode,
-      isHost: this.isHost
-    });
+    if (!this.isHost) {
+      this.scene.start('KidsFightScene', {
+        gameMode: 'online',
+        isHost: false,
+        mode: 'online',
+        p1: data.p1Char,
+        p2: data.p2Char,
+        selected: { p1: data.p1Char, p2: data.p2Char },
+        scenario: data.scenario,
+        roomCode: data.roomCode,
+        wsManager: this.wsManager,
+      });
+    } else {
+      this.scene.start('GameScene', {
+        player1Character: gameData.p1Char,
+        player2Character: gameData.p2Char,
+        mode: 'online' as const,
+        roomCode: gameData.roomCode,
+        isHost: this.isHost
+      });
+    }
   }
 
   private cleanupWebSocketHandlers(): void {
@@ -462,73 +480,25 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
     let currentPlayer: 1 | 2;
     if (this.mode === 'online') {
-      // Only host can move yellow selector, guest can only move blue
-      if (this.isHost) {
-        console.log('[PlayerSelectScene] Host transitioning to ScenarioSelectScene');
-        console.log('[PlayerSelectScene] Passing wsManager to ScenarioSelectScene:', !!this.wsManager);
-        // Host transitions to scenario selection only
-        this.scene.start('ScenarioSelectScene', {
-          mode: this.mode,
-          selected: this.selected,
-          roomCode: this.roomCode,
-          isHost: this.isHost,
-          wsManager: this.wsManager // Pass the WebSocket manager to the next scene
-        });
-        return; // Prevent any further transition for host
-      } else {
-        console.log('[PlayerSelectScene] Guest waiting for scenario selection');
-        // Guest sees waiting message
-        if (this.waitingText) { this.waitingText.setVisible(true);
-        }
-        else {
-          const w = this.cameras.main.width;
-          const h = this.cameras.main.height;
-          this.waitingText = this.add.text(w/2, h*0.92, 'Aguardando o anfitrião escolher o cenário...', {
-            fontSize: '22px',
-            color: '#fff',
-            backgroundColor: '#222',
-            padding: { x: 16, y: 8 },
-            fontFamily: 'monospace'
-          }).setOrigin(0.5);
-        }
-        // Guest stays in PlayerSelectScene and listens for scenario_selected
-        if (this.wsManager && this.wsManager.setMessageCallback) {
-          console.log('[Guest] Setting message callback for game_start');
-          this.wsManager.setMessageCallback((event: MessageEvent) => {
-            try {
-              // Check if data is already an object or needs parsing
-              const data = typeof event.data === 'string'
-                ? JSON.parse(event.data)
-                : event.data;
-
-              console.log('[Guest] Received message:', data);
-
-              if (data.type === 'game_start' || data.type === 'gameStart') {
-                this.scene.start('KidsFightScene', {
-                  gameMode: 'online',
-                  mode: this.mode,
-                  p1: data.p1Char.replace('_select', ''),
-                  p2: data.p2Char.replace('_select', ''),
-                  selected: { p1: data.p1Char.replace('_select', ''), p2: data.p2Char.replace('_select', '') },
-                  scenario: data.scenario,
-                  roomCode: this.roomCode,
-                  isHost: false // Explicitly set guest as not host
-                });
-              }
-            } catch (e) {
-              console.error('Error processing game_start message:', e);
-            }
-          });
-        }
+      // Ensure guest sets up WebSocket handlers before transition
+      if (!this.isHost) {
+        this.setupWebSocketHandlers();
       }
+      // Host and guest: always pass wsManager, roomCode, isHost to ScenarioSelectScene in online mode
+      this.scene.start('ScenarioSelectScene', {
+        mode: this.mode,
+        selected: this.selected,
+        roomCode: this.roomCode,
+        isHost: this.isHost,
+        wsManager: this.wsManager,
+      });
+    } else {
+      // Local mode: transition to scenario selection
+      this.scene.start('ScenarioSelectScene', {
+        mode: this.mode,
+        selected: this.selected
+      });
     }
-
-    console.log('[PlayerSelectScene] Local mode transitioning to ScenarioSelectScene');
-    // Local mode: transition to scenario selection
-    this.scene.start('ScenarioSelectScene', {
-      mode: this.mode,
-      selected: this.selected
-    });
   }
 
   private handlePlayerSelected(data: PlayerSelectWebSocketMessage): void {
@@ -676,7 +646,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
     }
   }
 
-  private setSelectorToCharacter(player: 1 | 2, charIndex: number): void {
+  public setSelectorToCharacter(player: 1 | 2, charIndex: number): void {
     console.log('[DEBUG] setSelectorToCharacter', { player, charIndex, isHost: this.isHost, mode: this.mode, charKey: this.characters[charIndex]?.key });
     // Restrict: host can only select for player 1, guest can only select for player 2 in online mode
     if (this.mode === 'online') {
@@ -752,6 +722,22 @@ export default class PlayerSelectScene extends Phaser.Scene {
             this.handlePlayerReady(data);
             break;
           case 'game_start':
+            if (!this.isHost) {
+              this.scene.start('KidsFightScene', {
+                gameMode: 'online',
+                isHost: false,
+                mode: 'online',
+                p1: data.p1Char,
+                p2: data.p2Char,
+                selected: { p1: data.p1Char, p2: data.p2Char },
+                scenario: data.scenario,
+                roomCode: data.roomCode,
+                wsManager: this.wsManager,
+              });
+            } else {
+              this.handleGameStart(data);
+            }
+            break;
           case 'gameStart':
             this.handleGameStart(data);
             break;

@@ -19,7 +19,8 @@ const mockWebSocketManager = {
   isHost: jest.fn().mockReturnValue(false),
   getRoomCode: jest.fn().mockReturnValue('TEST123'),
   setRoomCode: jest.fn(),
-  setHost: jest.fn()
+  setHost: jest.fn(),
+  setMessageCallback: jest.fn()
 };
 
 // Mock Phaser components
@@ -304,7 +305,7 @@ describe('Player Selection Behaviour', () => {
       console.log('DEBUG wsScene.p1Index before handleCharacterSelect:', wsScene.p1Index);
       wsScene.handleCharacterSelect(1, 1);
       expect(mockWebSocketManager.send).toHaveBeenCalledWith({
-        type: 'playerSelected',
+        type: 'player_selected',
         player: 'p1',
         character: 'bento'
       });
@@ -419,7 +420,7 @@ describe('Player Selection Behaviour', () => {
       console.log('DEBUG wsScene.p1Index before handleCharacterSelect:', wsScene.p1Index);
       wsScene.handleCharacterSelect(1, 1);
       expect(mockWebSocketManager.send).toHaveBeenCalledWith({
-        type: 'playerSelected',
+        type: 'player_selected',
         player: 'p1',
         character: 'bento'
       });

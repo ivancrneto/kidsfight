@@ -1,6 +1,14 @@
 import ScenarioSelectScene from '../scenario_select_scene';
 
 describe('ScenarioSelectScene - Online Mode Transitions', () => {
+  let originalDebug;
+  beforeAll(() => {
+    originalDebug = console.debug;
+    console.debug = jest.fn();
+  });
+  afterAll(() => {
+    console.debug = originalDebug;
+  });
   let scene: any;
 
   beforeEach(() => {
