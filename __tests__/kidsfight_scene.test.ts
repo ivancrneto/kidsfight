@@ -1,3 +1,5 @@
+jest.mock('../websocket_manager');
+
 // --- Ensure WebSocketManager is mocked at the module level ---
 const mockWebSocketManager = {
   connect: jest.fn().mockResolvedValue(undefined),

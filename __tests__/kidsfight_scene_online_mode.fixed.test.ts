@@ -1,5 +1,6 @@
 // --- Ensure WebSocketManager is mocked at the module level ---
 const mockWebSocketManager = {
+  onMessage: jest.fn(),
   connect: jest.fn().mockResolvedValue(undefined),
   on: jest.fn(),
   send: jest.fn(),
@@ -335,6 +336,7 @@ describe('KidsFightScene - Online Mode', () => {
         setDepth: jest.fn().mockReturnThis(),
         setScrollFactor: jest.fn().mockReturnThis(),
         fillRect: jest.fn().mockReturnThis(),
+setVisible: jest.fn().mockReturnThis(),
         clear: jest.fn().mockReturnThis(),
         destroy: jest.fn(),
       })),

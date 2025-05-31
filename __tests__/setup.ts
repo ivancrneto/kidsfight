@@ -107,6 +107,7 @@ function createPhaserMockObject() {
     overlap: jest.fn().mockReturnThis(),
     // Add a mock body with blocked.down for physics-based tests
     body: { blocked: { down: true } },
+    setVisible: jest.fn().mockReturnThis()
   };
 }
 
@@ -399,10 +400,12 @@ if (!('mockWebSocketInstances' in global)) {
 }
 
 // Set up document body
-document.body.innerHTML = '<div id="game"></div>';
+if (typeof document !== 'undefined') {
+  document.body.innerHTML = '<div id="game"></div>';
+}
 
 // Polyfill PointerEvent
-if (typeof global.PointerEvent === 'undefined') {
+if (typeof document !== 'undefined' && typeof global.PointerEvent === 'undefined') {
   // @ts-ignore
   global.PointerEvent = class MockPointerEvent extends Event {
     constructor(type: string, props: any) {

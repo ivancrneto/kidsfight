@@ -221,7 +221,8 @@ function tryAttack(scene, attackerIdx, defenderIdx, now, special) {
   }
   scene.lastAttackTime[attackerIdx] = now;
   scene.attackCount[attackerIdx]++;
-  scene.playerHealth[defenderIdx] = Math.max(0, (typeof scene.playerHealth[defenderIdx] === 'number' ? scene.playerHealth[defenderIdx] : 100) - (special ? 30 : 10));
+  const damage = special ? (scene.SPECIAL_DAMAGE ?? 30) : (scene.DAMAGE ?? 10);
+  scene.playerHealth[defenderIdx] = Math.max(0, (typeof scene.playerHealth[defenderIdx] === 'number' ? scene.playerHealth[defenderIdx] : 100) - damage);
   console.log('[TRYATTACK] playerHealth after:', scene.playerHealth[defenderIdx]);
   if (scene.cameras && scene.cameras.main && typeof scene.cameras.main.shake === 'function') {
     scene.cameras.main.shake(special ? 250 : 100, special ? 0.03 : 0.01);

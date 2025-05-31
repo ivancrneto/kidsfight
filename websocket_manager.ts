@@ -23,12 +23,18 @@ export interface WebSocketMessage {
 export type WebSocketFactory = (url: string) => WebSocket;
 
 class WebSocketManager {
+
+  public get isHost(): boolean {
+    return this._isHost;
+  }
   private static instance: WebSocketManager | null = null;
   private _ws: WebSocket | null = null;
   private _isHost: boolean = false;
   private _debugInstanceId: string = Math.random().toString(36).substr(2, 6);
   private _roomCode: string | null = null;
   private _onMessageCallback: ((event: MessageEvent) => void) | null = null;
+  private _messageCallbackId: number = 0;
+  private _currentCallbackId: number = 0;
   private _onCloseCallback: ((event: CloseEvent) => void) | null = null;
   private _onErrorCallback: ((event: Event) => void) | null = null;
   private _onConnectionCallback: ((isConnected: boolean) => void) | null = null;
@@ -94,6 +100,8 @@ class WebSocketManager {
           this._onConnectionCallback?.(true);
           if (this._onMessageCallback) {
             this._boundMessageCallback = (e: MessageEvent) => {
+              console.warn(`[WSM] _boundMessageCallback (connect) INVOKED. Current callback ID: ${this._currentCallbackId}`);
+              console.log('[WSM] Raw message event:', e.data);
               try {
                 // Parse the message data if it's a string
                 let parsedData = e.data;
@@ -111,6 +119,7 @@ class WebSocketManager {
               }
             };
             this._ws?.addEventListener('message', this._boundMessageCallback);
+            console.log('[WSM] Message event listener registered', { ws: !!this._ws, callback: !!this._boundMessageCallback });
           }
           resolve(this._ws!);
         };
@@ -266,6 +275,11 @@ class WebSocketManager {
   }
 
   public onMessage(callback: (event: MessageEvent) => void): void {
+    this._messageCallbackId++;
+    const cbId = this._messageCallbackId;
+    console.warn(`[WSM] onMessage() called. Assigning callback ID: ${cbId}`);
+    console.warn(`[WSM] onMessage() stack trace:`, new Error().stack);
+
     // Remove existing message listener if it exists
     if (this._boundMessageCallback) {
       this._ws?.removeEventListener('message', this._boundMessageCallback);

@@ -324,6 +324,13 @@ export function tryAttack({
 
   // Apply damage and knockback
   defender.health = Math.max(0, defender.health - damage);
+  
+  // Also update the scene's playerHealth array for consistency
+  if (scene.playerHealth && Array.isArray(scene.playerHealth) && scene.playerHealth.length > defenderIdx) {
+    scene.playerHealth[defenderIdx] = Math.max(0, scene.playerHealth[defenderIdx] - damage);
+    console.log('[TRYATTACK] Updated playerHealth array:', scene.playerHealth);
+  }
+  
   if (special) attacker.special = 0;
 
   // Optionally, apply knockback or other effects here

@@ -174,6 +174,27 @@ server.on('connection', (ws) => {
             }));
           }
           break;
+      
+        // --- RELAY ALL OTHER GAMEPLAY MESSAGES ---
+        default: {
+          const relayRoom = gameRooms.get(roomCode);
+          if (!relayRoom) return;
+
+          // List of system message types to NOT relay
+          const systemTypes = [
+            'create_room', 'join_room', 'player_joined', 'game_joined',
+            'player_selected', 'playerSelected', 'player_ready', 'scenario_selected',
+            'game_start', 'game_action'
+          ];
+          if (!systemTypes.includes(data.type)) {
+            const relayTarget = isHost ? relayRoom.client : relayRoom.host;
+            if (relayTarget) {
+              relayTarget.send(JSON.stringify(data));
+              console.log(`[Server] Relayed message of type '${data.type}' from ${isHost ? 'host' : 'guest'} to ${isHost ? 'guest' : 'host'} in room ${roomCode}`);
+            }
+          }
+        }
+        break;
       }
     } catch (error) {
       console.error('Error handling message:', error);
