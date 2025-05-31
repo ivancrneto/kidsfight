@@ -111,9 +111,56 @@ function createPhaserMockObject() {
   };
 }
 
-// Assign the enhanced mock to global.Phaser in the setup file after type declaration (see below for initialization)
+// --- Comprehensive Phaser GameObject Mock for UI and Scene tests ---
+const mockGameObject = () => ({
+  setOrigin: jest.fn().mockReturnThis(),
+  setDepth: jest.fn().mockReturnThis(),
+  setScrollFactor: jest.fn().mockReturnThis(),
+  setInteractive: jest.fn().mockReturnThis(),
+  setScale: jest.fn().mockReturnThis(),
+  setAlpha: jest.fn().mockReturnThis(),
+  setTint: jest.fn().mockReturnThis(),
+  play: jest.fn().mockReturnThis(),
+  setBounce: jest.fn().mockReturnThis(),
+  setCollideWorldBounds: jest.fn().mockReturnThis(),
+  setImmovable: jest.fn().mockReturnThis(),
+  setSize: jest.fn().mockReturnThis(),
+  setOffset: jest.fn().mockReturnThis(),
+  setVelocity: jest.fn().mockReturnThis(),
+  setVelocityX: jest.fn().mockReturnThis(),
+  setVelocityY: jest.fn().mockReturnThis(),
+  setGravityY: jest.fn().mockReturnThis(),
+  setFrictionX: jest.fn().mockReturnThis(),
+  setFrictionY: jest.fn().mockReturnThis(),
+  refreshBody: jest.fn().mockReturnThis(),
+  setDisplaySize: jest.fn().mockReturnThis(),
+  setText: jest.fn().mockReturnThis(),
+  setStyle: jest.fn().mockReturnThis(),
+  setPadding: jest.fn().mockReturnThis(),
+  setX: jest.fn().mockReturnThis(),
+  setY: jest.fn().mockReturnThis(),
+  setVisible: jest.fn().mockReturnThis(),
+  setStrokeStyle: jest.fn().mockReturnThis(),
+  on: jest.fn().mockReturnThis(),
+  destroy: jest.fn().mockReturnThis(),
+  setBackgroundColor: jest.fn().mockReturnThis(),
+  emit: jest.fn().mockReturnThis(),
+  // Add more as needed for specific tests
+});
 
-
+beforeEach(() => {
+  if (global.scene && global.scene.add) {
+    global.scene.add.rectangle = jest.fn(() => mockGameObject());
+    global.scene.add.circle = jest.fn(() => mockGameObject());
+    global.scene.add.text = jest.fn(() => mockGameObject());
+    global.scene.add.sprite = jest.fn(() => mockGameObject());
+    global.scene.add.image = jest.fn(() => mockGameObject());
+    global.scene.add.graphics = jest.fn(() => mockGameObject());
+    global.scene.add.container = jest.fn(() => mockGameObject());
+    global.scene.add.existing = jest.fn(() => mockGameObject());
+    // Add more as needed
+  }
+});
 
 // Initialize Phaser mock
 const phaserMock: PhaserMock = {
@@ -264,6 +311,22 @@ beforeEach(() => {
     playerHealth: [100, 100],
     TOTAL_HEALTH: 100
   };
+});
+
+// Patch global Phaser add methods for all tests
+beforeEach(() => {
+  // Patch scene.add
+  if (global.scene && global.scene.add) {
+    global.scene.add.rectangle = jest.fn(() => mockGameObject());
+    global.scene.add.circle = jest.fn(() => mockGameObject());
+    global.scene.add.text = jest.fn(() => mockGameObject());
+    global.scene.add.sprite = jest.fn(() => mockGameObject());
+    global.scene.add.image = jest.fn(() => mockGameObject());
+    global.scene.add.graphics = jest.fn(() => mockGameObject());
+    global.scene.add.container = jest.fn(() => mockGameObject());
+    global.scene.add.existing = jest.fn(() => mockGameObject());
+    // Add more as needed
+  }
 });
 
 // Initialize global mocks

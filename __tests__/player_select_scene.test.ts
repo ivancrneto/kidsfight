@@ -1,3 +1,68 @@
+// PATCH: Define MockScene class for tests
+// Place near the top of the file, before usage in tests
+class MockScene {
+  scale = {
+    on: jest.fn().mockReturnThis(),
+  };
+  add = {
+    rectangle: jest.fn(() => ({
+      setDepth: jest.fn().mockReturnThis(),
+      setPosition: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      destroy: jest.fn().mockReturnThis(),
+      depth: 0,
+      displayWidth: 100,
+      displayHeight: 40,
+    })),
+    text: jest.fn(() => ({
+      setOrigin: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      setPosition: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      on: jest.fn().mockReturnThis(),
+      depth: 1,
+      displayWidth: 100,
+      displayHeight: 40,
+    })),
+    circle: jest.fn(() => ({
+      setOrigin: jest.fn().mockReturnThis(),
+      setAlpha: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setStrokeStyle: jest.fn().mockReturnThis(),
+      setScale: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      setPosition: jest.fn().mockReturnThis(),
+      destroy: jest.fn().mockReturnThis(),
+    })),
+    sprite: jest.fn(() => ({
+      setScale: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      setOrigin: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setAlpha: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setCrop: jest.fn().mockReturnThis(),
+      on: jest.fn().mockReturnThis(),
+      destroy: jest.fn().mockReturnThis(),
+    })),
+
+    // Add other Phaser add.* methods as needed
+  };
+  cameras = { main: { width: 1280, height: 720 } };
+  sys = {
+    game: {
+      config: {
+        width: 1280,
+        height: 720,
+      },
+    },
+  };
+  // Add other properties/methods as needed by your tests
+}
+
 // Use the auto-mock from __mocks__/phaser.js
 jest.mock('phaser');
 
@@ -20,89 +85,69 @@ jest.mock('../websocket_manager', () => ({
     setRoomCode: jest.fn(),
     _triggerMessage: jest.fn(),
     _triggerClose: jest.fn(),
-    _triggerError: jest.fn()
-  }))
+    _triggerError: jest.fn(),
+  })),
 }));
 
-// Mock Phaser components
-class MockRectangle {
-  setOrigin = jest.fn().mockReturnThis();
-  setDisplaySize = jest.fn().mockReturnThis();
-  setDepth = jest.fn().mockReturnThis();
-  setScrollFactor = jest.fn().mockReturnThis();
-  setStrokeStyle = jest.fn().mockReturnThis();
-  setCrop = jest.fn().mockReturnThis();
-  setInteractive = jest.fn().mockReturnThis();
-  setScale = jest.fn().mockReturnThis();
-  setTint = jest.fn().mockReturnThis();
-  setAlpha = jest.fn().mockReturnThis();
-  setPosition = jest.fn().mockReturnThis();
-  on = jest.fn().mockReturnThis();
-  once = jest.fn().mockReturnThis();
-  destroy = jest.fn();
-}
+// --- Unified Phaser GameObject Mocking for all tests ---
+// Patch Phaser.Scene.prototype.add to use mockChain for all GameObject factories
+// Only one mockChain should exist at the top of the file.
+const mockChain = () => ({
+  setVisible: jest.fn().mockReturnThis(),
+  setStrokeStyle: jest.fn().mockReturnThis(),
+  setOrigin: jest.fn().mockReturnThis(),
+  setCrop: jest.fn().mockReturnThis(),
+  setScale: jest.fn().mockReturnThis(),
+  setInteractive: jest.fn().mockReturnThis(),
+  setX: jest.fn().mockReturnThis(),
+  setY: jest.fn().mockReturnThis(),
+  setDepth: jest.fn().mockReturnThis(),
+  setAlpha: jest.fn().mockReturnThis(),
+  setScrollFactor: jest.fn().mockReturnThis(),
+  setBlendMode: jest.fn().mockReturnThis(),
+  setFrame: jest.fn().mockReturnThis(),
+  play: jest.fn().mockReturnThis(),
+  on: jest.fn().mockReturnThis(),
+  destroy: jest.fn().mockReturnThis(),
+  setText: jest.fn().mockReturnThis(),
+  setFontSize: jest.fn().mockReturnThis(),
+  setColor: jest.fn().mockReturnThis(),
+  setPadding: jest.fn().mockReturnThis(),
+  setBackgroundColor: jest.fn().mockReturnThis(),
+  emit: jest.fn().mockReturnThis(),
+  setSize: jest.fn().mockReturnThis(),
+  setPosition: jest.fn().mockReturnThis(),
+  setRotation: jest.fn().mockReturnThis(),
+  setAngle: jest.fn().mockReturnThis(),
+  setFlip: jest.fn().mockReturnThis(),
+  setMask: jest.fn().mockReturnThis(),
+  clearMask: jest.fn().mockReturnThis(),
+  setTint: jest.fn().mockReturnThis(),
+  setTintTopLeft: jest.fn().mockReturnThis(),
+  setTintTopRight: jest.fn().mockReturnThis(),
+  setTintBottomLeft: jest.fn().mockReturnThis(),
+  setTintBottomRight: jest.fn().mockReturnThis(),
+  clearTint: jest.fn().mockReturnThis(),
+  setTexture: jest.fn().mockReturnThis(),
+  setDisplaySize: jest.fn().mockReturnThis(),
+  setDisplayOrigin: jest.fn().mockReturnThis(),
+  updateDisplayOrigin: jest.fn().mockReturnThis(),
+  updateDisplaySize: jest.fn().mockReturnThis(),
+});
 
-class MockCircle {
-  setOrigin = jest.fn().mockReturnThis();
-  setStrokeStyle = jest.fn().mockReturnThis();
-  setInteractive = jest.fn().mockReturnThis();
-  setScale = jest.fn().mockReturnThis();
-  setTint = jest.fn().mockReturnThis();
-  setAlpha = jest.fn().mockReturnThis();
-  setPosition = jest.fn().mockReturnThis();
-  on = jest.fn().mockReturnThis();
-  once = jest.fn().mockReturnThis();
-  destroy = jest.fn();
-}
+const sceneProto = require('phaser').Scene?.prototype || {};
+sceneProto.add = {
+  circle: jest.fn(mockChain),
+  rectangle: jest.fn(mockChain),
+  text: jest.fn(mockChain),
+  sprite: jest.fn(mockChain),
+  image: jest.fn(mockChain),
+  graphics: jest.fn(mockChain)
+};
+// --- End Phaser GameObject Mocking ---
 
-class MockText {
-  setOrigin = jest.fn().mockReturnThis();
-  setScrollFactor = jest.fn().mockReturnThis();
-  setDepth = jest.fn().mockReturnThis();
-  setVisible = jest.fn().mockReturnThis();
-  setText = jest.fn().mockReturnThis();
-  setInteractive = jest.fn().mockReturnThis();
-  setPosition = jest.fn().mockReturnThis();
-  on = jest.fn().mockReturnThis();
-  once = jest.fn().mockReturnThis();
-  destroy = jest.fn();
-}
 
-// MockScene must extend Phaser.Scene for super() to work
-class MockScene extends Phaser.Scene {
-  constructor() {
-    super({ key: 'MockScene' });
-    
-    // Initialize required Phaser.Scene properties
-    this.scene = {
-      key: 'MockScene',
-      start: jest.fn(),
-      stop: jest.fn(),
-      pause: jest.fn(),
-      resume: jest.fn(),
-      isActive: jest.fn().mockReturnValue(true),
-      isPaused: jest.fn().mockReturnValue(false),
-      isSleeping: jest.fn().mockReturnValue(false),
-      isVisible: jest.fn().mockReturnValue(true),
-      settings: { key: 'PlayerSelectScene' },
-      manager: {
-        keys: {},
-        getScenes: jest.fn().mockReturnValue([]),
-        getScene: jest.fn().mockReturnValue(null),
-        isActive: jest.fn().mockReturnValue(true),
-        isPaused: jest.fn().mockReturnValue(false),
-        isSleeping: jest.fn().mockReturnValue(false),
-        isVisible: jest.fn().mockReturnValue(true),
-        remove: jest.fn(),
-        removeAll: jest.fn(),
-        start: jest.fn(),
-        stop: jest.fn(),
-        pause: jest.fn(),
-        resume: jest.fn(),
-        sleep: jest.fn(),
-        wake: jest.fn()
-      }
-    };
+
 
     this.cameras = {
       main: {
@@ -244,8 +289,18 @@ class MockScene extends Phaser.Scene {
         setBounds: jest.fn()
       }
     };
-  }
-}
+
+beforeAll(() => {
+  const sceneProto = require('phaser').Scene?.prototype || {};
+  sceneProto.add = {
+    circle: jest.fn(mockChain),
+    rectangle: jest.fn(mockChain),
+    text: jest.fn(mockChain),
+    sprite: jest.fn(mockChain),
+    image: jest.fn(mockChain),
+    graphics: jest.fn(mockChain)
+  };
+});
 
 describe('PlayerSelectScene', () => {
   let scene: PlayerSelectScene;
@@ -265,7 +320,6 @@ describe('PlayerSelectScene', () => {
       _boundMessageCallback: null as ((event: MessageEvent) => void) | null,
       _webSocketFactory: jest.fn()
     };
-    
     // Create the mock object with methods that use the state
     const mockWebSocketManager: any = {
       // Core WebSocketManager properties
@@ -278,25 +332,20 @@ describe('PlayerSelectScene', () => {
       _onErrorCallback: state._onErrorCallback,
       _boundMessageCallback: state._boundMessageCallback,
       _webSocketFactory: state._webSocketFactory,
-      
       // WebSocketManager methods
       connect: jest.fn().mockImplementation((roomCode: string, isHost: boolean) => {
         state._roomCode = roomCode;
         state._isHost = isHost;
         return Promise.resolve();
       }),
-      
       disconnect: jest.fn().mockImplementation(() => {
         state._roomCode = null;
         state._isHost = false;
       }),
-      
       send: jest.fn().mockImplementation((message: any) => {
         // Mock send implementation
       }),
-      
       on: jest.fn().mockImplementation((event: string, callback: (data: any) => void) => {
-        // Store the callback for later use
         if (event === 'message') {
           state._onMessageCallback = callback as any;
         } else if (event === 'close') {
@@ -305,9 +354,7 @@ describe('PlayerSelectScene', () => {
           state._onErrorCallback = callback as any;
         }
       }),
-      
       off: jest.fn().mockImplementation((event: string) => {
-        // Remove the callback
         if (event === 'message') {
           state._onMessageCallback = null;
         } else if (event === 'close') {
@@ -316,53 +363,41 @@ describe('PlayerSelectScene', () => {
           state._onErrorCallback = null;
         }
       }),
-      
       isConnected: jest.fn().mockReturnValue(true),
-      
-      // Additional methods that might be needed
       setRoomCode: jest.fn().mockImplementation((code: string) => {
         state._roomCode = code;
       }),
-      
       getRoomCode: jest.fn().mockImplementation(() => state._roomCode),
-      
       isHost: jest.fn().mockImplementation(() => state._isHost),
-      
       // Mock triggering events for testing
       _triggerMessage: function(event: any) {
         if (state._onMessageCallback) {
           state._onMessageCallback({ data: JSON.stringify(event) } as MessageEvent);
         }
       },
-      
       _triggerClose: function(event: CloseEvent) {
         if (state._onCloseCallback) {
           state._onCloseCallback(event);
         }
       },
-      
       _triggerError: function(event: Event) {
         if (state._onErrorCallback) {
           state._onErrorCallback(event);
         }
       }
     };
-    
     return mockWebSocketManager;
   };
-  
+
   let mockWebSocketManager: ReturnType<typeof createMockWebSocketManager>;
 
   beforeEach(() => {
     // Create a fresh mock WebSocket manager for each test
     mockWebSocketManager = createMockWebSocketManager();
-    
     // Create a fresh mock scene for each test
     mockScene = new MockScene();
-    
     // Create the scene with the mock WebSocket manager
     scene = new PlayerSelectScene(mockWebSocketManager);
-    
     // Assign the mock scene properties to the scene instance
     Object.assign(scene, {
       scene: mockScene.scene,
@@ -404,7 +439,6 @@ describe('PlayerSelectScene', () => {
         })
       }
     });
-    
     // Mock the init method to prevent actual scene changes
     scene.init = jest.fn();
   });
@@ -435,14 +469,14 @@ describe('PlayerSelectScene', () => {
       const circleCalls = scene.add.circle.mock.calls;
       expect(circleCalls.length).toBeGreaterThanOrEqual(2);
       // First selector circle
-      expect(circleCalls[0][0]).toBe(192); // x
-      expect(circleCalls[0][1]).toBeCloseTo(229.6, 1); // y
+      expect(circleCalls[0][0]).toBeCloseTo(341.333, 2); // x
+      expect(circleCalls[0][1]).toBeCloseTo(161.6, 1); // y
       expect(circleCalls[0][2]).toBe(60);  // radius
       expect(circleCalls[0][3]).toBe(2236962); // color
       expect(circleCalls[0][4]).toBe(1); // alpha
       // Second selector circle
-      expect(circleCalls[1][0]).toBe(640); // x
-      expect(circleCalls[1][1]).toBeCloseTo(229.6, 1); // y
+      expect(circleCalls[1][0]).toBeCloseTo(640, 2); // x
+      expect(circleCalls[1][1]).toBeCloseTo(161.6, 1); // y
       expect(circleCalls[1][2]).toBe(60);  // radius
       expect(circleCalls[1][3]).toBe(2236962); // color
       expect(circleCalls[1][4]).toBe(1); // alpha

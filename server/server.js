@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const server = new WebSocket.Server({ port: 8081 });
+const server = new WebSocket.Server({ port: 18081 });
 
 // Store active game rooms
 const gameRooms = new Map();
@@ -223,4 +223,4 @@ server.on('connection', (ws) => {
   });
 });
 
-console.log('WebSocket server running on ws://localhost:8081');
+console.log('WebSocket server running on ws://localhost:18081');

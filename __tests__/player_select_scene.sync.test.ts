@@ -15,6 +15,40 @@ const mockWebSocketManager = () => ({
   setHost: jest.fn()
 });
 
+const mockChain = () => ({
+  setOrigin: jest.fn().mockReturnThis(),
+  setDepth: jest.fn().mockReturnThis(),
+  setScrollFactor: jest.fn().mockReturnThis(),
+  setAlpha: jest.fn().mockReturnThis(),
+  setVisible: jest.fn().mockReturnThis(),
+  setScale: jest.fn().mockReturnThis(),
+  setSize: jest.fn().mockReturnThis(),
+  setPosition: jest.fn().mockReturnThis(),
+  setRotation: jest.fn().mockReturnThis(),
+  setAngle: jest.fn().mockReturnThis(),
+  setFlip: jest.fn().mockReturnThis(),
+  setCrop: jest.fn().mockReturnThis(),
+  setMask: jest.fn().mockReturnThis(),
+  clearMask: jest.fn().mockReturnThis(),
+  setPipeline: jest.fn().mockReturnThis(),
+  setPostPipeline: jest.fn().mockReturnThis(),
+  clearMask: jest.fn().mockReturnThis(),
+  setBlendMode: jest.fn().mockReturnThis(),
+  setTint: jest.fn().mockReturnThis(),
+  setTintTopLeft: jest.fn().mockReturnThis(),
+  setTintTopRight: jest.fn().mockReturnThis(),
+  setTintBottomLeft: jest.fn().mockReturnThis(),
+  setTintBottomRight: jest.fn().mockReturnThis(),
+  clearTint: jest.fn().mockReturnThis(),
+  setTexture: jest.fn().mockReturnThis(),
+  setFrame: jest.fn().mockReturnThis(),
+  setDisplaySize: jest.fn().mockReturnThis(),
+  setDisplayOrigin: jest.fn().mockReturnThis(),
+  updateDisplayOrigin: jest.fn().mockReturnThis(),
+  setDisplaySize: jest.fn().mockReturnThis(),
+  updateDisplaySize: jest.fn().mockReturnThis(),
+});
+
 function createScene({ isHost = false, mode = 'online' } = {}) {
   const wsManager = mockWebSocketManager();
   wsManager.isHost = isHost;

@@ -23,86 +23,100 @@ const mockWebSocketManager = {
   setMessageCallback: jest.fn()
 };
 
+// --- Comprehensive Phaser GameObject Mock for UI and Scene tests ---
+const mockGameObject = () => ({
+  setOrigin: jest.fn().mockReturnThis(),
+  setDepth: jest.fn().mockReturnThis(),
+  setScrollFactor: jest.fn().mockReturnThis(),
+  setInteractive: jest.fn().mockReturnThis(),
+  setScale: jest.fn().mockReturnThis(),
+  setAlpha: jest.fn().mockReturnThis(),
+  setTint: jest.fn().mockReturnThis(),
+  play: jest.fn().mockReturnThis(),
+  setBounce: jest.fn().mockReturnThis(),
+  setCollideWorldBounds: jest.fn().mockReturnThis(),
+  setImmovable: jest.fn().mockReturnThis(),
+  setSize: jest.fn().mockReturnThis(),
+  setOffset: jest.fn().mockReturnThis(),
+  setVelocity: jest.fn().mockReturnThis(),
+  setVelocityX: jest.fn().mockReturnThis(),
+  setVelocityY: jest.fn().mockReturnThis(),
+  setGravityY: jest.fn().mockReturnThis(),
+  setFrictionX: jest.fn().mockReturnThis(),
+  setFrictionY: jest.fn().mockReturnThis(),
+  refreshBody: jest.fn().mockReturnThis(),
+  setDisplaySize: jest.fn().mockReturnThis(),
+  setText: jest.fn().mockReturnThis(),
+  setStyle: jest.fn().mockReturnThis(),
+  setPadding: jest.fn().mockReturnThis(),
+  setX: jest.fn().mockReturnThis(),
+  setY: jest.fn().mockReturnThis(),
+  setVisible: jest.fn().mockReturnThis(),
+  setStrokeStyle: jest.fn().mockReturnThis(),
+  on: jest.fn().mockReturnThis(),
+  destroy: jest.fn().mockReturnThis(),
+  setBackgroundColor: jest.fn().mockReturnThis(),
+  emit: jest.fn().mockReturnThis(),
+  setCrop: jest.fn().mockReturnThis(),
+  setPosition: jest.fn().mockReturnThis(), // <-- Added for bgCircle
+});
+
 // Mock Phaser components
-const mockScene = {
-  add: {
-    text: jest.fn().mockReturnValue({
-      setOrigin: jest.fn().mockReturnThis(),
-      setScrollFactor: jest.fn().mockReturnThis(),
-      setDepth: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis(),
-      setText: jest.fn().mockReturnThis(),
-      setInteractive: jest.fn().mockReturnThis(),
-      setFlipX: jest.fn().mockReturnThis(),
-      setScale: jest.fn().mockReturnThis(),
-      setCrop: jest.fn().mockReturnThis(),
-      setPosition: jest.fn().mockReturnThis(),
-      on: jest.fn().mockReturnThis(),
-      body: { blocked: { down: true } },
-      destroy: jest.fn()
-    }),
-    circle: jest.fn().mockReturnValue({
-      setOrigin: jest.fn(),
-      setStrokeStyle: jest.fn(),
-      setInteractive: jest.fn(),
-      setScale: jest.fn(),
-      setTint: jest.fn(),
-      setAlpha: jest.fn(),
-      setPosition: jest.fn(),
-      on: jest.fn(),
-      setVisible: jest.fn()
-    }),
-    rectangle: jest.fn().mockReturnValue({
-      setOrigin: jest.fn(),
-      setDisplaySize: jest.fn(),
-      setDepth: jest.fn(),
-      setScrollFactor: jest.fn(),
-      setStrokeStyle: jest.fn(),
-      setInteractive: jest.fn(),
-      on: jest.fn()
-    }),
-    sprite: jest.fn().mockReturnValue({
-      setOrigin: jest.fn().mockReturnThis(),
-      setScale: jest.fn().mockReturnThis(),
-      setCrop: jest.fn().mockReturnThis(),
-      setInteractive: jest.fn().mockReturnThis(),
-      setFlipX: jest.fn().mockReturnThis(),
-      on: jest.fn()
-    })
-  },
-  scale: {
-    on: jest.fn(),
-    width: 800,
-    height: 600
-  },
-  cameras: {
-    main: {
-      width: 800,
-      height: 600
-    }
-  },
-  sys: {
-    game: {
-      config: {
-        width: 800,
-        height: 600
-      }
-    }
-  },
-  physics: {
-    pause: jest.fn()
-  }
-};
+let scene: any;
+
+// Patch the scene.add property on each test scene instance
+beforeEach(() => {
+  scene = new PlayerSelectScene(mockWebSocketManager as unknown as WebSocketManager);
+  scene.add = {
+    rectangle: jest.fn(() => mockGameObject()),
+    circle: jest.fn(() => mockGameObject()),
+    text: jest.fn(() => mockGameObject()),
+    sprite: jest.fn(() => mockGameObject()),
+    image: jest.fn(() => mockGameObject()),
+    graphics: jest.fn(() => mockGameObject()),
+    container: jest.fn(() => mockGameObject()),
+    existing: jest.fn(() => mockGameObject()),
+  };
+  scene.scale = { on: jest.fn(), width: 800, height: 600 };
+  scene.cameras = { main: { width: 800, height: 600 } };
+  scene.sys = { game: { config: { width: 800, height: 600 } } };
+  scene.physics = { pause: jest.fn() };
+});
+
+beforeAll(() => {
+  const mockChain = () => ({
+    setVisible: jest.fn().mockReturnThis(),
+    setStrokeStyle: jest.fn().mockReturnThis(),
+    setOrigin: jest.fn().mockReturnThis(),
+    setCrop: jest.fn().mockReturnThis(),
+    setScale: jest.fn().mockReturnThis(),
+    setInteractive: jest.fn().mockReturnThis(),
+    setX: jest.fn().mockReturnThis(),
+    setY: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis(),
+    setAlpha: jest.fn().mockReturnThis(),
+    setScrollFactor: jest.fn().mockReturnThis(),
+    setBlendMode: jest.fn().mockReturnThis(),
+    setFrame: jest.fn().mockReturnThis(),
+    play: jest.fn().mockReturnThis(),
+    on: jest.fn().mockReturnThis(),
+    destroy: jest.fn().mockReturnThis(),
+    setText: jest.fn().mockReturnThis(),
+    setFontSize: jest.fn().mockReturnThis(),
+    setColor: jest.fn().mockReturnThis()
+  });
+  const sceneProto = require('phaser').Scene?.prototype || {};
+  sceneProto.add = {
+    circle: jest.fn(mockChain),
+    rectangle: jest.fn(mockChain),
+    text: jest.fn(mockChain),
+    sprite: jest.fn(mockChain),
+    image: jest.fn(mockChain),
+    graphics: jest.fn(mockChain)
+  };
+});
 
 describe('Player Selection Behaviour', () => {
-  let scene: PlayerSelectScene;
-
-  beforeEach(() => {
-    // Create a fresh instance for each test
-    scene = new PlayerSelectScene(mockWebSocketManager as unknown as WebSocketManager);
-    Object.assign(scene, mockScene);
-  });
-
   describe('Character Selection', () => {
     it('should allow player 1 to select a character in local mode', () => {
       scene.init({ mode: 'local' });

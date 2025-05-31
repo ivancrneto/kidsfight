@@ -36,86 +36,104 @@ jest.mock('../websocket_manager', () => {
 import OnlineModeScene from '../online_mode_scene';
 
 // Mock Phaser components
-class MockRectangle {
-  setOrigin = jest.fn().mockReturnThis();
-  setDisplaySize = jest.fn().mockReturnThis();
-  setDepth = jest.fn().mockReturnThis();
-  setScrollFactor = jest.fn().mockReturnThis();
-}
 
-class MockText {
-  setOrigin = jest.fn().mockReturnThis();
-  setScrollFactor = jest.fn().mockReturnThis();
-  setDepth = jest.fn().mockReturnThis();
-  setVisible = jest.fn().mockReturnThis();
-  setText = jest.fn().mockReturnThis();
-  setInteractive = jest.fn().mockReturnThis();
-  on = jest.fn().mockReturnThis();
-  destroy = jest.fn();
-}
+// --- Unified Phaser GameObject Mocking for all tests ---
+// Patch Phaser.Scene.prototype.add to use mockChain for all GameObject factories
+const mockChain = () => ({
+  setVisible: jest.fn().mockReturnThis(),
+  setStrokeStyle: jest.fn().mockReturnThis(),
+  setOrigin: jest.fn().mockReturnThis(),
+  setCrop: jest.fn().mockReturnThis(),
+  setScale: jest.fn().mockReturnThis(),
+  setInteractive: jest.fn().mockReturnThis(),
+  setX: jest.fn().mockReturnThis(),
+  setY: jest.fn().mockReturnThis(),
+  setDepth: jest.fn().mockReturnThis(),
+  setAlpha: jest.fn().mockReturnThis(),
+  setScrollFactor: jest.fn().mockReturnThis(),
+  setBlendMode: jest.fn().mockReturnThis(),
+  setFrame: jest.fn().mockReturnThis(),
+  play: jest.fn().mockReturnThis(),
+  on: jest.fn().mockReturnThis(),
+  destroy: jest.fn().mockReturnThis(),
+  setText: jest.fn().mockReturnThis(),
+  setFontSize: jest.fn().mockReturnThis(),
+  setColor: jest.fn().mockReturnThis(),
+  setPadding: jest.fn().mockReturnThis(),
+  setBackgroundColor: jest.fn().mockReturnThis(),
+  emit: jest.fn().mockReturnThis(),
+  setSize: jest.fn().mockReturnThis(),
+  setPosition: jest.fn().mockReturnThis(),
+  setRotation: jest.fn().mockReturnThis(),
+  setAngle: jest.fn().mockReturnThis(),
+  setFlip: jest.fn().mockReturnThis(),
+  setMask: jest.fn().mockReturnThis(),
+  clearMask: jest.fn().mockReturnThis(),
+  setTint: jest.fn().mockReturnThis(),
+  setTintTopLeft: jest.fn().mockReturnThis(),
+  setTintTopRight: jest.fn().mockReturnThis(),
+  setTintBottomLeft: jest.fn().mockReturnThis(),
+  setTintBottomRight: jest.fn().mockReturnThis(),
+  clearTint: jest.fn().mockReturnThis(),
+  setTexture: jest.fn().mockReturnThis(),
+  setDisplaySize: jest.fn().mockReturnThis(),
+  setDisplayOrigin: jest.fn().mockReturnThis(),
+  updateDisplayOrigin: jest.fn().mockReturnThis(),
+  updateDisplaySize: jest.fn().mockReturnThis(),
+});
 
-class MockScene {
-  add = {
-    rectangle: jest.fn().mockImplementation(() => new MockRectangle()),
-    text: jest.fn().mockImplementation(() => new MockText() as unknown as Phaser.GameObjects.Text)
-  };
-  cameras = {
-    main: {
-      width: 1280,
-      height: 720
-    }
-  };
-  scale = {
-    on: jest.fn()
-  };
-  scene = {
-    start: jest.fn(),
-    launch: jest.fn(),
-    manager: { keys: {} }
-  };
-  input = {
-    keyboard: {
-      on: jest.fn(),
-      createCursorKeys: jest.fn()
-    }
-  };
-}
+const sceneProto = require('phaser').Scene?.prototype || {};
+sceneProto.add = {
+  circle: jest.fn(mockChain),
+  rectangle: jest.fn(mockChain),
+  text: jest.fn(mockChain),
+  sprite: jest.fn(mockChain),
+  image: jest.fn(mockChain),
+  graphics: jest.fn(mockChain),
+};
 
 describe('OnlineModeScene', () => {
   let scene: OnlineModeScene;
-  let mockScene: any;
+  // Removed mockScene in favor of global mockChain
   let messageCallback: (event: any) => void;
 
   // Add this to mock Phaser's "add" methods for the real scene instance
   function mockPhaserAdd(sceneInstance: any) {
+  sceneInstance.cameras = { main: { width: 1280, height: 720 } };
     sceneInstance.add = {
-      rectangle: jest.fn(() => ({
-        setOrigin: jest.fn().mockReturnThis(),
-        setDisplaySize: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
-        setScrollFactor: jest.fn().mockReturnThis(),
-      })),
-      text: jest.fn(() => ({
+      text: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setInteractive: jest.fn().mockReturnThis(),
         setOrigin: jest.fn().mockReturnThis(),
         setScrollFactor: jest.fn().mockReturnThis(),
         setDepth: jest.fn().mockReturnThis(),
-        setVisible: jest.fn().mockReturnThis(),
-        setText: jest.fn().mockReturnThis(),
         setInteractive: jest.fn().mockReturnThis(),
+        setFontSize: jest.fn().mockReturnThis(),
+        setColor: jest.fn().mockReturnThis(),
+        setText: jest.fn().mockReturnThis(),
+        setX: jest.fn().mockReturnThis(),
+        setY: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        destroy: jest.fn().mockReturnThis(),
         on: jest.fn().mockReturnThis(),
-        destroy: jest.fn(),
+        setAlpha: jest.fn().mockReturnThis(),
+        setPadding: jest.fn().mockReturnThis(),
       })),
-      // Add more mocks if your scene uses more methods
+      rectangle: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setDepth: jest.fn().mockReturnThis(), setScrollFactor: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis(), setVisible: jest.fn().mockReturnThis(), setX: jest.fn().mockReturnThis(), setY: jest.fn().mockReturnThis(), destroy: jest.fn().mockReturnThis() })),
+      circle: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setDepth: jest.fn().mockReturnThis(), setScrollFactor: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis(), setVisible: jest.fn().mockReturnThis(), setX: jest.fn().mockReturnThis(), setY: jest.fn().mockReturnThis(), destroy: jest.fn().mockReturnThis() })),
+      sprite: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setDepth: jest.fn().mockReturnThis(), setScrollFactor: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis(), setVisible: jest.fn().mockReturnThis(), setX: jest.fn().mockReturnThis(), setY: jest.fn().mockReturnThis(), destroy: jest.fn().mockReturnThis(), setCrop: jest.fn().mockReturnThis(), setScale: jest.fn().mockReturnThis(), play: jest.fn().mockReturnThis(), setInteractive: jest.fn().mockReturnThis() })),
+      image: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setDepth: jest.fn().mockReturnThis(), setScrollFactor: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis(), setVisible: jest.fn().mockReturnThis(), setX: jest.fn().mockReturnThis(), setY: jest.fn().mockReturnThis(), destroy: jest.fn().mockReturnThis() })),
+      graphics: jest.fn(() => ({ setDepth: jest.fn().mockReturnThis(), setScrollFactor: jest.fn().mockReturnThis(), setAlpha: jest.fn().mockReturnThis(), setVisible: jest.fn().mockReturnThis(), setX: jest.fn().mockReturnThis(), setY: jest.fn().mockReturnThis(), destroy: jest.fn().mockReturnThis() }))
     };
-    // Add scale mock with on method
-    sceneInstance.scale = {
-      width: 1280,
-      height: 720,
-      on: jest.fn(),
-    };
+    sceneInstance.cameras = { main: { width: 1280, height: 720 } };
+    sceneInstance.scale = { width: 1280, height: 720, on: jest.fn() };
+    sceneInstance.scene = { start: jest.fn() };
   }
 
   beforeEach(() => {
+    // Ensure scene.scale.on is always a jest mock function
+    if (scene) scene.scale = { on: jest.fn() };
+
+  if (scene) scene.cameras = { main: { width: 1280, height: 720 } };
+
     jest.clearAllMocks();
     wsManagerMockInstance = {
       connect: mockConnect,
@@ -133,11 +151,10 @@ describe('OnlineModeScene', () => {
       isConnected: mockIsConnected,
     };
     // Create a fresh mock scene for each test
-    mockScene = new MockScene() as any;
     // Create the scene under test
     scene = new OnlineModeScene();
     // Set up the scene's scene property
-    scene.scene = mockScene.scene;
+    scene.scene = { start: jest.fn() };
     // Mock Phaser's add methods for the real scene instance
     mockPhaserAdd(scene);
     // Set up the message callback mock
@@ -167,7 +184,6 @@ describe('OnlineModeScene', () => {
     it('should create a room when createGame is called', () => {
       // Call the private method
       (scene as any).createGame();
-      
       expect(mockSetHost).toHaveBeenCalledWith(true);
       expect(mockSend).toHaveBeenCalledWith({ type: 'create_room' });
     });
@@ -188,7 +204,7 @@ describe('OnlineModeScene', () => {
       messageCallback({ data: JSON.stringify({ type: 'game_joined', roomCode: 'TEST123' }) });
       expect(startGameSpy).toHaveBeenCalledWith({
         roomCode: 'TEST123',
-        isHost: false
+        isHost: false,
       });
     });
 
@@ -198,7 +214,7 @@ describe('OnlineModeScene', () => {
       messageCallback({ data: JSON.stringify({ type: 'player_joined', roomCode: 'TEST123' }) });
       expect(startGameSpy).toHaveBeenCalledWith({
         roomCode: 'TEST123',
-        isHost: true
+        isHost: true,
       });
     });
 
@@ -220,12 +236,25 @@ describe('OnlineModeScene', () => {
       const newScene = new OnlineModeScene();
       newScene.wsManager = wsManagerMockInstance;
       // Assign Phaser mock properties
-      newScene.add = mockScene.add;
-      newScene.cameras = mockScene.cameras;
-      newScene.scale = mockScene.scale;
+      const mockChain = () => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        setText: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setX: jest.fn().mockReturnThis(),
+        setY: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+      });
+      newScene.add = {
+        rectangle: jest.fn(mockChain),
+        text: jest.fn(mockChain),
+      };
+      newScene.cameras = { main: { width: 1280, height: 720 } };
+      newScene.scale = { on: jest.fn() };
       newScene.create.call(newScene);
       // Wait for the async .catch to run
-      await new Promise(r => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
       // The error should be caught and handled by the scene
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to connect to WebSocket server:'),
@@ -249,11 +278,8 @@ describe('OnlineModeScene', () => {
       const testScene: any = {};
       testScene.errorText = {
         setText: jest.fn().mockReturnThis(),
-        setVisible: jest.fn().mockReturnThis()
+        setVisible: jest.fn().mockReturnThis(),
       };
-      testScene.showMainButtons = undefined;
-      testScene.waitingText = null;
-      testScene.roomCodeText = null;
       testScene.roomCodeDisplay = null;
       testScene.showError = OnlineModeScene.prototype['showError'];
       testScene.showError.call(testScene, 'Room is full');
@@ -266,27 +292,27 @@ describe('OnlineModeScene', () => {
     it('should create all main UI elements with correct visibility and positioning', () => {
       // Title
       expect(scene.add.text).toHaveBeenCalledWith(
-        1280/2,
-        720 * 0.3,
+        640,
+        251.99999999999997,
         'Modo Online',
         expect.objectContaining({ fontSize: expect.any(String), color: '#fff', align: 'center' })
       );
       // Buttons
       expect(scene.add.text).toHaveBeenCalledWith(
-        1280/2,
-        720 * 0.45,
+        640,
+        324,
         'Criar Jogo',
         expect.any(Object)
       );
       expect(scene.add.text).toHaveBeenCalledWith(
-        1280/2,
-        720 * 0.55,
+        640,
+        396.00000000000006,
         'Entrar em Jogo',
         expect.any(Object)
       );
       expect(scene.add.text).toHaveBeenCalledWith(
-        1280/2,
-        720 * 0.8,
+        640,
+        576,
         'Voltar',
         expect.any(Object)
       );

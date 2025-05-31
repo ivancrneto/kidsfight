@@ -1714,6 +1714,7 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     
     // Helper for display name
     const getDisplayName = (key: string) => {
+      // Map known keys to real names, fallback to key if not found
       const nameMap: Record<string, string> = {
         player1: 'Bento',
         player2: 'Davi R',

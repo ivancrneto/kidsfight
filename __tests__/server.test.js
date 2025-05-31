@@ -4,7 +4,7 @@
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
 
-const SERVER_URL = 'ws://localhost:8081';
+const SERVER_URL = 'ws://localhost:18081';
 let serverProcess;
 
 // Utility to start the server before tests
