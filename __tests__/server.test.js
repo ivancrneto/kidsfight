@@ -4,12 +4,13 @@
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
 
-const SERVER_URL = 'ws://localhost:18081';
+const SERVER_PORT = 8085;
+const SERVER_URL = `ws://localhost:${SERVER_PORT}`;
 let serverProcess;
 
 // Utility to start the server before tests
 beforeAll((done) => {
-  serverProcess = spawn('node', ['server.js'], { cwd: __dirname + '/../server' });
+  serverProcess = spawn('node', ['server.js', SERVER_PORT], { cwd: __dirname + '/../server' });
   serverProcess.stdout.on('data', (data) => {
     if (data.toString().includes('WebSocket server running')) done();
   });

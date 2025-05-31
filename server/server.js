@@ -1,8 +1,50 @@
 const WebSocket = require('ws');
-const server = new WebSocket.Server({ port: 18081 });
+const PORT = process.argv[2] ? parseInt(process.argv[2], 10) : 8081;
+const server = new WebSocket.Server({ port: PORT });
+console.log(`WebSocket server running on port ${PORT}`);
 
 // Store active game rooms
 const gameRooms = new Map();
+
+// Helper to get or init player state in a room
+function getPlayerState(room, playerKey) {
+  if (!room.gameState[playerKey]) {
+    room.gameState[playerKey] = { hits: 0, specialEnabled: false };
+  }
+  return room.gameState[playerKey];
+}
+
+// Helper to check if both players are ready and have selected characters
+function shouldStartGame(room) {
+  const p1 = room.gameState.p1;
+  const p2 = room.gameState.p2;
+  return (
+    p1 && p2 &&
+    p1.ready && p2.ready &&
+    p1.character && p2.character
+  );
+}
+
+function startGame(room, roomCode) {
+  if (room.host) {
+    room.host.send(JSON.stringify({
+      type: 'game_start',
+      p1Char: room.gameState.p1.character,
+      p2Char: room.gameState.p2.character,
+      scenario: room.gameState.scenario || 'scenario1',
+      roomCode
+    }));
+  }
+  if (room.client) {
+    room.client.send(JSON.stringify({
+      type: 'game_start',
+      p1Char: room.gameState.p1.character,
+      p2Char: room.gameState.p2.character,
+      scenario: room.gameState.scenario || 'scenario1',
+      roomCode
+    }));
+  }
+}
 
 server.on('connection', (ws) => {
   console.log('New client connected');
@@ -17,19 +59,15 @@ server.on('connection', (ws) => {
       switch (data.type) {
         case 'create_room':
           // Generate a unique room code
-          // roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-          // while (gameRooms.has(roomCode)) {
-          //   roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-          // }
           roomCode = '111111';
 
-          // Create new room
+          // Create new room (no default characters)
           gameRooms.set(roomCode, {
             host: ws,
             client: null,
             gameState: {
-              p1: { character: 'player1' }, // Default character
-              p2: { character: 'player2' }  // Default character
+              p1: {},
+              p2: {}
             }
           });
           
@@ -70,9 +108,14 @@ server.on('connection', (ws) => {
           break;
 
         case 'player_selected':
-        case 'playerSelected':
+        case 'playerSelected': {
           const selRoom = gameRooms.get(roomCode);
           if (!selRoom) return;
+          // Update character selection in gameState
+          if (data.player === 'p1' || data.player === 'p2') {
+            selRoom.gameState[data.player] = selRoom.gameState[data.player] || {};
+            selRoom.gameState[data.player].character = data.character;
+          }
           // Forward selection to the other player
           const selTarget = isHost ? selRoom.client : selRoom.host;
           if (selTarget) {
@@ -83,10 +126,23 @@ server.on('connection', (ws) => {
               roomCode: roomCode // optional, for debugging or client logic
             }));
           }
+          // Try to start game if both ready and selected
+          if (shouldStartGame(selRoom)) {
+            startGame(selRoom, roomCode);
+          }
           break;
-        case 'player_ready':
+        }
+        case 'player_ready': {
           const readyRoom = gameRooms.get(roomCode);
           if (!readyRoom) return;
+          // Mark this player as ready
+          if (isHost) {
+            readyRoom.gameState.p1 = readyRoom.gameState.p1 || {};
+            readyRoom.gameState.p1.ready = true;
+          } else {
+            readyRoom.gameState.p2 = readyRoom.gameState.p2 || {};
+            readyRoom.gameState.p2.ready = true;
+          }
           // Broadcast to both host and client if present
           if (readyRoom.host) {
             readyRoom.host.send(JSON.stringify({
@@ -102,7 +158,12 @@ server.on('connection', (ws) => {
               roomCode: roomCode
             }));
           }
+          // Try to start game if both ready and selected
+          if (shouldStartGame(readyRoom)) {
+            startGame(readyRoom, roomCode);
+          }
           break;
+        }
         case 'scenario_selected':
           const scRoom = gameRooms.get(roomCode);
           if (!scRoom) return;
@@ -165,6 +226,28 @@ server.on('connection', (ws) => {
           const currentRoom = gameRooms.get(roomCode);
           if (!currentRoom) return;
 
+          // Expect data.action to be an object: { type: 'hit', player: 'p1' | 'p2' | ... }
+          if (data.action && data.action.type === 'hit' && data.action.target) {
+            // Increment hit count for the attacker
+            const attackerKey = data.action.player;
+            const attackerState = getPlayerState(currentRoom, attackerKey);
+            attackerState.hits = (attackerState.hits || 0) + 1;
+            if (attackerState.hits >= 3 && !attackerState.specialEnabled) {
+              attackerState.specialEnabled = true;
+              // Notify both players that special is enabled for this player
+              if (currentRoom.host) currentRoom.host.send(JSON.stringify({ type: 'special_enabled', player: attackerKey }));
+              if (currentRoom.client) currentRoom.client.send(JSON.stringify({ type: 'special_enabled', player: attackerKey }));
+            }
+          }
+
+          // If action is special used, reset counter
+          if (data.action && data.action.type === 'special' && data.action.player) {
+            const userKey = data.action.player;
+            const userState = getPlayerState(currentRoom, userKey);
+            userState.hits = 0;
+            userState.specialEnabled = false;
+          }
+
           // Forward the action to the other player
           const target = isHost ? currentRoom.client : currentRoom.host;
           if (target) {
@@ -223,4 +306,4 @@ server.on('connection', (ws) => {
   });
 });
 
-console.log('WebSocket server running on ws://localhost:18081');
+console.log('WebSocket server running on ws://localhost:8081');

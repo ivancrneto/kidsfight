@@ -400,16 +400,30 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   private showError(message: string): void {
-    if (this.errorText) {
+    if (this.errorText && !(this.errorText as any).destroyed) {
       this.errorText.setText(message).setVisible(true);
+    } else {
+      console.warn('[OnlineModeScene] Tried to show error but errorText is missing or destroyed');
     }
+
+    // Defensive: If you have any canvas drawing, guard it:
+    if ((this as any).errorCanvas) {
+      const ctx = (this as any).errorCanvas.getContext && (this as any).errorCanvas.getContext('2d');
+      if (ctx) {
+        // Example: ctx.drawImage(...);
+        // (No-op unless you actually need it)
+      } else {
+        console.warn('[OnlineModeScene] showError: Canvas context is null!');
+      }
+    }
+
     if (this.showMainButtons) this.showMainButtons();
     if (this.waitingText) this.waitingText.setVisible(false);
     if (this.roomCodeText) this.roomCodeText.setVisible(false);
     if (this.roomCodeDisplay) this.roomCodeDisplay.setVisible(false);
 
     setTimeout(() => {
-      if (this.errorText) this.errorText.setVisible(false);
+      if (this.errorText && !(this.errorText as any).destroyed) this.errorText.setVisible(false);
     }, 3000);
   }
 

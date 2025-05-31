@@ -263,7 +263,7 @@ class KidsFightScene extends Phaser.Scene {
       console.warn('[KidsFightScene] Invalid p2 key:', this.p2, 'Defaulting to player2');
       this.p2 = 'player2';
     }
-    this.selectedScenario = data.selectedScenario || 'scenario1';
+    this.selectedScenario = data.scenario || data.selectedScenario || 'scenario1';
     this.gameMode = data.gameMode || 'single'; // <-- CRITICAL: set gameMode from data
     if (data.wsManager) {
       this.wsManager = data.wsManager; // <-- CRITICAL: set wsManager from data

@@ -228,6 +228,83 @@ describe('OnlineModeScene', () => {
   });
 
   describe('Error Handling', () => {
+    describe('showError', () => {
+      let scene: OnlineModeScene;
+      let errorTextMock: any;
+      let originalSetTimeout: any;
+      beforeEach(() => {
+        scene = new OnlineModeScene();
+        mockPhaserAdd(scene);
+        scene.scene = { start: jest.fn() };
+        errorTextMock = {
+          setText: jest.fn().mockReturnThis(),
+          setVisible: jest.fn().mockReturnThis(),
+          destroyed: false,
+        };
+        (scene as any).errorText = errorTextMock;
+        (scene as any).showMainButtons = jest.fn();
+        (scene as any).waitingText = { setVisible: jest.fn() };
+        (scene as any).roomCodeText = { setVisible: jest.fn() };
+        (scene as any).roomCodeDisplay = { setVisible: jest.fn() };
+        jest.useFakeTimers();
+      });
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+      it('shows error when errorText is present and not destroyed', () => {
+        (scene as any).showError('Test error');
+        expect(errorTextMock.setText).toHaveBeenCalledWith('Test error');
+        expect(errorTextMock.setVisible).toHaveBeenCalledWith(true);
+      });
+      it('warns and does not throw if errorText is missing', () => {
+        delete (scene as any).errorText;
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+        expect(() => (scene as any).showError('No errorText')).not.toThrow();
+        expect(warnSpy).toHaveBeenCalledWith('[OnlineModeScene] Tried to show error but errorText is missing or destroyed');
+        warnSpy.mockRestore();
+      });
+      it('warns and does not throw if errorText is destroyed', () => {
+        (scene as any).errorText.destroyed = true;
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+        expect(() => (scene as any).showError('Destroyed errorText')).not.toThrow();
+        expect(warnSpy).toHaveBeenCalledWith('[OnlineModeScene] Tried to show error but errorText is missing or destroyed');
+        warnSpy.mockRestore();
+      });
+      it('guards canvas drawing if errorCanvas context is null', () => {
+        (scene as any).errorCanvas = {
+          getContext: jest.fn().mockReturnValue(null)
+        };
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+        (scene as any).showError('Canvas context null');
+        expect((scene as any).errorCanvas.getContext).toHaveBeenCalledWith('2d');
+        expect(warnSpy).toHaveBeenCalledWith('[OnlineModeScene] showError: Canvas context is null!');
+        warnSpy.mockRestore();
+      });
+      it('does not warn if errorCanvas context is valid', () => {
+        const ctxMock = { drawImage: jest.fn() };
+        (scene as any).errorCanvas = {
+          getContext: jest.fn().mockReturnValue(ctxMock)
+        };
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+        (scene as any).showError('Canvas context ok');
+        expect((scene as any).errorCanvas.getContext).toHaveBeenCalledWith('2d');
+        expect(warnSpy).not.toHaveBeenCalledWith('[OnlineModeScene] showError: Canvas context is null!');
+        warnSpy.mockRestore();
+      });
+      it('hides errorText after timeout if not destroyed', () => {
+        (scene as any).showError('Timeout test');
+        expect(errorTextMock.setVisible).toHaveBeenCalledWith(true);
+        jest.advanceTimersByTime(3000);
+        expect(errorTextMock.setVisible).toHaveBeenCalledWith(false);
+      });
+      it('does not throw if errorText destroyed before timeout', () => {
+        (scene as any).showError('Timeout destroy test');
+        (scene as any).errorText.destroyed = true;
+        jest.advanceTimersByTime(3000);
+        // Should not throw
+        expect(errorTextMock.setVisible).toHaveBeenCalledWith(true);
+      });
+    });
     it('should handle connection errors', async () => {
       // Simulate a connection error
       const error = new Error('Connection failed');
@@ -270,7 +347,20 @@ describe('OnlineModeScene', () => {
       scene.roomCodeText = null;
       scene.roomCodeDisplay = null;
       scene.showMainButtons = undefined;
-      expect(() => scene['showError']('Room is full')).not.toThrow();
+      
+      // Spy on console.warn to verify warning is logged
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      
+      // Call the actual showError method (not the mock)
+      const originalShowError = OnlineModeScene.prototype.showError;
+      scene.showError = originalShowError;
+      scene.showError('Room is full');
+      
+      // Verify warning was logged
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[OnlineModeScene] Tried to show error but errorText is missing or destroyed'
+      );
+      consoleWarnSpy.mockRestore();
     });
 
     it('should display error message if errorText exists (isolated test)', () => {
@@ -279,12 +369,93 @@ describe('OnlineModeScene', () => {
       testScene.errorText = {
         setText: jest.fn().mockReturnThis(),
         setVisible: jest.fn().mockReturnThis(),
+        destroyed: false
       };
       testScene.roomCodeDisplay = null;
       testScene.showError = OnlineModeScene.prototype['showError'];
       testScene.showError.call(testScene, 'Room is full');
       expect(testScene.errorText.setText).toHaveBeenCalledWith('Room is full');
       expect(testScene.errorText.setVisible).toHaveBeenCalledWith(true);
+    });
+    
+    it('should not update errorText if it has been destroyed', () => {
+      // Isolated test for destroyed errorText
+      const testScene: any = {};
+      testScene.errorText = {
+        setText: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        destroyed: true
+      };
+      
+      // Spy on console.warn to verify warning is logged
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      
+      testScene.showError = OnlineModeScene.prototype['showError'];
+      testScene.showError.call(testScene, 'Room is full');
+      
+      // Verify setText and setVisible were NOT called
+      expect(testScene.errorText.setText).not.toHaveBeenCalled();
+      expect(testScene.errorText.setVisible).not.toHaveBeenCalled();
+      
+      // Verify warning was logged
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[OnlineModeScene] Tried to show error but errorText is missing or destroyed'
+      );
+      consoleWarnSpy.mockRestore();
+    });
+    
+    it('should hide error message after timeout only if errorText exists and is not destroyed', () => {
+      jest.useFakeTimers();
+      
+      // Isolated test for setTimeout behavior
+      const testScene: any = {};
+      testScene.errorText = {
+        setText: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        destroyed: false
+      };
+      
+      testScene.showError = OnlineModeScene.prototype['showError'];
+      testScene.showError.call(testScene, 'Room is full');
+      
+      // Verify initial state
+      expect(testScene.errorText.setVisible).toHaveBeenCalledWith(true);
+      testScene.errorText.setVisible.mockClear();
+      
+      // Fast-forward timer
+      jest.advanceTimersByTime(3000);
+      
+      // Verify errorText is hidden after timeout
+      expect(testScene.errorText.setVisible).toHaveBeenCalledWith(false);
+      
+      jest.useRealTimers();
+    });
+    
+    it('should not attempt to hide error message after timeout if errorText has been destroyed', () => {
+      jest.useFakeTimers();
+      
+      // Isolated test for setTimeout behavior with destroyed errorText
+      const testScene: any = {};
+      testScene.errorText = {
+        setText: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        destroyed: false
+      };
+      
+      testScene.showError = OnlineModeScene.prototype['showError'];
+      testScene.showError.call(testScene, 'Room is full');
+      
+      // Simulate errorText being destroyed during the timeout period
+      testScene.errorText.destroyed = true;
+      testScene.errorText.setVisible.mockClear();
+      
+      // Fast-forward timer
+      jest.advanceTimersByTime(3000);
+      
+      // Verify setVisible was NOT called since errorText is now destroyed
+      expect(testScene.errorText.setVisible).not.toHaveBeenCalled();
+      
+      jest.useRealTimers();
     });
   });
 

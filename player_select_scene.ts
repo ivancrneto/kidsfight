@@ -398,6 +398,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
         if (this.wsManager && typeof this.wsManager.send === 'function') {
           const playerKey = player === 1 ? 'p1' : 'p2';
           const characterKey = this.characters[newIndex].key;
+          console.log('[DEBUG] Sending player_selected:', { player: playerKey, character: characterKey });
           this.wsManager.send({
             type: 'player_selected',
             player: playerKey,
@@ -430,6 +431,9 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
     const gameData = data as GameStartWebSocketMessage;
     if (!this.isHost) {
+      console.log('[DEBUG] handleGameStart: Starting KidsFightScene with:', {
+        p1: data.p1Char, p2: data.p2Char, scenario: data.scenario, roomCode: data.roomCode
+      });
       this.scene.start('KidsFightScene', {
         gameMode: 'online',
         isHost: false,
@@ -539,6 +543,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
       this.p1Index = idx;
       this.selectedP1Index = idx;
     } else if (data.player === 'p2' && data.character) {
+      console.log('[DEBUG] Received player_selected for p2:', data.character);
       this.selected.p2 = data.character;
       const idx = this.characters.findIndex(c => c.key === data.character);
       if (idx === -1) {
