@@ -95,10 +95,17 @@ interface GameObject extends Phaser.GameObjects.GameObject {
 }
 
 interface RemoteAction {
-  type: 'move' | 'jump' | 'attack' | 'special' | 'block';
+  type: 'move' | 'jump' | 'attack' | 'special' | 'block' | 'position_update';
   playerIndex: number;
   direction?: number;
   active?: boolean;
+  // For position_update
+  x?: number;
+  y?: number;
+  velocityX?: number;
+  velocityY?: number;
+  flipX?: boolean;
+  frame?: number;
 }
 
 interface ReplayData {
@@ -144,7 +151,7 @@ class KidsFightScene extends Phaser.Scene {
   private roundStartTime!: number;
   private roundEndTime!: number;
   private lastUpdateTime!: number;
-  playerHealth: number[] = [MAX_HEALTH * 2, MAX_HEALTH * 2];
+  playerHealth: number[] = [MAX_HEALTH, MAX_HEALTH];
   private playerSpecial: number[] = [0, 0];
   playerDirection: ('left' | 'right')[] = ['right', 'left'];
   isAttacking: boolean[] = [false, false];
@@ -187,8 +194,8 @@ class KidsFightScene extends Phaser.Scene {
     blockButton?: Phaser.GameObjects.Rectangle;
   };
 
-  private readonly TOTAL_HEALTH: number = 200;
-  private readonly DAMAGE: number = 10;
+  private readonly TOTAL_HEALTH: number = 100;
+  private readonly DAMAGE: number = 2.5;
   private readonly SPECIAL_DAMAGE: number = 20;
   private readonly SPECIAL_COST: number = 3;
   private readonly ROUND_TIME: number = 99;
@@ -197,6 +204,9 @@ class KidsFightScene extends Phaser.Scene {
   private player2: Phaser.Physics.Arcade.Sprite & PlayerProps | undefined;
 
   localPlayerIndex: number = 0;
+
+  // Store last sent position/frame for sync efficiency
+  private _lastSentPosition: { x: number, y: number, velocityX: number, velocityY: number, flipX: boolean, frame: any } | null = null;
 
   constructor(config?: Phaser.Types.Scenes.SettingsConfig & { customKeyboard?: any }) {
     super({key: 'KidsFightScene', ...config});
@@ -244,7 +254,7 @@ class KidsFightScene extends Phaser.Scene {
     // DEBUG: Log incoming player keys
     console.log('[DEBUG][KidsFightScene.init] incoming p1:', this.p1, 'p2:', this.p2);
     // Fallback: if p1 or p2 is not a valid sprite key, set default
-    const validKeys = ['player1','player2','player3','player4','player5','player6','player7','player8','player9'];
+    const validKeys = ['player1','player2','player3','player4','player5','player6','player7','player8','player9','bento'];
     if (!validKeys.includes(this.p1)) {
       console.warn('[KidsFightScene] Invalid p1 key:', this.p1, 'Defaulting to player1');
       this.p1 = 'player1';
@@ -254,7 +264,10 @@ class KidsFightScene extends Phaser.Scene {
       this.p2 = 'player2';
     }
     this.selectedScenario = data.selectedScenario || 'scenario1';
-    this.gameMode = data.gameMode || 'single';
+    this.gameMode = data.gameMode || 'single'; // <-- CRITICAL: set gameMode from data
+    if (data.wsManager) {
+      this.wsManager = data.wsManager; // <-- CRITICAL: set wsManager from data
+    }
     this.roomCode = data.roomCode;
     this.isHost = data.isHost;
     // Set localPlayerIndex based on host/guest
@@ -274,9 +287,20 @@ class KidsFightScene extends Phaser.Scene {
     this.load.spritesheet('player7', player7RawImg, { frameWidth: 410, frameHeight: 512 });
     this.load.spritesheet('player8', player8RawImg, { frameWidth: 410, frameHeight: 512 });
     this.load.spritesheet('player9', player9RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('bento', player1RawImg, { frameWidth: 410, frameHeight: 512 });
   }
 
   create(): void {
+    // DEBUG: Log player array and local player index at scene start
+    console.log('[DEBUG][KidsFightScene] Player array at start:', this.players, 'Local index:', this.localPlayerIndex);
+
+    // Log camera info
+    if (this.cameras && this.cameras.main) {
+      const cam = this.cameras.main;
+      console.log('[KidsFightScene] Camera info:', {
+        x: cam.x, y: cam.y, width: cam.width, height: cam.height, scrollX: cam.scrollX, scrollY: cam.scrollY, zoom: cam.zoom
+      });
+    }
     // Reset game state
     this.gameOver = false;
     this.timeLeft = this.ROUND_TIME;
@@ -315,6 +339,9 @@ class KidsFightScene extends Phaser.Scene {
       playerHealth: this.playerHealth,
       gameOver: this.gameOver
     });
+    
+    console.log('[KidsFightScene gameMode:', this.gameMode);
+    console.log('[KidsFightScene] wsManager:', this.wsManager);
     
     // Setup scene with proper scaling
     this.background = this.add.image(0, 0, this.selectedScenario)
@@ -447,6 +474,102 @@ class KidsFightScene extends Phaser.Scene {
     // After both players are assigned, mark them as ready
     this.playersReady = !!(this.players[0] && this.players[1]);
     console.log('[DEBUG] Both players assigned:', this.players);
+    // Register WebSocket message handler after players are created
+    if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connect === 'function') {
+      console.log('[DEBUG][KidsFightScene] Registering message handler, players:', this.players);
+      console.log('[DEBUG] About to call wsManager.connect and setMessageCallback in KidsFightScene.create');
+      this.wsManager.connect().then(() => {
+        console.log('[DEBUG] wsManager.onMessage callback registered in KidsFightScene.create');
+        this.wsManager.onMessage((event: MessageEvent) => {
+          console.debug('[WSM][KidsFightScene] Message received (raw):', event);
+          try {
+            const action = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            console.debug('[WSM][KidsFightScene] Message received (parsed):', action);
+            // Only handle gameplay actions here
+            if (action.type === 'attack') {
+              if (typeof action.playerIndex === 'number') {
+                // Only the host should process the attack and apply damage
+                if (this.wsManager.isHost) {
+                  console.debug('[KidsFightScene][WS HANDLE ATTACK][HOST]', action);
+                  this.tryAction(action.playerIndex, 'attack', !!action.isSpecial);
+                } else {
+                  console.debug('[KidsFightScene][WS HANDLE ATTACK][GUEST] Ignoring attack action, waiting for health_update', action);
+                }
+              }
+            } else if (action.type === 'health_update') {
+              // Robust: Always update both player health values and bars
+              console.debug('[KidsFightScene][WS HEALTH UPDATE][RECEIVED]', action);
+              // Update the specified player
+              if (typeof action.playerIndex === 'number' && this.players[action.playerIndex]) {
+                this.players[action.playerIndex].health = action.health;
+                this.playerHealth[action.playerIndex] = action.health;
+                console.debug('[KidsFightScene][WS HEALTH UPDATE] Updated player', action.playerIndex, 'to', action.health);
+              } else {
+                console.warn('[KidsFightScene][WS HEALTH UPDATE] Player object missing for index', action.playerIndex, action);
+              }
+              // After any health update, always refresh both health bars
+              this.updateHealthBar(0);
+              this.updateHealthBar(1);
+              return;
+
+              console.debug('[KidsFightScene][WS HEALTH UPDATE][RECEIVED]', action);
+              const idx = action.playerIndex;
+              if (this.players[idx]) {
+                console.debug('[KidsFightScene][WS HEALTH UPDATE][BEFORE]', {
+                  playerIndex: idx,
+                  playerObjectHealth: this.players[idx].health,
+                  playerHealthArray: this.playerHealth[idx],
+                  allPlayers: [
+                    this.players[0] ? {health: this.players[0].health} : null,
+                    this.players[1] ? {health: this.players[1].health} : null
+                  ],
+                  allHealthArray: this.playerHealth.slice(),
+                });
+                // Update both the player object AND the health array
+                this.players[idx].health = action.health;
+                this.playerHealth[idx] = action.health;
+                console.debug('[KidsFightScene][WS HEALTH UPDATE][AFTER]', {
+                  playerIndex: idx,
+                  newHealth: action.health,
+                  playerObjectHealth: this.players[idx].health,
+                  playerHealthArray: this.playerHealth[idx],
+                  allPlayers: [
+                    this.players[0] ? {health: this.players[0].health} : null,
+                    this.players[1] ? {health: this.players[1].health} : null
+                  ],
+                  allHealthArray: this.playerHealth.slice(),
+                });
+                console.debug('[KidsFightScene][WS HEALTH UPDATE] Updating health bars...');
+                this.updateHealthBar(0);
+                this.updateHealthBar(1);
+              } else {
+                console.warn('[KidsFightScene][WS HEALTH UPDATE] Player object missing for index', idx, action);
+              }
+              return;
+            } else if ([
+              'move',
+              'jump',
+              'attack',
+              'special',
+              'block',
+              'replay_request',
+              'position_update' // Now handle position_update correctly
+            ].includes(action.type)) {
+              if (action.type === 'replay_request') {
+                this.showReplayRequestPopup(action);
+              } else {
+                this.handleRemoteAction(action);
+              }
+            } else {
+              // Ignore navigation/scene actions
+              console.log('Ignoring non-gameplay action:', action.type);
+            }
+          } catch (e) {
+            console.error('[KidsFightScene] Failed to parse remote action:', e, event);
+          }
+        });
+      });
+    }
 
     // Initialize playerHealth array to match player health
     this.playerHealth = [
@@ -463,16 +586,110 @@ class KidsFightScene extends Phaser.Scene {
       console.warn('[DEBUG] Tried to create UI/controls before players were ready:', this.players);
     }
 
-    // Legacy compatibility for tests
-    this.syncLegacyPlayerRefs();
+// Legacy compatibility for tests
+this.syncLegacyPlayerRefs();
 
-    // --- ONLINE MODE: Set up WebSocket message handler ---
-    if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.setMessageCallback === 'function') {
-      this.wsManager.setMessageCallback((event: MessageEvent) => {
-        try {
-          const action = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          // Only handle gameplay actions here
-          if ([
+// --- ONLINE MODE: Set up WebSocket message handler ---
+if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connect === 'function') {
+  console.log('[DEBUG] About to call wsManager.connect and setMessageCallback in KidsFightScene.create');
+  this.wsManager.connect().then(() => {
+    console.log('[DEBUG] wsManager.onMessage callback registered in KidsFightScene.create');
+    this.wsManager.onMessage((event: MessageEvent) => {
+      console.debug('[WSM][KidsFightScene] Message received (raw):', event);
+      try {
+        const action = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        console.debug('[WSM][KidsFightScene] Message received (parsed):', action);
+        // Only handle gameplay actions here
+        // if (action.type === 'attack') {
+          // // Host processes attack action and runs tryAction for the correct player
+          // if (typeof action.playerIndex === 'number') {
+          //   console.debug('[KidsFightScene][WS HANDLE ATTACK]', action);
+          //   this.tryAction(action.playerIndex, 'attack', !!action.isSpecial);
+          // //   console.debug('[KidsFightScene][WS HEALTH UPDATE] BEFORE', {
+          // //     playerHealth: this.playerHealth.slice(),
+          // //     players: [
+          // //       this.players[0] ? {health: this.players[0].health} : null,
+          // //       this.players[1] ? {health: this.players[1].health} : null
+          // //     ]
+          // //   });
+          // //   this.playerHealth[action.playerIndex] = action.health;
+          // //   if (this.players[action.playerIndex]) {
+          // //     this.players[action.playerIndex]!.health = action.health;
+          // //     this.updateHealthBar(action.playerIndex);
+          // //   }
+          // //   console.debug('[KidsFightScene][WS HEALTH UPDATE] AFTER', {
+          // //     playerHealth: this.playerHealth.slice(),
+          // //     players: [
+          // //       this.players[0] ? {health: this.players[0].health} : null,
+          // //       this.players[1] ? {health: this.players[1].health} : null
+          // //     ]
+          // //   });
+          
+          // // return;
+          // }
+          if (action.type === 'attack') {
+            // Host processes attack action and runs tryAction for the correct player
+            if (typeof action.playerIndex === 'number') {
+              console.debug('[KidsFightScene][WS HANDLE ATTACK]', action);
+              this.tryAction(action.playerIndex, 'attack', !!action.isSpecial);
+            //   console.debug('[KidsFightScene][WS HEALTH UPDATE] BEFORE', {
+            //     playerHealth: this.playerHealth.slice(),
+            //     players: [
+            //       this.players[0] ? {health: this.players[0].health} : null,
+            //       this.players[1] ? {health: this.players[1].health} : null
+            //     ]
+            //   });
+            //   this.playerHealth[action.playerIndex] = action.health;
+            //   if (this.players[action.playerIndex]) {
+            //     this.players[action.playerIndex]!.health = action.health;
+            //     this.updateHealthBar(action.playerIndex);
+            //   }
+            //   console.debug('[KidsFightScene][WS HEALTH UPDATE] AFTER', {
+            //     playerHealth: this.playerHealth.slice(),
+            //     players: [
+            //       this.players[0] ? {health: this.players[0].health} : null,
+            //       this.players[1] ? {health: this.players[1].health} : null
+            //     ]
+            //   });
+            
+            // return;
+            }
+          } else if (action.type === 'health_update') {
+            console.debug('[KidsFightScene][WS HEALTH UPDATE][RECEIVED]', action);
+            const idx = action.playerIndex;
+            if (this.players[idx]) {
+              console.debug('[KidsFightScene][WS HEALTH UPDATE][BEFORE]', {
+                playerIndex: idx,
+                playerObjectHealth: this.players[idx].health,
+                playerHealthArray: this.playerHealth[idx],
+                allPlayers: [
+                  this.players[0] ? {health: this.players[0].health} : null,
+                  this.players[1] ? {health: this.players[1].health} : null
+                ],
+                allHealthArray: this.playerHealth.slice(),
+              });
+              // Update both the player object AND the health array
+              this.players[idx].health = action.health;
+              this.playerHealth[idx] = action.health;
+              console.debug('[KidsFightScene][WS HEALTH UPDATE][AFTER]', {
+                playerIndex: idx,
+                newHealth: action.health,
+                playerObjectHealth: this.players[idx].health,
+                playerHealthArray: this.playerHealth[idx],
+                allPlayers: [
+                  this.players[0] ? {health: this.players[0].health} : null,
+                  this.players[1] ? {health: this.players[1].health} : null
+                ],
+                allHealthArray: this.playerHealth.slice(),
+              });
+              console.debug('[KidsFightScene][WS HEALTH UPDATE] Updating health bars...');
+              this.updateHealthBar(0);
+              this.updateHealthBar(1);
+            } else {
+              console.warn('[KidsFightScene][WS HEALTH UPDATE] Player object missing for index', idx, action);
+            }
+            return;
+          } else if ([
             'move',
             'jump',
             'attack',
@@ -493,7 +710,7 @@ class KidsFightScene extends Phaser.Scene {
           console.error('[KidsFightScene] Failed to parse remote action:', e, event);
         }
       });
-    }
+    });
     // Make hitbox slightly smaller than visual sprite for better gameplay
     if (this.players[0].body && this.players[1].body) {
       this.players[0].body.setSize(this.players[0].width * 0.6, this.players[0].height * 0.5);
@@ -510,6 +727,9 @@ class KidsFightScene extends Phaser.Scene {
       }
     }
   }
+}
+
+  // <-- Added closing brace for create()
 
   private createUI(): void {
     // Get the current game dimensions for proper UI scaling
@@ -524,7 +744,7 @@ class KidsFightScene extends Phaser.Scene {
     this.createHealthBars(scaleX, scaleY);
 
     // Create special bars
-    this.createSpecialBars(scaleX, scaleY);
+    this.createSpecialPips(scaleX, scaleY);
     this.updateSpecialPips(); // Update special pips after creating
 
     // Create player names
@@ -535,90 +755,160 @@ class KidsFightScene extends Phaser.Scene {
     const gameWidth = this.sys.game.canvas.width;
     const barWidth = 300 * scaleX;
     const barHeight = 24 * scaleY;
-    const barX = gameWidth / 2;
-    const barY = 20 * scaleY;
+    const barY1 = 20 * scaleY;
+    const barY2 = barY1 + barHeight + 4 * scaleY; // Stack vertically with a small gap
 
     // Remove old bars if they exist
     if (this.healthBarBg1) this.healthBarBg1.destroy();
     if (this.healthBar1) this.healthBar1.destroy();
     if (this.healthBar2) this.healthBar2.destroy();
 
-    // Draw single dark background bar (not white!)
-    this.healthBarBg1 = this.add.rectangle(barX, barY, barWidth, barHeight, 0x222222).setOrigin(0.5, 0.5);
-    this.healthBar1 = this.add.graphics(); // Player 1 (left)
-    this.healthBar2 = this.add.graphics(); // Player 2 (right)
+    // Player 1 background and bars
+    this.healthBarBg1 = this.add.rectangle(60 * scaleX + barWidth/2, barY1, barWidth, barHeight, 0x222222).setOrigin(0.5, 0.5);
+    this.healthBar1 = this.add.graphics(); // Player 1 base (green)
+    this.healthBar1.setDepth(1000);
+    // Player 2 background and bars
+    this.healthBarBg2 = this.add.rectangle(this.sys.game.canvas.width - (60 * scaleX + barWidth/2), barY1, barWidth, barHeight, 0x222222).setOrigin(0.5, 0.5);
+    this.healthBar2 = this.add.graphics(); // Player 2 base (red)
+    this.healthBar2.setDepth(1000);
 
-    this.updateHealthBar(-1); // Draw both layers
+    // Initialize both players' health to max
+    this.playerHealth = [this.TOTAL_HEALTH, this.TOTAL_HEALTH];
+    if (this.players[0]) this.players[0].health = this.TOTAL_HEALTH;
+    if (this.players[1]) this.players[1].health = this.TOTAL_HEALTH;
+
+    // Force update both health bars
+    this.updateHealthBar(0);
+    this.updateHealthBar(1);
   }
 
   private updateHealthBar(playerIndex: number): void {
-    // Double health: two layers per player
-    const maxHealth = this.TOTAL_HEALTH || 200; // Should be 200 for double health
-    const halfHealth = maxHealth / 2;
+    // Single health bar logic (no double health, no two-layer stacking)
+    const maxHealth = 100; // MAX_HEALTH
     const gameWidth = this.sys.game.canvas.width;
     const scaleX = gameWidth / 800;
     const barWidth = 300 * scaleX;
     const barHeight = 24 * scaleX;
-    const barX = gameWidth / 2;
     const barY = 20 * scaleX;
+    const barX1 = 60 * scaleX + barWidth / 2;
+    const barX2 = gameWidth - (60 * scaleX + barWidth / 2);
 
-    this.healthBar1?.clear();
-    this.healthBar2?.clear();
+    // Ensure health bars exist
+    if (!this.healthBar1 || !this.healthBar2) return;
+    this.healthBar1.clear();
+    this.healthBar2.clear();
+
+    if (playerIndex === 0) {
+      // Player 1 (left)
+      let p1 = Math.max(0, Math.min(maxHealth, this.playerHealth[0]));
+      // Draw depleted background (gray) is handled by healthBarBg1
+      if (p1 > 0) {
+        const greenWidth = barWidth * (p1 / maxHealth);
+        this.healthBar1.fillStyle(0x00ff00);
+        this.healthBar1.fillRect(barX1 - barWidth / 2, barY - barHeight / 2, greenWidth, barHeight);
+      }
+    } else if (playerIndex === 1) {
+      // Player 2 (right)
+      let p2 = Math.max(0, Math.min(maxHealth, this.playerHealth[1]));
+      if (p2 > 0) {
+        const redWidth = barWidth * (p2 / maxHealth);
+        this.healthBar2.fillStyle(0xff0000);
+        this.healthBar2.fillRect(barX2 - barWidth / 2, barY - barHeight / 2, redWidth, barHeight);
+      }
+    }
+  
+      console.log('[updateHealthBar][GUEST HEALTH DEBUG]', {
+        playerIndex,
+        guestHeathArray: this.playerHealth[1],
+        guestPlayerObject: this.players[1]?.health,
+        healthBar2: this.healthBar2,
+        isVisible: this.healthBar2?.visible,
+        stackTrace: new Error().stack
+      });
+    
+
+    // Add more verbose logging to trace the exact state
+    console.log('[updateHealthBar][VERBOSE] DETAILED STATE', {
+      playerIndex,
+      playerHealth: this.playerHealth,
+      player1Health: this.players[0]?.health,
+      player2Health: this.players[1]?.health,
+      healthBar1Present: !!this.healthBar1,
+      healthBar2Present: !!this.healthBar2,
+      isHealthBar1Visible: this.healthBar1?.visible,
+      isHealthBar2Visible: this.healthBar2?.visible
+    });
+
+    // Ensure health bars exist
+    if (!this.healthBar1 || !this.healthBar2) {
+      console.error('[updateHealthBar] Health bars not initialized!');
+      
+      // Try to recreate health bars if they don't exist
+      const scaleX = this.sys.game.canvas.width / 800;
+      const scaleY = this.sys.game.canvas.height / 480;
+      this.createHealthBars(scaleX, scaleY);
+      return;
+    }
+
+    // Force make visible in case they've been hidden
+    this.healthBar1.setVisible(true);
+    this.healthBar2.setVisible(true);
+
+
+
+    // Clear both health bars completely
+    this.healthBar1.clear();
+    this.healthBar2.clear();
+
+    // Log health values before drawing (updated for single-bar logic)
+    console.log('[updateHealthBar] Drawing health bars with:', {
+      p1Health: this.playerHealth[0],
+      p2Health: this.playerHealth[1],
+      barX1, barX2, barY, barWidth, barHeight,
+      maxHealth
+    });
 
     // --- Player 1 (left half) ---
-    let p1 = Math.max(0, this.playerHealth[0]);
+    let p1 = Math.max(0, Math.min(maxHealth, this.playerHealth[0]));
     // Draw depleted background (gray)
     this.healthBar1?.fillStyle(0x444444);
-    this.healthBar1?.fillRect(barX - barWidth/2, barY - barHeight/2, barWidth/2, barHeight);
-    // Draw second layer (yellow) if health > half
-    if (p1 > halfHealth) {
-      const secondLayer = (p1 - halfHealth) / halfHealth;
-      const secondLayerWidth = barWidth/2 * secondLayer;
-      this.healthBar1?.fillStyle(0xffff00); // yellow
-      this.healthBar1?.fillRect(barX - barWidth/2, barY - barHeight/2, secondLayerWidth, barHeight);
-      // Draw main layer (green) for the bottom half
+    this.healthBar1?.fillRect(barX1 - barWidth/2, barY - barHeight/2, barWidth, barHeight);
+    // Draw main layer (green)
+    if (p1 > 0) {
+      const greenWidth = barWidth * (p1 / maxHealth);
       this.healthBar1?.fillStyle(0x00ff00);
-      this.healthBar1?.fillRect(barX - barWidth/2 + secondLayerWidth, barY - barHeight/2, barWidth/2 - secondLayerWidth, barHeight);
-    } else if (p1 > 0) {
-      // Only main layer (green)
-      const mainLayerWidth = barWidth/2 * (p1 / halfHealth);
-      this.healthBar1?.fillStyle(0x00ff00);
-      this.healthBar1?.fillRect(barX - barWidth/2, barY - barHeight/2, mainLayerWidth, barHeight);
+      this.healthBar1?.fillRect(barX1 - barWidth/2, barY - barHeight/2, greenWidth, barHeight);
     }
 
     // --- Player 2 (right half) ---
-    let p2 = Math.max(0, this.playerHealth[1]);
+    let p2 = Math.max(0, Math.min(maxHealth, this.playerHealth[1]));
+    // Draw depleted background (gray)
     this.healthBar2?.fillStyle(0x444444);
-    this.healthBar2?.fillRect(barX, barY - barHeight/2, barWidth/2, barHeight);
-    if (p2 > halfHealth) {
-      const secondLayer = (p2 - halfHealth) / halfHealth;
-      const secondLayerWidth = barWidth/2 * secondLayer;
-      this.healthBar2?.fillStyle(0x0000ff); // blue
-      this.healthBar2?.fillRect(barX + barWidth/2 - secondLayerWidth, barY - barHeight/2, secondLayerWidth, barHeight);
-      // Draw main layer (red) for the bottom half
+    this.healthBar2?.fillRect(barX2 - barWidth/2, barY - barHeight/2, barWidth, barHeight);
+    // Draw main layer (red)
+    if (p2 > 0) {
+      const redWidth = barWidth * (p2 / maxHealth);
       this.healthBar2?.fillStyle(0xff0000);
-      this.healthBar2?.fillRect(barX, barY - barHeight/2, barWidth/2 - secondLayerWidth, barHeight);
-    } else if (p2 > 0) {
-      // Only main layer (red)
-      const mainLayerWidth = barWidth/2 * (p2 / halfHealth);
-      this.healthBar2?.fillStyle(0xff0000);
-      this.healthBar2?.fillRect(barX + barWidth/2 - mainLayerWidth, barY - barHeight/2, mainLayerWidth, barHeight);
+      this.healthBar2?.fillRect(barX2 - barWidth/2, barY - barHeight/2, redWidth, barHeight);
     }
+
+    // Force display update
+    if (this.healthBar1.dirty) this.healthBar1.dirty = true;
+    if (this.healthBar2.dirty) this.healthBar2.dirty = true;
   }
 
-  private createSpecialBars(scaleX: number, scaleY: number): void {
-    const gameWidth = this.sys.game.canvas.width;
-    const pipRadius = 10 * scaleX;
-    const pipSpacing = 30 * scaleX;
-    const pipY = 48 * scaleY;
-
-    // Remove old pips if they exist
+// ...
+  private createSpecialPips(scaleX: number, scaleY: number): void {
+    // Clear previous pips
     this.specialPips1.forEach(pip => pip.destroy());
     this.specialPips2.forEach(pip => pip.destroy());
     this.specialPips1 = [];
     this.specialPips2 = [];
 
-    // Draw 3 pips (special circles) for each player
+    const gameWidth = this.sys.game.canvas.width;
+    const pipRadius = 10 * scaleX;
+    const pipSpacing = 30 * scaleX;
+    const pipY = 48 * scaleY;
     for (let i = 0; i < 3; i++) {
       // Player 1 (left)
       const pip1 = this.add.graphics();
@@ -634,7 +924,6 @@ class KidsFightScene extends Phaser.Scene {
       pip2.setDepth(10);
       this.specialPips2.push(pip2);
     }
-    this.updateSpecialPips();
   }
 
   private updateSpecialPips(): void {
@@ -675,6 +964,7 @@ class KidsFightScene extends Phaser.Scene {
         player7: 'Jacqueline',
         player8: 'Ivan',
         player9: 'D. Isa',
+        bento: 'Bento',
       };
       return nameMap[key] || key;
     };
@@ -806,13 +1096,16 @@ class KidsFightScene extends Phaser.Scene {
 
   // --- Touch Button Handlers ---
   private handleLeftDown(): void {
+    console.log('[KidsFightScene] handleLeftDown called');
     this.updateTouchControlState('left', true);
     if (this.gameMode === 'online' && this.wsManager) {
-      this.wsManager.send({
+      const moveMsg = {
         type: 'move',
         direction: -1,
         playerIndex: this.localPlayerIndex
-      });
+      };
+      console.debug('[KidsFightScene][WS SEND]', moveMsg); // DEBUG: Log outgoing move
+      this.wsManager.send(moveMsg);
     }
   }
 
@@ -822,12 +1115,23 @@ class KidsFightScene extends Phaser.Scene {
 
   private handleRightDown(): void {
     this.updateTouchControlState('right', true);
+    // Only handle right movement, not attack
     if (this.gameMode === 'online' && this.wsManager) {
-      this.wsManager.send({
+      const moveMsg = {
         type: 'move',
         direction: 1,
         playerIndex: this.localPlayerIndex
-      });
+      };
+      console.debug('[KidsFightScene][WS SEND]', moveMsg); // DEBUG: Log outgoing move
+      this.wsManager.send(moveMsg);
+    } else {
+      // Local mode: move player right
+      const player = this.players[this.localPlayerIndex];
+      if (player) {
+        player.setVelocityX(160);
+        player.setFlipX(false);
+        this.playerDirection[this.localPlayerIndex] = 'right';
+      }
     }
   }
 
@@ -882,21 +1186,29 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   private handleAttack(): void {
-    const player = this.players[this.localPlayerIndex];
-    if (player) {
-      player.setData('isAttacking', true);
+    console.log('[DEBUG] After alert in handleAttack');
+
+    try {
+      console.debug('[KidsFightScene][handleAttack] CALLED', { localPlayerIndex: this.localPlayerIndex, gameMode: this.gameMode });
+      const player = this.players[this.localPlayerIndex];
+      if (player) {
+        player.setData('isAttacking', true);
+      }
+      this.tryAction(this.localPlayerIndex, 'attack', false);
+      if (this.gameMode === 'online' && this.wsManager) {
+        console.debug('[KidsFightScene][WS SEND ATTACK]', { playerIndex: this.localPlayerIndex });
+        this.wsManager.send({
+          type: 'attack',
+          playerIndex: this.localPlayerIndex
+        });
+      }
+      setTimeout(() => {
+        const p = this.players[this.localPlayerIndex];
+        if (p) p.setData('isAttacking', false);
+      }, 300);
+    } catch (error) {
+      console.error('[KidsFightScene][handleAttack] ERROR', error);
     }
-    this.tryAction(this.localPlayerIndex, 'attack', false);
-    if (this.gameMode === 'online' && this.wsManager) {
-      this.wsManager.send({
-        type: 'attack',
-        playerIndex: this.localPlayerIndex
-      });
-    }
-    setTimeout(() => {
-      const p = this.players[this.localPlayerIndex];
-      if (p) p.setData('isAttacking', false);
-    }, 300);
   }
 
   private handleSpecial(): void {
@@ -933,6 +1245,7 @@ class KidsFightScene extends Phaser.Scene {
           player7: 'Jacqueline',
           player8: 'Ivan',
           player9: 'D. Isa',
+          bento: 'Bento',
         };
         return nameMap[key] || key;
       };
@@ -1051,41 +1364,56 @@ private showReplayRequestPopup(data: ReplayData): void {
 }
 
 private handleRemoteAction(action: RemoteAction): void {
-  if (!this.players[0] || !this.players[1]) return;
-
-  // Use playerIndex directly for correct assignment
+  console.debug('[KidsFightScene][HANDLE REMOTE ACTION]', action); // DEBUG: Log action handling
   const player = this.players[action.playerIndex];
-  const otherPlayer = this.players[1 - action.playerIndex];
-
-  if (!player) return;
-
+  if (!player) {
+    console.warn('[KidsFightScene][HANDLE REMOTE ACTION] No player at index', action.playerIndex, this.players);
+    return;
+  }
   switch (action.type) {
     case 'move':
       if (typeof action.direction !== 'undefined') {
+        console.debug('[KidsFightScene][REMOTE MOVE]', action); // DEBUG: Log remote move
         player.setVelocityX(action.direction * 160);
         player.setFlipX(action.direction < 0);
         this.playerDirection[action.playerIndex] = action.direction < 0 ? 'left' : 'right';
       }
       break;
-
+    case 'position_update':
+      // Only update position and animation, never health or attack
+      if (typeof action.x === 'number' && typeof action.y === 'number') {
+        player.x = action.x;
+        player.y = action.y;
+      }
+      if (typeof action.velocityX === 'number') {
+        player.setVelocityX(action.velocityX);
+      }
+      if (typeof action.velocityY === 'number') {
+        player.setVelocityY(action.velocityY);
+      }
+      if (typeof action.flipX === 'boolean') {
+        player.setFlipX(action.flipX);
+      }
+      if (typeof action.direction === 'number') {
+        this.playerDirection[action.playerIndex] = action.direction < 0 ? 'left' : 'right';
+      }
+      // Optionally update animation frame if sent
+      break;
     case 'jump':
       if (player.body?.touching?.down) {
         player.setVelocityY(-330); // Standard jump
       }
       break;
-
     case 'attack':
       if (this.players[0] && this.players[1]) {
         this.tryAction(action.playerIndex, 'attack', false);
       }
       break;
-
     case 'special':
       if (this.players[0] && this.players[1]) {
         this.tryAction(action.playerIndex, 'special', true);
       }
       break;
-
     case 'block':
       if (action.active !== undefined) {
         player.setData('isBlocking', action.active);
@@ -1102,6 +1430,7 @@ private handleRemoteAction(action: RemoteAction): void {
 }
 
 private tryAction(playerIndex: number, actionType: 'attack' | 'special', isSpecial: boolean): void {
+  console.debug('[KidsFightScene][tryAction] CALLED', { playerIndex, actionType, isSpecial });
   // Defensive guard
   if (!this.players[0] || !this.players[1]) {
     console.warn('[SCENE] Players not ready for action', this.players);
@@ -1117,6 +1446,28 @@ private tryAction(playerIndex: number, actionType: 'attack' | 'special', isSpeci
 }
 
 private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special: boolean) {
+  console.debug('[KidsFightScene][tryAttack] START', {
+    attackerIdx, defenderIdx, now, special,
+    gameMode: this.gameMode,
+    wsManager: !!this.wsManager,
+    players: [
+      this.players[0] ? {health: this.players[0].health} : null,
+      this.players[1] ? {health: this.players[1].health} : null
+    ],
+    playerHealth: this.playerHealth.slice(),
+    playerSpecial: this.playerSpecial.slice(),
+  });
+  console.debug('[KidsFightScene][tryAttack] CALLED', {
+    attackerIdx, defenderIdx, now, special,
+    gameMode: this.gameMode,
+    wsManager: !!this.wsManager,
+    players: [
+      this.players[0] ? {health: this.players[0].health} : null,
+      this.players[1] ? {health: this.players[1].health} : null
+    ]
+  });
+  // LOG: Before sending health update
+  const preAttackHealth = this.playerHealth.slice();
   // Defensive guard: prevent attack if players aren't ready
   if (!this.players[0] || !this.players[1]) {
     console.warn('[SCENE] Players not ready for attack', this.players);
@@ -1136,15 +1487,24 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
     player2Health: this.players[1]?.health
   });
   
-  // Call the actual attack logic from gameUtils
-  tryAttack(this, attackerIdx, defenderIdx, now, special);
+  // Calculate damage using class fields
+  const damage = special ? this.SPECIAL_DAMAGE : this.DAMAGE;
   
-  // Sync health between player object and playerHealth array
-  if (defender === this.players[0]) {
-    this.players[0]!.health = this.playerHealth[0];
-  } else if (defender === this.players[1]) {
-    this.players[1]!.health = this.playerHealth[1];
-  }
+  // Log before applying damage
+  console.debug('[KidsFightScene][tryAttack] BEFORE DAMAGE', {
+    defenderIdx,
+    defenderHealthBefore: defender.health,
+    playerHealthBefore: this.playerHealth[defenderIdx]
+  });
+  // Apply damage to both the player object and the health array
+  defender.health = Math.max(0, defender.health - damage);
+  this.playerHealth[defenderIdx] = Math.max(0, this.playerHealth[defenderIdx] - damage);
+  // Log after applying damage
+  console.debug('[KidsFightScene][tryAttack] AFTER DAMAGE', {
+    defenderIdx,
+    defenderHealthAfter: defender.health,
+    playerHealthAfter: this.playerHealth[defenderIdx]
+  });
   
   console.log('[TRYATTACK] AFTER', {
     attackerIdx,
@@ -1155,21 +1515,44 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
   });
   
   // Update health bar UI and check for winner
-  this.updateHealthBar(defenderIdx);
+  console.debug('[KidsFightScene][tryAttack] Updating health bars...');
+  this.updateHealthBar(0); // Update both health bars
+  this.updateHealthBar(1);
+  console.debug('[KidsFightScene][tryAttack] Checking winner...');
   this.checkWinner();
-  
+
+  // --- Send health update to remote player in online mode ---
+  if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
+    const healthUpdate = {
+      type: 'health_update',
+      playerIndex: defenderIdx,
+      health: this.players[defenderIdx]?.health
+    };
+    console.debug('[KidsFightScene][tryAttack] SENDING health_update', {
+      healthUpdate,
+      localPlayerIndex: this.localPlayerIndex,
+      attackerIdx, defenderIdx,
+      playerHealth: this.playerHealth.slice(),
+      players: [
+        this.players[0] ? {health: this.players[0].health} : null,
+        this.players[1] ? {health: this.players[1].health} : null
+      ]
+    });
+    this.wsManager.send(JSON.stringify(healthUpdate));
+  }
+
   // Update special pips after attack
   this.updateSpecialPips();
-  
+
   // Award special points for successful hits
-  if (!special && attackerIdx === 0) {
+  if (!special && attackerIdx === 0 && this.playerSpecial[0] < 3) {
     this.playerSpecial[0] = Math.min(3, this.playerSpecial[0] + 1);
-    console.log('[DEBUG] Player 1 special:', this.playerSpecial[0]);
+    console.debug('[KidsFightScene][tryAttack] Player 1 special awarded:', this.playerSpecial[0]);
     this.updateSpecialPips();
   }
-  if (!special && attackerIdx === 1) {
+  if (!special && attackerIdx === 1 && this.playerSpecial[1] < 3) {
     this.playerSpecial[1] = Math.min(3, this.playerSpecial[1] + 1);
-    console.log('[DEBUG] Player 2 special:', this.playerSpecial[1]);
+    console.debug('[KidsFightScene][tryAttack] Player 2 special awarded:', this.playerSpecial[1]);
     this.updateSpecialPips();
   }
 }
@@ -1178,14 +1561,14 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
   const player = playerIndex === 0 ? this.players[0] : this.players[1];
   if (!player) return;
   // Debug log for animation frame
-  console.log(`[DEBUG][Anim] Player ${playerIndex + 1} anim update`, {
-    key: player.texture.key,
-    frame: player.frame ? player.frame.name : undefined,
-    width: player.width,
-    height: player.height,
-    displayWidth: player.displayWidth,
-    displayHeight: player.displayHeight
-  });
+  // console.log(`[DEBUG][Anim] Player ${playerIndex + 1} anim update`, {
+  //   key: player.texture.key,
+  //   frame: player.frame ? player.frame.name : undefined,
+  //   width: player.width,
+  //   height: player.height,
+  //   displayWidth: player.displayWidth,
+  //   displayHeight: player.displayHeight
+  // });
 
   // If called with isWalking parameter (legacy call)
   if (isWalking !== undefined) {
@@ -1270,7 +1653,43 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
   //   });
   //   // Update health bar UI
   //   this.updateHealthBar(defenderIdx);
-  //   this.updateSpecialPips(); // Update special pips after attack
+  //   this.checkWinner();
+
+  //   // --- Send health update to remote player in online mode ---
+  //   if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
+  //     console.debug('[KidsFightScene][tryAttack] About to send health update', {
+  //       attackerIdx, defenderIdx, gameMode: this.gameMode, wsManager: !!this.wsManager,
+  //       healthUpdateTarget: defenderIdx,
+  //       healthUpdateValue: this.players[defenderIdx]?.health,
+  //       // playerHealth: this.playerHealth.slice(),
+  //       players: [
+  //         this.players[0] ? {health: this.players[0].health} : null,
+  //         this.players[1] ? {health: this.players[1].health} : null
+  //       ]
+  //     });
+  //     const healthUpdate = {
+  //       type: 'health_update',
+  //       playerIndex: defenderIdx,
+  //       health: this.players[defenderIdx]?.health
+  //     };
+  //     console.debug('[KidsFightScene][WS SEND HEALTH UPDATE]', healthUpdate);
+  //     this.wsManager.send(JSON.stringify(healthUpdate));
+  //   }
+
+  //   // Update special pips after attack
+  //   this.updateSpecialPips();
+
+  //   // Award special points for successful hits
+  //   if (!special && attackerIdx === 0) {
+  //     this.playerSpecial[0] = Math.min(3, this.playerSpecial[0] + 1);
+  //     console.log('[DEBUG] Player 1 special:', this.playerSpecial[0]);
+  //     this.updateSpecialPips();
+  //   }
+  //   if (!special && attackerIdx === 1) {
+  //     this.playerSpecial[1] = Math.min(3, this.playerSpecial[1] + 1);
+  //     console.log('[DEBUG] Player 2 special:', this.playerSpecial[1]);
+  //     this.updateSpecialPips();
+  //   }
   // }
 
   private checkWinner(): boolean {
@@ -1292,6 +1711,7 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
         player7: 'Jacqueline',
         player8: 'Ivan',
         player9: 'D. Isa',
+        bento: 'Bento',
       };
       return nameMap[key] || key;
     };
@@ -1319,7 +1739,7 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
     return false;
   }
 
-  update(): void {
+  update(time: number, delta: number): void {
     // Call animation update for both players every frame
     this.updatePlayerAnimation(0);
     this.updatePlayerAnimation(1);
@@ -1340,6 +1760,38 @@ private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: n
         this.players[1].setFlipX(true);
         this.playerDirection[0] = 'right';
         this.playerDirection[1] = 'left';
+      }
+    }
+
+    if (this.gameMode === 'online' && this.wsManager && this.players[this.localPlayerIndex]) {
+      const player = this.players[this.localPlayerIndex];
+      const curr = {
+        x: player.x,
+        y: player.y,
+        velocityX: player.body?.velocity.x || 0,
+        velocityY: player.body?.velocity.y || 0,
+        flipX: player.flipX,
+        frame: (typeof player.frame === 'object' && player.frame !== null && 'name' in player.frame)
+          ? player.frame.name
+          : (typeof player.frame === 'string' || typeof player.frame === 'number')
+            ? player.frame
+            : (player.anims?.getFrameName?.() || null)
+      };
+
+      if (!this._lastSentPosition ||
+        curr.x !== this._lastSentPosition.x ||
+        curr.y !== this._lastSentPosition.y ||
+        curr.velocityX !== this._lastSentPosition.velocityX ||
+        curr.velocityY !== this._lastSentPosition.velocityY ||
+        curr.flipX !== this._lastSentPosition.flipX ||
+        curr.frame !== this._lastSentPosition.frame) {
+        const positionMsg = {
+          type: 'position_update',
+          playerIndex: this.localPlayerIndex,
+          ...curr
+        };
+        this.wsManager.send(positionMsg);
+        this._lastSentPosition = { ...curr };
       }
     }
   }
