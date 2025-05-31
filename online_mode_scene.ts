@@ -32,6 +32,7 @@ export default class OnlineModeScene extends Phaser.Scene {
   private roomCodeText!: Phaser.GameObjects.Text;
   private errorText!: Phaser.GameObjects.Text;
   private joinPromptText!: Phaser.GameObjects.Text;
+  private titleText!: Phaser.GameObjects.Text;
   private wsManager: WebSocketManager;
   private roomCode: string | null = null;
 
@@ -53,10 +54,10 @@ export default class OnlineModeScene extends Phaser.Scene {
     // Add background
     this.bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
 
-    // Title text
-    const titleText = this.add.text(
-      640,
-      216,
+    // Title text (store as instance property for reuse)
+    this.titleText = this.add.text(
+      w/2,
+      h * 0.35,
       'Modo Online',
       {
         fontSize: '36px',
@@ -82,8 +83,8 @@ export default class OnlineModeScene extends Phaser.Scene {
 
     // Create game button
     this.createButton = this.add.text(
-      640, // fixed x position per test expectation
-      720 * 0.45, // y = 720 * 0.45 to match test precision
+      w/2,
+      h * 0.45,
       'Criar Jogo',
       buttonStyle
     ).setOrigin(0.5);
@@ -91,8 +92,8 @@ export default class OnlineModeScene extends Phaser.Scene {
 
     // Join game button
     this.joinButton = this.add.text(
-      640, // fixed x position per test expectation
-      720 * 0.55, // y = 720 * 0.55 to match test precision
+      w/2,
+      h * 0.55,
       'Entrar em Jogo',
       buttonStyle
     ).setOrigin(0.5);
@@ -100,8 +101,8 @@ export default class OnlineModeScene extends Phaser.Scene {
 
     // Back button
     this.backButton = this.add.text(
-      640,
-      720 * 0.8, // y = 576 to match test expectation
+      w/2,
+      h * 0.8,
       'Voltar',
       buttonStyle
     ).setOrigin(0.5);
@@ -310,8 +311,9 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   private showWaitingScreen(): void {
-    this.hideMainButtons();
-    this.waitingText.setVisible(true);
+    // Use the last known room code or empty string
+    const code = this.roomCodeDisplay.text || '';
+    this.showRoomCode(code);
   }
 
   private async handleWebSocketMessage(event: MessageEvent): Promise<void> {
@@ -362,8 +364,39 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   private showRoomCode(code: string): void {
-    this.roomCodeText.setVisible(true);
-    this.roomCodeDisplay.setText(code).setVisible(true);
+    const w = this.cameras.main.width;
+    const h = this.cameras.main.height;
+    // Define all lines
+    // Use the titleText created in create()
+    if (!this.titleText) {
+      // Fallback: if missing, create it (shouldn't happen)
+      this.titleText = this.add.text(w/2, 0, 'Modo Online', {
+        fontSize: '36px',
+        color: '#fff',
+        fontFamily: 'monospace',
+        align: 'center'
+      }).setOrigin(0.5);
+    }
+    this.titleText.setVisible(true);
+    const lines = [
+      this.titleText,
+      this.roomCodeText.setText('Código da Sala:').setOrigin(0.5).setVisible(true),
+      this.roomCodeDisplay.setText(code).setOrigin(0.5).setVisible(true),
+      this.waitingText.setText('Aguardando outro jogador...').setOrigin(0.5).setVisible(true)
+    ];
+    // Calculate vertical stacking
+    const gap = 40;
+    const totalHeight = (lines.length - 1) * gap;
+    const startY = h/2 - totalHeight/2;
+    lines.forEach((txt, i) => {
+      txt.setX(w/2);
+      txt.setY(startY + i * gap);
+      txt.setVisible(true);
+    });
+    // Hide main menu buttons
+    this.createButton.setVisible(false);
+    this.joinButton.setVisible(false);
+    this.backButton.setVisible(false);
   }
 
   private showError(message: string): void {
@@ -412,10 +445,10 @@ export default class OnlineModeScene extends Phaser.Scene {
     this.bg.setSize(w, h).setPosition(w/2, h/2);
 
     const buttons = [this.createButton, this.joinButton, this.backButton];
-    const yPositions = [720 * 0.45, 720 * 0.55, 720 * 0.8];
+    const yPositions = [0.45, 0.55, 0.8];
     
     buttons.forEach((button, index) => {
-      button.setPosition(640, yPositions[index]);
+      button.setPosition(w/2, h * yPositions[index]);
       button.setFontSize('28px');
       button.setPadding(
         16,

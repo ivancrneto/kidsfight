@@ -121,6 +121,17 @@ class WebSocketManager {
             this._ws?.addEventListener('message', this._boundMessageCallback);
             console.log('[WSM] Message event listener registered', { ws: !!this._ws, callback: !!this._boundMessageCallback });
           }
+          // Add LOGGING to all incoming messages
+          if (this._ws) {
+            this._ws.addEventListener('message', (event) => {
+              try {
+                const msg = JSON.parse(event.data);
+                console.log('[WSM][RECV]', msg);
+              } catch (e) {
+                console.error('[WSM][RECV][ERROR]', event.data, e);
+              }
+            });
+          }
           resolve(this._ws!);
         };
 

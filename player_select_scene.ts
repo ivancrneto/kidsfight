@@ -250,98 +250,121 @@ export default class PlayerSelectScene extends Phaser.Scene {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
     // --- Responsive character grid setup (centered grid, smaller height section) ---
+    // Only declare these ONCE:
     const gridCols = 3;
     const gridRows = 3;
-    const gridW = w * 0.7; // grid takes 70% of width
-    const gridH = h * 0.38; // grid takes LESS height (38% instead of 50%)
-    const spacingX = gridW / (gridCols - 1);
-    const spacingY = gridH / (gridRows - 1);
-    const startX = w / 2 - gridW / 2;
-    const startY = h * 0.18;
-    this.characters = [
-      { name: 'Bento', key: 'player1', x: startX, y: startY, scale: 0.5 },
-      { name: 'Davi R', key: 'player2', x: startX + spacingX, y: startY, scale: 0.5 },
-      { name: 'José', key: 'player3', x: startX + spacingX * 2, y: startY, scale: 0.5 },
-      { name: 'Davis', key: 'player4', x: startX, y: startY + spacingY, scale: 0.5 },
-      { name: 'Carol', key: 'player5', x: startX + spacingX, y: startY + spacingY, scale: 0.5 },
-      { name: 'Roni', key: 'player6', x: startX + spacingX * 2, y: startY + spacingY, scale: 0.5 },
-      { name: 'Jacqueline', key: 'player7', x: startX, y: startY + spacingY * 2, scale: 0.5 },
-      { name: 'Ivan', key: 'player8', x: startX + spacingX, y: startY + spacingY * 2, scale: 0.5 },
-      { name: 'D. Isa', key: 'player9', x: startX + spacingX * 2, y: startY + spacingY * 2, scale: 0.5 }
+    const gridW = w * 0.7;
+    const gridH = h * 0.65; // use even more vertical space
+    const cellW = gridW / gridCols;
+    const cellH = gridH / gridRows;
+    const circleRadius = 60;
+    const labelOffset = 10;
+    // Offsets for proportional layout
+    const circleYOffset = -cellH * 0.4; // move circles 40% up
+    const nameYOffset = -cellH * 0.1;   // move names 10% up
+    const spriteYOffset = cellH * 0.3;  // move sprites 30% down
+    const startX = w / 2 - gridW / 2 + cellW / 2;
+    const startY = h / 2 - gridH / 2 + cellH / 2 + 20; // center grid, nudge it slightly lower
+    // Setup characters with only name/key, then assign x/y/scale
+    const characterDefs = [
+      { name: 'Bento', key: 'player1' },
+      { name: 'Davi R', key: 'player2' },
+      { name: 'José', key: 'player3' },
+      { name: 'Davis', key: 'player4' },
+      { name: 'Carol', key: 'player5' },
+      { name: 'Roni', key: 'player6' },
+      { name: 'Jacqueline', key: 'player7' },
+      { name: 'Ivan', key: 'player8' },
+      { name: 'D. Isa', key: 'player9' }
     ];
-    // --- END Responsive centered grid ---
-    // Create character sprites with background circles
+    this.characters = characterDefs.map((char, i) => {
+      const col = i % gridCols;
+      const row = Math.floor(i / gridCols);
+      const cx = startX + col * cellW;
+      const cy = startY + row * cellH;
+      return {
+        ...char,
+        x: cx,
+        y: cy,
+        scale: 0.5
+      };
+    });
     this.characters.forEach((char, i) => {
-      // When creating the background circle, store the original offset for later use
-      const bgCircleOffsetY = 100; // move bgCircle 100px down from char.y
-      const bgCircle = this.add.circle(char.x, char.y + bgCircleOffsetY, 60, 0x222222, 1);
+      // Use char.x, char.y as the center of the cell
+      // Background circle
+      const bgCircle = this.add.circle(char.x, char.y + circleYOffset, circleRadius, 0x222222, 1);
       char.bgCircle = bgCircle;
-      char.bgCircleOffsetY = bgCircleOffsetY;
-      // Fine-tuned crop values for better alignment (head+shoulders, avoid cutting off chins)
-      const cropX = 30;    // left offset
-      const cropY = 40;    // top offset
-      const cropW = 300;   // width of visible area
-      const cropH = 250;   // height of visible area
-      // Show only frame 0 and crop to head+shoulders area (classic style)
-      const sprite = this.add.sprite(char.x, char.y + 40, char.key, 0);
-      // Responsive scale: base scale for 296x296, shrink to 0.4 for default 1280x720, scale with min(screenW,screenH)
+      char.bgCircleOffsetY = 0;
+      // Sprite (feet at bottom of circle)
+      const cropX = 30;
+      const cropY = 40;
+      const cropW = 300;
+      const cropH = 250;
       const baseSize = 296;
       const screenW = this.sys.game.config.width as number;
       const screenH = this.sys.game.config.height as number;
-      const scale = 0.4 * Math.min(screenW, screenH) / 720; // 0.4 at 720p, smaller for smaller screens
+      const scale = 0.4 * Math.min(screenW, screenH) / 720;
+      const sprite = this.add.sprite(char.x, char.y + spriteYOffset + circleRadius / 2, char.key, 0);
       sprite.setScale(scale);
       sprite.setInteractive({ useHandCursor: true });
-      // Center origin at the feet (bottom of the sprite) for correct alignment
       sprite.setOrigin(0.5, 1.0);
       sprite.setCrop(cropX, cropY, cropW, cropH);
-      // Allow host/guest to select their player with left click
       sprite.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
         console.log('[DEBUG] pointerdown', { isHost: this.isHost, mode: this.mode, pointer, charKey: char.key });
         if (this.mode === 'online') {
           if (this.isHost) {
-            // Host: left click selects for player 1
-            if (pointer.leftButtonDown()) {
-              this.setSelectorToCharacter(1, i);
-            }
+            if (pointer.leftButtonDown()) this.setSelectorToCharacter(1, i);
           } else {
-            // Guest: left click selects for player 2
-            if (pointer.leftButtonDown()) {
-              this.setSelectorToCharacter(2, i);
-            }
+            if (pointer.leftButtonDown()) this.setSelectorToCharacter(2, i);
           }
         } else {
-          // Local mode: left click selects for player 1, right click for player 2
-          if (pointer.leftButtonDown()) {
-            this.setSelectorToCharacter(1, i);
-          }
-          if (pointer.rightButtonDown()) {
-            this.setSelectorToCharacter(2, i);
-          }
+          if (pointer.leftButtonDown()) this.setSelectorToCharacter(1, i);
+          if (pointer.rightButtonDown()) this.setSelectorToCharacter(2, i);
         }
       });
-      // Store sprite reference
-      this.characterSprites[char.key] = sprite;
-      // Add name label and keep reference
-      const label = this.add.text(
-        char.x,
-        char.y + 100,
-        char.name,
-        {
-          fontSize: '20px',
-          color: '#fff',
-          fontFamily: 'monospace',
-          align: 'center'
-        }
-      ).setOrigin(0.5);
-      char.nameLabel = label;
-      // Align selector circle with the center of the cropped sprite
-      bgCircle.setPosition(char.x, char.y + 40 + cropH / 2 - 10); // adjust -10 for visual centering
-    });
+    this.characterSprites[char.key] = sprite;
+    // Align selector circle with center
+    bgCircle.setPosition(char.x, char.y);
+  });
+
+  // Draw each bottom-row name label directly under its character
+  const lastRowY = startY + (gridRows - 1) * cellH;
+  const nameFontSize = 20;
+  const nameLabelsY = lastRowY + circleRadius + labelOffset;
+  // Draw name label for EVERY character, centered under each
+  for (let i = 0; i < this.characters.length; i++) {
+    const char = this.characters[i];
+    const label = this.add.text(
+      char.x,
+      char.y + nameYOffset + circleRadius + labelOffset + circleYOffset,
+      char.name,
+      {
+        fontSize: '20px',
+        color: '#fff',
+        fontFamily: 'monospace',
+        align: 'center',
+      }
+    ).setOrigin(0.5, 0);
+    char.nameLabel = label;
   }
+
+  // Move button group further down below the row of names
+  const buttonOffset = 80; // much more space for buttons below names
+  const buttonsY = nameLabelsY + nameFontSize + buttonOffset;
+  if (this.backButton && this.readyButton && this.startButtonRect) {
+    const spacing = 32;
+    const totalWidth = this.readyButton.displayWidth + spacing + this.backButton.displayWidth;
+    const centerX = w / 2;
+    this.backButton.setPosition(centerX - totalWidth/2 + this.backButton.displayWidth/2, buttonsY);
+    this.readyButton.setPosition(centerX + totalWidth/2 - this.readyButton.displayWidth/2, buttonsY);
+    this.startButtonRect.setPosition(this.readyButton.x, this.readyButton.y);
+  }
+}
 
   public handleCharacterSelect(player: 1 | 2, direction: -1 | 1): void {
     const currentIndex = player === 1 ? this.p1Index : this.p2Index;
     let newIndex = (currentIndex + direction + this.CHARACTER_KEYS.length) % this.CHARACTER_KEYS.length;
+    // ... rest of the code remains the same ...
 
     if (this.mode !== 'online') {
       if (player === 1) {
@@ -556,59 +579,65 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
   private createSelectionIndicators(): void {
     // Use fixed values to match UI test expectations
-    this.p1SelectorCircle = this.add.circle(240, 360, 40, 0xffff00, 0.18);
-    this.p2SelectorCircle = this.add.circle(560, 360, 40, 0x0000ff, 0.18);
+    this.p1SelectorCircle = this.add.circle(-100, -100, 40, 0xffff00, 0.18).setVisible(false);
+    this.p2SelectorCircle = this.add.circle(-100, -100, 40, 0x0000ff, 0.18).setVisible(false);
     // Player 1 indicator (green circle)
-    this.p1Indicator = this.add.circle(0, 0, 30, 0x00ff00, 0.7)
-      .setStrokeStyle(3, 0xffffff, 1);
-    this.p1Text = this.add.text(0, 0, 'P1', {
+    this.p1Indicator = this.add.circle(-100, -100, 30, 0x00ff00, 0.7)
+      .setStrokeStyle(3, 0xffffff, 1).setVisible(false);
+    this.p1Text = this.add.text(-100, -100, 'P1', {
       fontSize: '20px',
       color: '#ffffff',
       fontFamily: 'monospace',
       fontWeight: 'bold'
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setVisible(false);
     // Player 2 indicator (red circle)
-    this.p2Indicator = this.add.circle(0, 0, 30, 0xff0000, 0.7)
-      .setStrokeStyle(3, 0xffffff, 1);
-    this.p2Text = this.add.text(0, 0, 'P2', {
+    this.p2Indicator = this.add.circle(-100, -100, 30, 0xff0000, 0.7)
+      .setStrokeStyle(3, 0xffffff, 1).setVisible(false);
+    this.p2Text = this.add.text(-100, -100, 'P2', {
       fontSize: '20px',
       color: '#ffffff',
       fontFamily: 'monospace',
       fontWeight: 'bold'
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setVisible(false);
   }
 
   private createUIButtons(): void {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
 
-    // Start button (green, offset left)
-    const buttonX = w * 0.5 - 18;
-    this.startButtonRect = this.add.rectangle(buttonX, h * 0.85, 200, 60, 0x00ff00);
-    this.readyButton = this.add.text(
-      buttonX,
-      h * 0.85,
-      'COMEÇAR',
-      {
-        fontSize: '24px',
-        color: '#fff',
-        backgroundColor: '#4a4a4a',
-        padding: { x: 20, y: 10 }
-      }
-    ).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    // Back button
-    this.backButton = this.add.text(
-      w * 0.3,
-      h * 0.85,
-      'Voltar',
-      {
-        fontSize: '24px',
-        color: '#fff',
-        backgroundColor: '#4a4a4a',
-        padding: { x: 20, y: 10 }
-      }
-    ).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    // --- Centered button group ---
+    const spacing = 32; // space between buttons
+    // Create both buttons first (off-screen)
+    this.readyButton = this.add.text(0, 0, 'COMEÇAR', {
+      fontSize: '24px',
+      color: '#fff',
+      backgroundColor: '#4a4a4a',
+      padding: { x: 20, y: 10 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    this.backButton = this.add.text(0, 0, 'Voltar', {
+      fontSize: '24px',
+      color: '#fff',
+      backgroundColor: '#4a4a4a',
+      padding: { x: 20, y: 10 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    // Calculate total width
+    const totalWidth = this.readyButton.displayWidth + spacing + this.backButton.displayWidth;
+    const centerX = w / 2;
+    const y = h * 0.85;
+    // Position backButton to the left, readyButton to the right
+    this.backButton.setPosition(centerX - totalWidth/2 + this.backButton.displayWidth/2, y);
+    this.readyButton.setPosition(centerX + totalWidth/2 - this.readyButton.displayWidth/2, y);
+    // Optionally, add a green rectangle behind the readyButton
+    if (this.startButtonRect) this.startButtonRect.destroy();
+    this.startButtonRect = this.add.rectangle(
+      this.readyButton.x,
+      this.readyButton.y,
+      this.readyButton.displayWidth + 16,
+      this.readyButton.displayHeight + 8,
+      0x00ff00
+    ).setDepth(this.readyButton.depth - 1);
+    this.readyButton.setDepth(1);
+    // --- End centered button group ---
 
     // Button hover effects
     [this.readyButton, this.backButton].forEach(button => {
