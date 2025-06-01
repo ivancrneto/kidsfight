@@ -16,10 +16,10 @@ describe('KidsFightScene.tryAction', () => {
     scene.cameras = { main: { width: 800, height: 480, shake: jest.fn() } } as any;
     scene.physics = { pause: jest.fn() } as any;
     scene.players = [
-      { health: 200, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
-      { health: 200, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
+      { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
+      { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
     ];
-    scene.playerHealth = [200, 200];
+    scene.playerHealth = [100, 100];
     scene.playerSpecial = [0, 0];
     scene.gameOver = false;
     now = Date.now();

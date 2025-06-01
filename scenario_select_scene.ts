@@ -137,20 +137,46 @@ class ScenarioSelectScene extends Phaser.Scene {
     // Action buttons
     this.createActionButtons();
 
+    // Show waiting message for guest
+    if (this.mode === 'online' && !this.isHost) {
+      this.waitingText = this.add.text(width/2, height*0.85, 'Aguardando o anfitrião escolher o cenário...', {
+        fontSize: '22px',
+        color: '#fff',
+        backgroundColor: '#222',
+        padding: { x: 16, y: 8 },
+        fontFamily: 'monospace'
+      }).setOrigin(0.5);
+      
+      // Disable scenario selection for guest
+      if (this.prevButton) this.prevButton.disableInteractive();
+      if (this.nextButton) this.nextButton.disableInteractive();
+    }
+
+    // Responsive layout update on resize
+    this.scale.on('resize', this.updateLayout, this);
+
     // Listen for ready and game_start messages if online
     if (this.mode === 'online' && this.wsManager && this.wsManager.setMessageCallback) {
       console.log('[ScenarioSelectScene] Setting WebSocket message handler for scenario scene');
-      this._wsMessageHandler = (event: MessageEvent) => {
+      this._wsMessageHandler = (event: MessageEvent): void => {
         try {
+          // Handle the data which might be already parsed by WebSocketManager
           const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          console.debug('[ScenarioSelectScene][WebSocket] Incoming message:', data, {
-            isHost: this.isHost,
-            hostReady: this.hostReady,
-            guestReady: this.guestReady,
-            gameStarted: this.gameStarted,
-            roomCode: this.roomCode
-          });
-          if (data.type === 'player_ready') {
+          console.debug('[ScenarioSelectScene][WebSocket] Received message:', data);
+          
+          if (data.type === 'scenario_selected' && !this.isHost) {
+            // Update the preview to match the host's selection
+            console.debug('[ScenarioSelectScene][WebSocket] Guest received scenario selection from host:', data.scenario);
+            
+            // Find the scenario index
+            const scenarioIndex = SCENARIOS.findIndex(s => s.key === data.scenario);
+            if (scenarioIndex !== -1) {
+              this.selectedScenario = scenarioIndex;
+              this.preview.setTexture(SCENARIOS[this.selectedScenario].key);
+              this.rescalePreview();
+              console.debug('[ScenarioSelectScene][WebSocket] Guest updated scenario preview to:', data.scenario);
+            }
+          } else if (data.type === 'player_ready') {
             console.debug('[ScenarioSelectScene][WebSocket] player_ready received:', data);
             console.debug('[ScenarioSelectScene][WebSocket] Readiness BEFORE assignment:', {
               isHost: this.isHost,
@@ -372,9 +398,26 @@ class ScenarioSelectScene extends Phaser.Scene {
   }
 
   private changeScenario(direction: number): void {
+    // Only allow host to change scenario in online mode
+    if (this.mode === 'online' && !this.isHost) {
+      console.debug('[ScenarioSelectScene][changeScenario] Guest attempted to change scenario, ignoring');
+      return;
+    }
+    
     this.selectedScenario = (this.selectedScenario + direction + SCENARIOS.length) % SCENARIOS.length;
     this.preview.setTexture(SCENARIOS[this.selectedScenario].key);
     this.rescalePreview();
+    
+    // In online mode, when host changes scenario, send update to server
+    if (this.mode === 'online' && this.isHost && this.wsManager) {
+      const scenarioMsg = {
+        type: 'scenario_selected',
+        scenario: SCENARIOS[this.selectedScenario].key,
+        roomCode: this.roomCode
+      };
+      console.debug('[ScenarioSelectScene][changeScenario] Host selected new scenario, sending update:', scenarioMsg);
+      this.wsManager.send(scenarioMsg);
+    }
   }
 
   private rescalePreview(): void {

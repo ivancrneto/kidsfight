@@ -29,18 +29,18 @@ function createTestScene() {
   };
   
   // Initialize player properties
-  scene.playerHealth = [200, 200];
+  scene.playerHealth = [100, 100];
   scene.playerSpecial = [0, 0];
   scene.players = [
     { 
-      health: 200, 
+      health: 100, 
       setData: jest.fn(), 
       getData: jest.fn(), 
       setFrame: jest.fn(),
       body: { velocity: { x: 0, y: 0 } }
     },
     { 
-      health: 200, 
+      health: 100, 
       setData: jest.fn(), 
       getData: jest.fn(), 
       setFrame: jest.fn(),
@@ -75,7 +75,7 @@ describe('KidsFightScene Health & Damage Logic', () => {
 
   it('should allow mixed attacks to KO a player', () => {
     const scene: any = createTestScene();
-    // 5 special (20*5=100), 10 normal (10*10=100)
+    // 5 special (10*5=50), 10 normal (5*10=50)
     for (let i = 0; i < 5; i++) scene.tryAttack(0, 1, Date.now(), true);
     for (let i = 0; i < 10; i++) scene.tryAttack(0, 1, Date.now(), false);
     expect(scene.players[1].health).toBe(0);
@@ -92,8 +92,8 @@ describe('KidsFightScene Health & Damage Logic', () => {
   it('should apply correct damage for normal and special attacks', () => {
     const scene: any = createTestScene();
     scene.tryAttack(0, 1, Date.now(), false); // normal
-    expect(scene.players[1].health).toBe(190);
+    expect(scene.players[1].health).toBe(95);
     scene.tryAttack(0, 1, Date.now(), true); // special
-    expect(scene.players[1].health).toBe(170);
+    expect(scene.players[1].health).toBe(85);
   });
 });

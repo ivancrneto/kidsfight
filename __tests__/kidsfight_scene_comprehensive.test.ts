@@ -16,10 +16,10 @@ describe('KidsFightScene Comprehensive', () => {
     scene.cameras = { main: { width: 800, height: 480, shake: jest.fn() } } as any;
     scene.physics = { pause: jest.fn() } as any;
     scene.players = [
-      { health: 200, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
-      { health: 200, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
+      { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
+      { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
     ];
-    scene.playerHealth = [200, 200];
+    scene.playerHealth = [100, 100];
     scene.playerSpecial = [0, 0];
     scene.gameOver = false;
     scene.updateSpecialPips = jest.fn();
@@ -53,9 +53,9 @@ describe('KidsFightScene Comprehensive', () => {
 
   describe('Attack Damage and Health', () => {
     it('applies correct normal attack damage and caps health', () => {
-      scene.DAMAGE = 10;
-      scene.playerHealth = [200, 10];
-      scene.players[1].health = 10;
+      scene.DAMAGE = 5;
+      scene.playerHealth = [100, 5];
+      scene.players[1].health = 5;
       scene.tryAttack(0, 1, now, false);
       expect(scene.players[1].health).toBe(0);
       expect(scene.playerHealth[1]).toBe(0);
@@ -63,9 +63,9 @@ describe('KidsFightScene Comprehensive', () => {
       expect(scene.updateHealthBar).toHaveBeenCalledWith(1);
     });
     it('applies correct special attack damage and caps health', () => {
-      scene.SPECIAL_DAMAGE = 20;
-      scene.playerHealth = [200, 25];
-      scene.players[1].health = 25;
+      scene.SPECIAL_DAMAGE = 10;
+      scene.playerHealth = [100, 15];
+      scene.players[1].health = 15;
       scene.tryAttack(0, 1, now, true);
       expect(scene.players[1].health).toBe(5);
       expect(scene.playerHealth[1]).toBe(5);
@@ -73,12 +73,12 @@ describe('KidsFightScene Comprehensive', () => {
     it('does not apply negative or excessive damage', () => {
       scene.DAMAGE = -5;
       scene.SPECIAL_DAMAGE = 1000;
-      scene.playerHealth = [200, 200];
-      scene.players[1].health = 200;
+      scene.playerHealth = [100, 100];
+      scene.players[1].health = 100;
       scene.tryAttack(0, 1, now, false);
-      expect(scene.players[1].health).toBe(200); // No negative damage
+      expect(scene.players[1].health).toBe(100); // No negative damage
       scene.tryAttack(0, 1, now, true);
-      expect(scene.players[1].health).toBe(180); // Max 20 damage
+      expect(scene.players[1].health).toBe(90); // Max 10 damage
     });
   });
 

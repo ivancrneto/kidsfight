@@ -42,10 +42,10 @@ describe('KidsFightScene - Attack and Health', () => {
     scene.checkWinner = jest.fn();
   });
 
-  it('should decrease defender health by 2.5 on normal attack', () => {
+  it('should decrease defender health by 5 on normal attack', () => {
     // attackerIdx = 0, defenderIdx = 1
     scene.tryAttack(0, 1, now, false);
-    expect(scene.playerHealth[1]).toBe(90);
+    expect(scene.playerHealth[1]).toBe(95);
     expect(scene.updateHealthBar).toHaveBeenCalledWith(1);
   });
 
@@ -56,10 +56,10 @@ describe('KidsFightScene - Attack and Health', () => {
     expect(scene.playerHealth[1]).toBe(0);
   });
 
-  it('should decrease defender health by 20 on special attack', () => {
+  it('should decrease defender health by 10 on special attack', () => {
     scene.playerHealth[1] = 100;
     scene.tryAttack(0, 1, now, true);
-    expect(scene.playerHealth[1]).toBe(80);
+    expect(scene.playerHealth[1]).toBe(90);
   });
 
   it('should do nothing if attacker or defender is missing', () => {
@@ -103,17 +103,17 @@ describe('KidsFightScene - Attack and Health', () => {
 
   it('should sync defender health object with playerHealth array (defender is player1)', () => {
     scene.playerHealth[0] = 100;
-    scene.players[0].health = 200;
+    scene.players[0].health = 100;
     scene.tryAttack(1, 0, now, false);
-    expect(scene.playerHealth[0]).toBe(190);
-    expect(scene.players[0].health).toBe(190);
+    expect(scene.playerHealth[0]).toBe(95);
+    expect(scene.players[0].health).toBe(95);
   });
 
   it('should sync defender health object with playerHealth array (defender is player2)', () => {
     scene.playerHealth[1] = 100;
-    scene.players[1].health = 200;
+    scene.players[1].health = 100;
     scene.tryAttack(0, 1, now, false);
-    expect(scene.playerHealth[1]).toBe(190);
-    expect(scene.players[1].health).toBe(190);
+    expect(scene.playerHealth[1]).toBe(95);
+    expect(scene.players[1].health).toBe(95);
   });
 });

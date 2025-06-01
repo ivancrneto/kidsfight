@@ -63,7 +63,7 @@ server.on('connection', (ws) => {
       switch (data.type) {
         case 'create_room':
           // Generate a unique room code
-          if (process.env.NODE_ENV === 'development' && PORT !== 8081) {
+          if (process.env.NODE_ENV === 'development') {
             // Use fixed code only in development for easier testing
             roomCode = '111111';
           } else {

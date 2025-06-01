@@ -26,32 +26,32 @@ describe('KidsFightScene - Health, Damage, and Win Logic', () => {
     scene.cameras = { main: { width: 800, height: 480, shake: jest.fn() } } as any;
     scene.physics = { pause: jest.fn() } as any;
     scene.players = [
-      { health: 200, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
-      { health: 200, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
+      { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
+      { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
     ];
-    scene.playerHealth = [200, 200];
+    scene.playerHealth = [100, 100];
     scene.playerSpecial = [0, 0];
     scene.gameOver = false;
     now = Date.now();
   });
 
-  it('initializes both players with 200 health', () => {
-    expect(scene.playerHealth[0]).toBe(200);
-    expect(scene.playerHealth[1]).toBe(200);
-    expect(scene.players[0].health).toBe(200);
-    expect(scene.players[1].health).toBe(200);
+  it('initializes both players with 100 health', () => {
+    expect(scene.playerHealth[0]).toBe(100);
+    expect(scene.playerHealth[1]).toBe(100);
+    expect(scene.players[0].health).toBe(100);
+    expect(scene.players[1].health).toBe(100);
   });
 
-  it('applies normal attack damage of 10', () => {
+  it('applies normal attack damage of 5', () => {
     scene.tryAttack(0, 1, now, false);
-    expect(scene.playerHealth[1]).toBe(190);
-    expect(scene.players[1].health).toBe(190);
+    expect(scene.playerHealth[1]).toBe(95);
+    expect(scene.players[1].health).toBe(95);
   });
 
-  it('applies special attack damage of 20', () => {
+  it('applies special attack damage of 10', () => {
     scene.tryAttack(0, 1, now, true);
-    expect(scene.playerHealth[1]).toBe(180);
-    expect(scene.players[1].health).toBe(180);
+    expect(scene.playerHealth[1]).toBe(90);
+    expect(scene.players[1].health).toBe(90);
   });
 
   it('does not allow health to drop below 0', () => {
@@ -97,9 +97,9 @@ describe('KidsFightScene - Health, Damage, and Win Logic', () => {
     scene.DAMAGE = -50;
     scene.SPECIAL_DAMAGE = 999;
     scene.tryAttack(0, 1, now, false);
-    expect(scene.playerHealth[1]).toBe(200); // negative damage clamped
+    expect(scene.playerHealth[1]).toBe(100); // negative damage clamped
     scene.tryAttack(0, 1, now, true);
-    expect(scene.playerHealth[1]).toBe(180); // max 20 damage
+    expect(scene.playerHealth[1]).toBe(90); // max 10 damage
   });
 
   it('synchronizes health with health_update message', () => {

@@ -76,11 +76,11 @@ export function stretchBackgroundToFill(bg: any, width: number, height: number):
 
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 480;
-const MAX_HEALTH = 200; // Each health bar represents this amount of health
+const MAX_HEALTH = 100; // Each health bar represents this amount of health
 const TOTAL_HEALTH = MAX_HEALTH; // Total health per player
-// === FIX DAMAGE VALUES TO MATCH TESTS ===
-const ATTACK_DAMAGE = 10;
-const SPECIAL_DAMAGE = 20;
+const SECONDS_BETWEEN_ATTACKS = 0.5;
+const ATTACK_DAMAGE = 5; // Reduced to make game longer (20 hits to win)
+const SPECIAL_DAMAGE = 10; // Reduced to maintain 2x ratio
 const ATTACK_COOLDOWN = 500; // ms
 const SPECIAL_COOLDOWN = 1000; // ms
 const SPECIAL_ANIMATION_DURATION = 900; // ms
@@ -511,24 +511,9 @@ class KidsFightScene extends Phaser.Scene {
                 }
               }
             } else if (action.type === 'health_update') {
-              // Robust: Always update both player health values and bars
-              console.debug('[KidsFightScene][WS HEALTH UPDATE][RECEIVED]', action);
-              // Update the specified player
-              if (typeof action.playerIndex === 'number' && this.players[action.playerIndex]) {
-                this.players[action.playerIndex].health = action.health;
-                this.playerHealth[action.playerIndex] = action.health;
-                console.debug('[KidsFightScene][WS HEALTH UPDATE] Updated player', action.playerIndex, 'to', action.health);
-              } else {
-                console.warn('[KidsFightScene][WS HEALTH UPDATE] Player object missing for index', action.playerIndex, action);
-              }
-              // After any health update, always refresh both health bars
-              this.updateHealthBar(0);
-              this.updateHealthBar(1);
-              //return;
-
               console.debug('[KidsFightScene][WS HEALTH UPDATE][RECEIVED]', action);
               const idx = action.playerIndex;
-              if (this.players[idx]) {
+              if (idx !== undefined && this.players[idx]) {
                 console.debug('[KidsFightScene][WS HEALTH UPDATE][BEFORE]', {
                   playerIndex: idx,
                   playerObjectHealth: this.players[idx].health,
@@ -539,23 +524,40 @@ class KidsFightScene extends Phaser.Scene {
                   ],
                   allHealthArray: this.playerHealth.slice(),
                 });
-                // Update both the player object AND the health array
-                this.players[idx].health = action.health;
-                this.playerHealth[idx] = action.health;
-                console.debug('[KidsFightScene][WS HEALTH UPDATE][AFTER]', {
-                  playerIndex: idx,
-                  newHealth: action.health,
-                  playerObjectHealth: this.players[idx].health,
-                  playerHealthArray: this.playerHealth[idx],
-                  allPlayers: [
-                    this.players[0] ? {health: this.players[0].health} : null,
-                    this.players[1] ? {health: this.players[1].health} : null
-                  ],
-                  allHealthArray: this.playerHealth.slice(),
-                });
-                console.debug('[KidsFightScene][WS HEALTH UPDATE] Updating health bars...');
-                this.updateHealthBar(0);
-                this.updateHealthBar(1);
+                
+                // Only update if we're receiving a health update for the remote player
+                // or if the health value is significantly different
+                const isRemotePlayer = idx !== this.localPlayerIndex;
+                const significantDifference = Math.abs(this.playerHealth[idx] - action.health) > 10;
+                
+                if (isRemotePlayer || significantDifference) {
+                  // Update both the player object AND the health array
+                  this.players[idx].health = action.health;
+                  this.playerHealth[idx] = action.health;
+                  console.debug('[KidsFightScene][WS HEALTH UPDATE][AFTER]', {
+                    playerIndex: idx,
+                    newHealth: action.health,
+                    playerObjectHealth: this.players[idx].health,
+                    playerHealthArray: this.playerHealth[idx],
+                    allPlayers: [
+                      this.players[0] ? {health: this.players[0].health} : null,
+                      this.players[1] ? {health: this.players[1].health} : null
+                    ],
+                    allHealthArray: this.playerHealth.slice(),
+                  });
+                  
+                  console.debug('[KidsFightScene][WS HEALTH UPDATE] Updating health bars...');
+                  this.updateHealthBar(0);
+                  this.updateHealthBar(1);
+                  this.checkWinner();
+                } else {
+                  console.debug('[KidsFightScene][WS HEALTH UPDATE] Ignoring echo for local player update', {
+                    localPlayerIndex: this.localPlayerIndex,
+                    updatedPlayerIndex: idx,
+                    currentHealth: this.playerHealth[idx],
+                    receivedHealth: action.health
+                  });
+                }
               } else {
                 console.warn('[KidsFightScene][WS HEALTH UPDATE] Player object missing for index', idx, action);
               }
@@ -567,7 +569,7 @@ class KidsFightScene extends Phaser.Scene {
               'special',
               'block',
               'replay_request',
-              'position_update' // Now handle position_update correctly
+              'position_update'
             ].includes(action.type)) {
               if (action.type === 'replay_request') {
                 this.showReplayRequestPopup(action);
@@ -627,7 +629,7 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
         } else if (action.type === 'health_update') {
           console.debug('[KidsFightScene][WS HEALTH UPDATE][RECEIVED]', action);
           const idx = action.playerIndex;
-          if (this.players[idx]) {
+          if (idx !== undefined && this.players[idx]) {
             console.debug('[KidsFightScene][WS HEALTH UPDATE][BEFORE]', {
               playerIndex: idx,
               playerObjectHealth: this.players[idx].health,
@@ -638,23 +640,40 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
               ],
               allHealthArray: this.playerHealth.slice(),
             });
-            // Update both the player object AND the health array
-            this.players[idx].health = action.health;
-            this.playerHealth[idx] = action.health;
-            console.debug('[KidsFightScene][WS HEALTH UPDATE][AFTER]', {
-              playerIndex: idx,
-              newHealth: action.health,
-              playerObjectHealth: this.players[idx].health,
-              playerHealthArray: this.playerHealth[idx],
-              allPlayers: [
-                this.players[0] ? {health: this.players[0].health} : null,
-                this.players[1] ? {health: this.players[1].health} : null
-              ],
-              allHealthArray: this.playerHealth.slice(),
-            });
-            console.debug('[KidsFightScene][WS HEALTH UPDATE] Updating health bars...');
-            this.updateHealthBar(0);
-            this.updateHealthBar(1);
+            
+            // Only update if we're receiving a health update for the remote player
+            // or if the health value is significantly different
+            const isRemotePlayer = idx !== this.localPlayerIndex;
+            const significantDifference = Math.abs(this.playerHealth[idx] - action.health) > 10;
+            
+            if (isRemotePlayer || significantDifference) {
+              // Update both the player object AND the health array
+              this.players[idx].health = action.health;
+              this.playerHealth[idx] = action.health;
+              console.debug('[KidsFightScene][WS HEALTH UPDATE][AFTER]', {
+                playerIndex: idx,
+                newHealth: action.health,
+                playerObjectHealth: this.players[idx].health,
+                playerHealthArray: this.playerHealth[idx],
+                allPlayers: [
+                  this.players[0] ? {health: this.players[0].health} : null,
+                  this.players[1] ? {health: this.players[1].health} : null
+                ],
+                allHealthArray: this.playerHealth.slice(),
+              });
+              
+              console.debug('[KidsFightScene][WS HEALTH UPDATE] Updating health bars...');
+              this.updateHealthBar(0);
+              this.updateHealthBar(1);
+              this.checkWinner();
+            } else {
+              console.debug('[KidsFightScene][WS HEALTH UPDATE] Ignoring echo for local player update', {
+                localPlayerIndex: this.localPlayerIndex,
+                updatedPlayerIndex: idx,
+                currentHealth: this.playerHealth[idx],
+                receivedHealth: action.health
+              });
+            }
           } else {
             console.warn('[KidsFightScene][WS HEALTH UPDATE] Player object missing for index', idx, action);
           }
@@ -1506,9 +1525,9 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
   if (console.trace) console.trace('[DEBUG][tryAttack][TRACE]');
   // Calculate damage using class fields, ensure hard cap
   let damage = special ? this.SPECIAL_DAMAGE : this.DAMAGE;
-  if (damage > 20) {
+  if (damage > 10) {
     console.error('[DEBUG][tryAttack][ERROR] Damage value too high:', damage);
-    damage = 20;
+    damage = 10;
   }
   if (damage < 0) {
     console.error('[DEBUG][tryAttack][ERROR] Damage value negative:', damage);
@@ -1534,14 +1553,17 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
   });
   
   // --- FIX: Ensure health never goes below 0 and both health values stay in sync ---
-  const currentHealth = Math.max(0, Math.min(MAX_HEALTH, defender.health));
+  // Use playerHealth array as the source of truth to prevent double-decrement
+  const currentHealth = Math.max(0, Math.min(MAX_HEALTH, this.playerHealth[defenderIdx]));
   const newHealth = Math.max(0, currentHealth - damage);
   
   console.log(`[HEALTH] Player ${defenderIdx + 1} health: ${currentHealth} -> ${newHealth} (damage: ${damage})`);
   
-  // Update both health references
-  defender.health = newHealth;
+  // Update both the player object AND the health array
   this.playerHealth[defenderIdx] = newHealth;
+  if (defender) {
+    defender.health = newHealth;
+  }
   
   // Force sync the other player's health reference if needed
   if (this.players[defenderIdx] && this.players[defenderIdx].health !== newHealth) {
@@ -1597,22 +1619,31 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
 
   // --- Send health update to remote player in online mode ---
   if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
-    const healthUpdate = {
-      type: 'health_update',
-      playerIndex: defenderIdx,
-      health: this.players[defenderIdx]?.health
-    };
-    console.debug('[KidsFightScene][tryAttack] SENDING health_update', {
-      healthUpdate,
-      localPlayerIndex: this.localPlayerIndex,
-      attackerIdx, defenderIdx,
-      playerHealth: this.playerHealth.slice(),
-      players: [
-        this.players[0] ? {health: this.players[0].health} : null,
-        this.players[1] ? {health: this.players[1].health} : null
-      ]
-    });
-    this.wsManager.send(JSON.stringify(healthUpdate));
+    // Only send health updates for attacks initiated by the local player
+    // This prevents double health decrements from message echoes
+    if (attackerIdx === this.localPlayerIndex) {
+      const healthUpdate = {
+        type: 'health_update',
+        playerIndex: defenderIdx,
+        health: this.playerHealth[defenderIdx]
+      };
+      console.debug('[KidsFightScene][tryAttack] SENDING health_update', {
+        healthUpdate,
+        localPlayerIndex: this.localPlayerIndex,
+        attackerIdx, defenderIdx,
+        playerHealth: this.playerHealth.slice(),
+        players: [
+          this.players[0] ? {health: this.players[0].health} : null,
+          this.players[1] ? {health: this.players[1].health} : null
+        ]
+      });
+      this.wsManager.send(JSON.stringify(healthUpdate));
+    } else {
+      console.debug('[KidsFightScene][tryAttack] NOT sending health_update for non-local player attack', {
+        localPlayerIndex: this.localPlayerIndex,
+        attackerIdx
+      });
+    }
   }
 
   // Update special pips after attack
@@ -1695,17 +1726,25 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
   private checkWinner(): boolean {
     if (this.gameOver) return false;
     
-    // Get current health values
-    const p1Health = this.players[0]?.health ?? this.playerHealth[0];
-    const p2Health = this.players[1]?.health ?? this.playerHealth[1];
+    // Always use playerHealth array as the source of truth for health values
+    const p1Health = this.playerHealth[0] ?? MAX_HEALTH;
+    const p2Health = this.playerHealth[1] ?? MAX_HEALTH;
 
-    if (p1Health <= 0) {
-      // Player 2 won
-      this.endGame(1, `${this.getDisplayName(this.p2)} Venceu!`);
-      return true;
-    } else if (p2Health <= 0) {
-      // Player 1 won
-      this.endGame(0, `${this.getDisplayName(this.p1)} Venceu!`);
+    // Debug log health values
+    console.log(`[DEBUG][checkWinner] Player 1 Health: ${p1Health}, Player 2 Health: ${p2Health}`);
+
+    if (p1Health <= 0 || p2Health <= 0) {
+      // Determine the winner based on who still has health
+      if (p1Health <= 0 && p2Health <= 0) {
+        // Both players hit 0 health at the same time (unlikely but possible)
+        this.endGame(-1, 'Empate!');
+      } else if (p1Health <= 0) {
+        // Player 2 won
+        this.endGame(1, `${this.getDisplayName(this.p2)} Venceu!`);
+      } else {
+        // Player 1 won
+        this.endGame(0, `${this.getDisplayName(this.p1)} Venceu!`);
+      }
       return true;
     } else if (this.timeLeft <= 0) {
       // Time's up - check who has more health

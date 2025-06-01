@@ -162,7 +162,7 @@ describe('KidsFightScene - Special Attack', () => {
       scene['tryAction'](0, 'special', true);
       
       // Assert - Verify damage was applied
-      expect(scene.playerHealth[1]).toBe(initialHealth - 20);
+      expect(scene.playerHealth[1]).toBe(initialHealth - 10);
       // Verify special pips were consumed
       expect((scene as any).playerSpecial[0]).toBe(0);
     });

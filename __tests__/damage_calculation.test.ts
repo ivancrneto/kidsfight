@@ -4,9 +4,9 @@ import KidsFightScene from '../kidsfight_scene';
 import { setupMockScene } from './test-utils-fix';
 
 // Test constants - must match the actual game constants for the tests to be valid
-const MAX_HEALTH = 200;
-const ATTACK_DAMAGE = 10;
-const SPECIAL_DAMAGE = 20;
+const MAX_HEALTH = 100;
+const ATTACK_DAMAGE = 5;
+const SPECIAL_DAMAGE = 10;
 
 describe('KidsFightScene - Damage Calculation', () => {
   let scene: KidsFightScene;
@@ -137,9 +137,9 @@ describe('KidsFightScene - Damage Calculation', () => {
     
     scene.tryAttack(0, 1, now, false);
     
-    // Damage should be capped at 20 (value from tryAttack method)
-    // So health should be MAX_HEALTH - 20 instead of MAX_HEALTH - 9999
-    expect(scene.playerHealth[1]).toBe(MAX_HEALTH - 20);
+    // Damage should be capped at 10 (value from tryAttack method)
+    // So health should be MAX_HEALTH - 10 instead of MAX_HEALTH - 9999
+    expect(scene.playerHealth[1]).toBe(MAX_HEALTH - 10);
     
     // Restore original damage value
     (scene as any).DAMAGE = originalDamage;
