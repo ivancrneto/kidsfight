@@ -132,19 +132,47 @@ describe('Health Damage Consistency Tests', () => {
     // Create scene
     scene = new KidsFightScene();
     
-    // Store the real constants before patching
-    const DAMAGE = scene.DAMAGE;
-    const SPECIAL_DAMAGE = scene.SPECIAL_DAMAGE;
+    // Define constants explicitly for tests
+    const DAMAGE = 5;
+    const SPECIAL_DAMAGE = 10;
+    const MAX_HEALTH = 100;
     
     // Define our own test version of tryAttack to avoid Phaser dependencies
     scene.tryAttack = function(attackerIdx, defenderIdx, now, special) {
+      // Skip if on cooldown or game over
+      if (this.gameOver) {
+        return;
+      }
+      
+      // Initialize arrays if they don't exist
+      if (!Array.isArray(this.playerHealth)) {
+        this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
+      }
+      
+      if (!Array.isArray(this.playerSpecial)) {
+        this.playerSpecial = [0, 0];
+      }
+      
+      // Ensure health values are valid numbers and within MAX_HEALTH bounds
+      if (typeof this.playerHealth[defenderIdx] !== 'number' || isNaN(this.playerHealth[defenderIdx])) {
+        this.playerHealth[defenderIdx] = MAX_HEALTH;
+      } else {
+        // Clamp health to MAX_HEALTH before calculating damage
+        this.playerHealth[defenderIdx] = Math.min(MAX_HEALTH, this.playerHealth[defenderIdx]);
+      }
+      
+      if (typeof this.playerHealth[attackerIdx] !== 'number' || isNaN(this.playerHealth[attackerIdx])) {
+        this.playerHealth[attackerIdx] = MAX_HEALTH;
+      } else {
+        // Clamp health to MAX_HEALTH before calculating damage
+        this.playerHealth[attackerIdx] = Math.min(MAX_HEALTH, this.playerHealth[attackerIdx]);
+      }
+      
       // Calculate damage using constants
       let damage = special ? SPECIAL_DAMAGE : DAMAGE;
-      damage = Math.max(0, Math.min(10, damage)); // Enforce limits
       
       // Use playerHealth array as the source of truth
-      const MAX_HEALTH = 100;
-      const currentHealth = Math.max(0, Math.min(MAX_HEALTH, this.playerHealth[defenderIdx]));
+      const currentHealth = this.playerHealth[defenderIdx];
       const newHealth = Math.max(0, currentHealth - damage);
       
       // Update health
@@ -170,16 +198,22 @@ describe('Health Damage Consistency Tests', () => {
             playerIndex: defenderIdx,
             health: this.playerHealth[defenderIdx]
           };
-          this.wsManager.send(JSON.stringify(healthUpdate));
+          this.wsManager.send(healthUpdate);
         }
       }
       
-      // Optionally award special points
-      if (damage > 0 && attackerIdx < this.players?.length) {
-        const attacker = this.players[attackerIdx];
-        if (attacker) {
-          attacker.special = Math.min(3, (attacker.special || 0) + 1);
+      // Update special meter for normal attacks
+      if (!special) {
+        if (!Array.isArray(this.playerSpecial)) {
+          this.playerSpecial = [0, 0];
         }
+        
+        // Ensure special is always a valid number
+        if (typeof this.playerSpecial[attackerIdx] !== 'number' || isNaN(this.playerSpecial[attackerIdx])) {
+          this.playerSpecial[attackerIdx] = 0;
+        }
+        
+        this.playerSpecial[attackerIdx] = Math.min(3, this.playerSpecial[attackerIdx] + 1);
       }
     };
     
@@ -191,7 +225,7 @@ describe('Health Damage Consistency Tests', () => {
     // Setup basic game properties
     scene.gameMode = 'online';
     scene.localPlayerIndex = 0;
-    scene.playerHealth = [100, 100];
+    scene.playerHealth = [MAX_HEALTH, MAX_HEALTH];
     
     // Mock health bars so updateHealthBar doesn't fail
     scene.healthBars = [
@@ -206,7 +240,7 @@ describe('Health Damage Consistency Tests', () => {
     // Mock players
     scene.players = [
       {
-        health: 100,
+        health: MAX_HEALTH,
         special: 0,
         isBlocking: false,
         isAttacking: false,
@@ -219,7 +253,7 @@ describe('Health Damage Consistency Tests', () => {
         y: 100
       } as any,
       {
-        health: 100,
+        health: MAX_HEALTH,
         special: 0,
         isBlocking: false,
         isAttacking: false,

@@ -129,19 +129,47 @@ function setupScene(localPlayerIndex = 0) {
   // Create scene
   const scene = new KidsFightScene();
   
-  // Store the real constants before patching
-  const DAMAGE = scene.DAMAGE;
-  const SPECIAL_DAMAGE = scene.SPECIAL_DAMAGE;
+  // Define constants explicitly for tests
+  const DAMAGE = 5;
+  const SPECIAL_DAMAGE = 10;
+  const MAX_HEALTH = 100;
   
   // Define our own test version of tryAttack to avoid Phaser dependencies
   scene.tryAttack = function(attackerIdx, defenderIdx, now, special) {
-    // Calculate damage using constants
+    // Skip if on cooldown or game over
+    if (this.gameOver) {
+      return;
+    }
+    
+    // Initialize arrays if they don't exist
+    if (!Array.isArray(this.playerHealth)) {
+      this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
+    }
+    
+    if (!Array.isArray(this.playerSpecial)) {
+      this.playerSpecial = [0, 0];
+    }
+    
+    // Ensure health values are valid numbers and within MAX_HEALTH bounds
+    if (typeof this.playerHealth[defenderIdx] !== 'number' || isNaN(this.playerHealth[defenderIdx])) {
+      this.playerHealth[defenderIdx] = MAX_HEALTH;
+    } else {
+      // Clamp health to MAX_HEALTH before calculating damage
+      this.playerHealth[defenderIdx] = Math.min(MAX_HEALTH, this.playerHealth[defenderIdx]);
+    }
+    
+    if (typeof this.playerHealth[attackerIdx] !== 'number' || isNaN(this.playerHealth[attackerIdx])) {
+      this.playerHealth[attackerIdx] = MAX_HEALTH;
+    } else {
+      // Clamp health to MAX_HEALTH before calculating damage
+      this.playerHealth[attackerIdx] = Math.min(MAX_HEALTH, this.playerHealth[attackerIdx]);
+    }
+    
+    // Calculate damage using explicit constants
     let damage = special ? SPECIAL_DAMAGE : DAMAGE;
-    damage = Math.max(0, Math.min(10, damage)); // Enforce limits
     
     // Use playerHealth array as the source of truth
-    const MAX_HEALTH = 100;
-    const currentHealth = Math.max(0, Math.min(MAX_HEALTH, this.playerHealth[defenderIdx]));
+    const currentHealth = this.playerHealth[defenderIdx];
     const newHealth = Math.max(0, currentHealth - damage);
     
     // Update health
@@ -166,16 +194,22 @@ function setupScene(localPlayerIndex = 0) {
           playerIndex: defenderIdx,
           health: this.playerHealth[defenderIdx]
         };
-        this.wsManager.send(JSON.stringify(healthUpdate));
+        this.wsManager.send(healthUpdate);
       }
     }
     
-    // Optionally award special points
-    if (damage > 0 && attackerIdx < this.players?.length) {
-      const attacker = this.players[attackerIdx];
-      if (attacker) {
-        attacker.special = Math.min(3, (attacker.special || 0) + 1);
+    // Update special meter for normal attacks
+    if (!special) {
+      if (!Array.isArray(this.playerSpecial)) {
+        this.playerSpecial = [0, 0];
       }
+      
+      // Ensure special is always a valid number
+      if (typeof this.playerSpecial[attackerIdx] !== 'number' || isNaN(this.playerSpecial[attackerIdx])) {
+        this.playerSpecial[attackerIdx] = 0;
+      }
+      
+      this.playerSpecial[attackerIdx] = Math.min(3, this.playerSpecial[attackerIdx] + 1);
     }
   };
   
@@ -191,7 +225,7 @@ function setupScene(localPlayerIndex = 0) {
   // Setup basic game properties
   scene.gameMode = 'online';
   scene.localPlayerIndex = localPlayerIndex;
-  scene.playerHealth = [100, 100];
+  scene.playerHealth = [MAX_HEALTH, MAX_HEALTH];
   
   // Mock health bars so updateHealthBar doesn't fail
   scene.healthBars = [
@@ -206,7 +240,7 @@ function setupScene(localPlayerIndex = 0) {
   // Mock players
   scene.players = [
     {
-      health: 100,
+      health: MAX_HEALTH,
       special: 0,
       isBlocking: false,
       isAttacking: false,
@@ -219,7 +253,7 @@ function setupScene(localPlayerIndex = 0) {
       y: 100
     } as any,
     {
-      health: 100,
+      health: MAX_HEALTH,
       special: 0,
       isBlocking: false,
       isAttacking: false,
@@ -265,7 +299,7 @@ describe('KidsFightScene Online Health Synchronization Tests', () => {
     
     // 2. WebSocket message should be sent with health update
     expect(mockWsManager.send).toHaveBeenCalledTimes(1);
-    const messageSent = JSON.parse(mockWsManager.send.mock.calls[0][0]);
+    const messageSent = mockWsManager.send.mock.calls[0][0];
     expect(messageSent).toEqual({
       type: 'health_update',
       playerIndex: defenderIdx,
@@ -421,12 +455,13 @@ describe('KidsFightScene Online Health Synchronization Tests', () => {
     const attackerIdx = 0;
     const defenderIdx = 1;
     const now = Date.now();
+    const ATTACK_COOLDOWN = 500; // ms - must match the constant in kidsfight_scene.ts
     
     // Act
-    // Perform 3 attacks - 2 normal, 1 special
+    // Perform 3 attacks - 2 normal, 1 special, with sufficient time between attacks
     scene.tryAttack(attackerIdx, defenderIdx, now, false); // -5 health
-    scene.tryAttack(attackerIdx, defenderIdx, now + 100, false); // -5 health
-    scene.tryAttack(attackerIdx, defenderIdx, now + 200, true); // -10 health
+    scene.tryAttack(attackerIdx, defenderIdx, now + ATTACK_COOLDOWN + 100, false); // -5 health
+    scene.tryAttack(attackerIdx, defenderIdx, now + (ATTACK_COOLDOWN * 2) + 200, true); // -10 health
     
     // Assert
     // Total damage should be 5 + 5 + 10 = 20

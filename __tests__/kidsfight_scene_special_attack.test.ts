@@ -38,6 +38,15 @@ describe('KidsFightScene - Special Attack', () => {
     
     // Setup Phaser mocks before init/create
     setupPhaserMocks(scene);
+    scene.playersReady = true;
+    // Mock sys.game.canvas for updateSpecialPips
+    scene.sys = {
+      ...scene.sys,
+      game: {
+        ...((scene.sys && scene.sys.game) || {}),
+        canvas: { width: 800, height: 480 }
+      }
+    } as any;
     
     // Mock Phaser time
     scene.time = {
@@ -51,14 +60,16 @@ describe('KidsFightScene - Special Attack', () => {
     };
     
     // Initialize scene properties needed for testing
+    // Always use valid mock players for both slots
     scene.players = [mockPlayer, { ...mockPlayer }];
     scene.localPlayerIndex = 0;
     scene.gameMode = 'single';
-    
-    // Use type assertion to access private properties in test
     (scene as any).playerSpecial = [3, 0]; // Start with 3 pips for player 1
     scene.playerHealth = [100, 100];
     scene.isAttacking = [false, false];
+
+    scene.updateHealthBar = jest.fn();
+    scene.checkWinner = jest.fn();
     scene.playerBlocking = [false, false];
     scene.lastAttackTime = [0, 0];
     (scene as any).lastSpecialTime = [0, 0];
@@ -150,12 +161,36 @@ describe('KidsFightScene - Special Attack', () => {
     it('should apply special damage to opponent', () => {
       // Arrange
       // Initialize players with proper health and mock methods
-      scene.players = [
-        { health: 100, setData: jest.fn() },
-        { health: 100, setData: jest.fn() }
-      ];
+      const mockPlayer1 = { 
+        health: 100, 
+        setData: jest.fn(),
+        body: { blocked: { down: true } },
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn()
+      };
+      const mockPlayer2 = { 
+        health: 100, 
+        setData: jest.fn(),
+        body: { blocked: { down: true } },
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn()
+      };
+      
+      // Set up scene state
+      scene.players = [mockPlayer1, mockPlayer2];
       scene.playerHealth = [100, 100];
       (scene as any).playerSpecial = [3, 0]; // Full special meter
+      (scene as any).playersReady = true; // Ensure players are ready
+      scene.gameOver = false; // Ensure game is not over
+      
+      // Mock getTime to control timing
+      const now = Date.now();
+      const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
+        // @ts-ignore
+        return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
+      });
+      jest.spyOn(scene, 'getTime').mockReturnValue(now);
+      
       const initialHealth = scene.playerHealth[1];
       
       // Act

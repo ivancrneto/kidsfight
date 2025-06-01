@@ -453,19 +453,19 @@ setVisible: jest.fn().mockReturnThis(),
       it('should handle remote attack actions', () => {
         scene.isHost = true;
         scene.gameMode = 'online';
-        scene.tryAction = jest.fn();
+        scene.tryAttack = jest.fn();
         const attackAction = { type: 'attack', playerIndex: 0 };
         scene.handleRemoteAction(attackAction);
-        expect(scene.tryAction).toHaveBeenCalledWith(0, 'attack', false);
+        expect(scene.tryAttack).toHaveBeenCalledWith(0, 1, expect.any(Number), false);
       });
       
       it('should handle remote special actions', () => {
         scene.isHost = true;
         scene.gameMode = 'online';
-        scene.tryAction = jest.fn();
+        scene.tryAttack = jest.fn();
         const specialAction = { type: 'special', playerIndex: 0 };
         scene.handleRemoteAction(specialAction);
-        expect(scene.tryAction).toHaveBeenCalledWith(0, 'special', true);
+        expect(scene.tryAttack).toHaveBeenCalledWith(0, 1, expect.any(Number), true);
       });
       
       it('should handle remote block actions', () => {

@@ -57,8 +57,10 @@ function createTestScene() {
 describe('KidsFightScene Health & Damage Logic', () => {
   it('should require 20 normal hits to KO a player', () => {
     const scene: any = createTestScene();
+    const now = Date.now();
+    // Each attack needs to be at least 500ms apart due to cooldown
     for (let i = 0; i < 20; i++) {
-      scene.tryAttack(0, 1, Date.now(), false); // normal attack
+      scene.tryAttack(0, 1, now + (i * 600), false);
     }
     expect(scene.players[1].health).toBe(0);
     expect(scene.playerHealth[1]).toBe(0);
@@ -91,9 +93,31 @@ describe('KidsFightScene Health & Damage Logic', () => {
 
   it('should apply correct damage for normal and special attacks', () => {
     const scene: any = createTestScene();
-    scene.tryAttack(0, 1, Date.now(), false); // normal
-    expect(scene.players[1].health).toBe(95);
-    scene.tryAttack(0, 1, Date.now(), true); // special
-    expect(scene.players[1].health).toBe(85);
+    const now = Date.now();
+    
+    // Set up players and game state
+    scene.players = [
+      { health: 100, setData: jest.fn(), body: { blocked: { down: false } } },
+      { health: 100, setData: jest.fn(), body: { blocked: { down: false } } }
+    ];
+    scene.playerHealth = [100, 100];
+    (scene as any).playerSpecial = [3, 0]; // Full special meter
+    (scene as any).playersReady = true;
+    scene.gameOver = false;
+    
+    // Mock getTime to control timing
+    jest.spyOn(scene, 'getTime').mockReturnValue(now);
+    
+    // First attack (normal)
+    scene['tryAction'](0, 'attack', false);
+    expect(scene.playerHealth[1]).toBe(95);
+    
+    // Update time for cooldown
+    const newTime = now + 1000;
+    (scene.getTime as jest.Mock).mockReturnValue(newTime);
+    
+    // Second attack (special)
+    scene['tryAction'](0, 'special', true);
+    expect(scene.playerHealth[1]).toBe(85);
   });
 });

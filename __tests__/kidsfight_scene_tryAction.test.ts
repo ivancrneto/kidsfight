@@ -15,33 +15,45 @@ describe('KidsFightScene.tryAction', () => {
     } as any;
     scene.cameras = { main: { width: 800, height: 480, shake: jest.fn() } } as any;
     scene.physics = { pause: jest.fn() } as any;
-    scene.players = [
-      { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
-      { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any,
-    ];
+    // Always use valid mock players for both slots
+    const mockPlayer = { health: 100, setData: jest.fn(), setFrame: jest.fn(), setAngle: jest.fn(), setVelocityX: jest.fn(), setFlipX: jest.fn(), setVelocityY: jest.fn(), body: { blocked: { down: true }, touching: { down: true }, velocity: { x: 0, y: 0 } }, anims: { getFrameName: jest.fn() } } as any;
+    scene.players = [mockPlayer, { ...mockPlayer }];
     scene.playerHealth = [100, 100];
     scene.playerSpecial = [0, 0];
+    scene.playersReady = true;
+    scene.updateSpecialPips = jest.fn();
+    scene.updateHealthBar = jest.fn();
+    scene.checkWinner = jest.fn();
     scene.gameOver = false;
     now = Date.now();
   });
 
   it('should not perform action if players are not ready', () => {
     scene.players = [null, null];
-    const spy = jest.spyOn(scene, 'tryAttack');
+    const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
+  // @ts-ignore
+  return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
+});
     scene.tryAction(0, 'attack', false);
     expect(spy).not.toHaveBeenCalled();
   });
 
   it('should not perform special if not enough pips', () => {
     scene.playerSpecial[0] = 2;
-    const spy = jest.spyOn(scene, 'tryAttack');
+    const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
+  // @ts-ignore
+  return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
+});
     scene.tryAction(0, 'special', true);
     expect(spy).not.toHaveBeenCalled();
   });
 
   it('should consume all pips and call tryAttack for special', () => {
     scene.playerSpecial[0] = 3;
-    const spy = jest.spyOn(scene, 'tryAttack');
+    const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
+  // @ts-ignore
+  return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
+});
     scene.updateSpecialPips = jest.fn();
     scene.tryAction(0, 'special', true);
     expect(scene.playerSpecial[0]).toBe(0);
@@ -50,14 +62,20 @@ describe('KidsFightScene.tryAction', () => {
   });
 
   it('should call tryAttack for normal attack', () => {
-    const spy = jest.spyOn(scene, 'tryAttack');
+    const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
+  // @ts-ignore
+  return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
+});
     scene.tryAction(0, 'attack', false);
     expect(spy).toHaveBeenCalledWith(0, 1, expect.any(Number), false);
   });
 
   it('should not fail if attacker or target is missing', () => {
     scene.players[1] = null;
-    const spy = jest.spyOn(scene, 'tryAttack');
+    const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
+  // @ts-ignore
+  return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
+});
     scene.tryAction(0, 'attack', false);
     expect(spy).not.toHaveBeenCalled();
   });

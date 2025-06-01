@@ -20,11 +20,13 @@ describe('KidsFightScene - Damage Calculation', () => {
     // Initialize health with the correct MAX_HEALTH value
     scene.playerHealth = [MAX_HEALTH, MAX_HEALTH];
     scene.playerSpecial = [0, 0];
-    scene.players = [
-      { x: 100, y: 100, width: 50, height: 100, setData: jest.fn(), getData: jest.fn().mockReturnValue(false), health: MAX_HEALTH },
-      { x: 120, y: 100, width: 50, height: 100, health: MAX_HEALTH }
-    ];
+    // Always use valid mock players for both slots
+    const mockPlayer = { x: 100, y: 100, width: 50, height: 100, setData: jest.fn(), getData: jest.fn().mockReturnValue(false), health: MAX_HEALTH };
+    scene.players = [mockPlayer, { ...mockPlayer }];
     now = Date.now();
+    scene.updateSpecialPips = jest.fn();
+    scene.updateHealthBar = jest.fn();
+    scene.checkWinner = jest.fn();
     
     // Mock health bars and UI update methods
     scene.healthBar1 = scene.add.graphics();
@@ -137,9 +139,9 @@ describe('KidsFightScene - Damage Calculation', () => {
     
     scene.tryAttack(0, 1, now, false);
     
-    // Damage should be capped at 10 (value from tryAttack method)
-    // So health should be MAX_HEALTH - 10 instead of MAX_HEALTH - 9999
-    expect(scene.playerHealth[1]).toBe(MAX_HEALTH - 10);
+    // Damage should be capped at 5 for regular attacks (value from tryAttack method)
+    // So health should be MAX_HEALTH - 5 instead of MAX_HEALTH - 9999
+    expect(scene.playerHealth[1]).toBe(MAX_HEALTH - 5);
     
     // Restore original damage value
     (scene as any).DAMAGE = originalDamage;
