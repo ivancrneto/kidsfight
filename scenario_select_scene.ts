@@ -171,7 +171,8 @@ class ScenarioSelectScene extends Phaser.Scene {
               p2: data.p2Char.replace('_select', ''),
               scenario: data.scenario,
               roomCode: data.roomCode,
-              isHost: false
+              isHost: data.isHost,
+              playerIndex: data.playerIndex
             });
           }
         } catch (e) {

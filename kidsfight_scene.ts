@@ -75,8 +75,8 @@ export function stretchBackgroundToFill(bg: any, width: number, height: number):
 
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 480;
-const MAX_HEALTH = 100; // Each health bar represents this amount of health
-const TOTAL_HEALTH = MAX_HEALTH * 2; // Double health
+const MAX_HEALTH = 200; // Each health bar represents this amount of health
+const TOTAL_HEALTH = MAX_HEALTH; // Total health per player
 const ATTACK_DAMAGE = 10;
 const SPECIAL_DAMAGE = 20;
 const ATTACK_COOLDOWN = 500; // ms
@@ -194,9 +194,9 @@ class KidsFightScene extends Phaser.Scene {
     blockButton?: Phaser.GameObjects.Rectangle;
   };
 
-  private readonly TOTAL_HEALTH: number = 100;
-  private readonly DAMAGE: number = 2.5;
-  private readonly SPECIAL_DAMAGE: number = 20;
+  private readonly TOTAL_HEALTH: number = MAX_HEALTH;
+  private readonly DAMAGE: number = ATTACK_DAMAGE;
+  private readonly SPECIAL_DAMAGE: number = SPECIAL_DAMAGE;
   private readonly SPECIAL_COST: number = 3;
   private readonly ROUND_TIME: number = 99;
 
@@ -222,7 +222,7 @@ class KidsFightScene extends Phaser.Scene {
     this.isHost = false;
     this.touchControls = {};
     this.touchControlsVisible = false;
-    this.playerHealth = [MAX_HEALTH * 2, MAX_HEALTH * 2];
+    this.playerHealth = [MAX_HEALTH, MAX_HEALTH]; // Always 200
     this.playerSpecial = [0, 0];
     this.playerDirection = ['right', 'left'];
     this.isAttacking = [false, false];
@@ -248,9 +248,12 @@ class KidsFightScene extends Phaser.Scene {
   // Initialization methods
   init(data: SceneData): void {
     console.log('KidsFightScene init with data:', data);
-    this.selected = data.selected || {p1: 'player1', p2: 'player2'};
-    this.p1 = data.p1 || (this.selected.p1 || 'player1');
-    this.p2 = data.p2 || (this.selected.p2 || 'player2');
+    // Accept both p1/p2 and p1Char/p2Char for compatibility
+    const p1Key = data.p1Char || data.p1 || (data.selected?.p1) || 'player1';
+    const p2Key = data.p2Char || data.p2 || (data.selected?.p2) || 'player2';
+    this.selected = { p1: p1Key, p2: p2Key };
+    this.p1 = p1Key;
+    this.p2 = p2Key;
     // DEBUG: Log incoming player keys
     console.log('[DEBUG][KidsFightScene.init] incoming p1:', this.p1, 'p2:', this.p2);
     // Fallback: if p1 or p2 is not a valid sprite key, set default
@@ -304,7 +307,7 @@ class KidsFightScene extends Phaser.Scene {
     // Reset game state
     this.gameOver = false;
     this.timeLeft = this.ROUND_TIME;
-    this.playerHealth = [MAX_HEALTH * 2, MAX_HEALTH * 2];
+    this.playerHealth = [MAX_HEALTH, MAX_HEALTH]; // Always 200
     this.playerSpecial = [0, 0];
     this.isAttacking = [false, false];
     this.playerBlocking = [false, false];
@@ -448,6 +451,7 @@ class KidsFightScene extends Phaser.Scene {
     this.physics.add.collider(this.players[0], upperPlatform);
     this.physics.add.collider(this.players[1], upperPlatform);
 
+    // --- FORCE HEALTH INIT TO 200 ---
     this.players.forEach((player, index) => {
       if (!player) return;
       const isPlayer1 = index === 0;
@@ -456,14 +460,13 @@ class KidsFightScene extends Phaser.Scene {
       player.setGravityY?.(300);
       player.setSize?.(80, 200);
       player.setOffset?.(92, 32);
-      
       // Set custom properties
-      player.health = MAX_HEALTH * 2;
+      player.health = MAX_HEALTH; // Always 200
+      this.playerHealth[index] = MAX_HEALTH; // Always 200
       player.special = 0;
       player.isBlocking = false;
       player.isAttacking = false;
       player.direction = isPlayer1 ? 'right' : 'left';
-      
       console.log(`Created player ${index + 1} with sprite: ${isPlayer1 ? this.p1 : this.p2}`, {
         position: { x: player.x, y: player.y },
         direction: player.direction,
@@ -578,8 +581,8 @@ class KidsFightScene extends Phaser.Scene {
 
     // Initialize playerHealth array to match player health
     this.playerHealth = [
-      (this.players[0] && typeof this.players[0].health === 'number') ? this.players[0].health : 200,
-      (this.players[1] && typeof this.players[1].health === 'number') ? this.players[1].health : 200
+      (this.players[0] && typeof this.players[0].health === 'number') ? this.players[0].health : MAX_HEALTH,
+      (this.players[1] && typeof this.players[1].health === 'number') ? this.players[1].health : MAX_HEALTH
     ];
     console.log('[DEBUG] playerHealth initialized:', this.playerHealth);
 
@@ -735,9 +738,9 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
     this.healthBar2.setDepth(1000);
 
     // Initialize both players' health to max
-    this.playerHealth = [this.TOTAL_HEALTH, this.TOTAL_HEALTH];
-    if (this.players[0]) this.players[0].health = this.TOTAL_HEALTH;
-    if (this.players[1]) this.players[1].health = this.TOTAL_HEALTH;
+    this.playerHealth = [MAX_HEALTH, MAX_HEALTH]; // Always 200
+    if (this.players[0]) this.players[0].health = MAX_HEALTH; // Always 200
+    if (this.players[1]) this.players[1].health = MAX_HEALTH; // Always 200
 
     // Force update both health bars
     this.updateHealthBar(0);
@@ -745,8 +748,10 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
   }
 
   private updateHealthBar(playerIndex: number): void {
+    // Guard for test environments
+    if (!this.sys?.game?.canvas) return;
     // Single health bar logic (no double health, no two-layer stacking)
-    const maxHealth = 100; // MAX_HEALTH
+    const maxHealth = MAX_HEALTH; // Match TOTAL_HEALTH and playerHealth
     const gameWidth = this.sys.game.canvas.width;
     const scaleX = gameWidth / 800;
     const barWidth = 300 * scaleX;
@@ -763,7 +768,10 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
     if (playerIndex === 0) {
       // Player 1 (left)
       let p1 = Math.max(0, Math.min(maxHealth, this.playerHealth[0]));
-      // Draw depleted background (gray) is handled by healthBarBg1
+      // Draw depleted background (gray)
+      this.healthBar1.fillStyle(0x444444);
+      this.healthBar1.fillRect(barX1 - barWidth / 2, barY - barHeight / 2, barWidth, barHeight);
+      // Draw main layer (green)
       if (p1 > 0) {
         const greenWidth = barWidth * (p1 / maxHealth);
         this.healthBar1.fillStyle(0x00ff00);
@@ -772,6 +780,10 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
     } else if (playerIndex === 1) {
       // Player 2 (right)
       let p2 = Math.max(0, Math.min(maxHealth, this.playerHealth[1]));
+      // Draw depleted background (gray)
+      this.healthBar2.fillStyle(0x444444);
+      this.healthBar2.fillRect(barX2 - barWidth / 2, barY - barHeight / 2, barWidth, barHeight);
+      // Draw main layer (red)
       if (p2 > 0) {
         const redWidth = barWidth * (p2 / maxHealth);
         this.healthBar2.fillStyle(0xff0000);
@@ -1185,44 +1197,141 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
         break;
       case 'block':
         this.playerBlocking[this.localPlayerIndex] = active;
-        break;
-    }
-    // Optionally update button visuals here
+}
   }
 
-  private handleAttack(): void {
-    console.log('[DEBUG] After alert in handleAttack');
+// --- Touch Button Handlers ---
+private handleLeftDown(): void {
+  console.log('[KidsFightScene] handleLeftDown called');
+  this.updateTouchControlState('left', true);
+  if (this.gameMode === 'online' && this.wsManager) {
+    const moveMsg = {
+      type: 'move',
+      direction: -1,
+      playerIndex: this.localPlayerIndex
+    };
+    console.debug('[KidsFightScene][WS SEND]', moveMsg); // DEBUG: Log outgoing move
+    this.wsManager.send(moveMsg);
 
     try {
-      console.debug('[KidsFightScene][handleAttack] CALLED', { localPlayerIndex: this.localPlayerIndex, gameMode: this.gameMode });
+      console.debug('[KidsFightScene][handleSpecial] CALLED', { localPlayerIndex: this.localPlayerIndex, gameMode: this.gameMode });
       const player = this.players[this.localPlayerIndex];
       if (player) {
-        player.setData('isAttacking', true);
+        player.setData('isSpecialAttacking', true);
       }
-      this.tryAction(this.localPlayerIndex, 'attack', false);
+      this.tryAction(this.localPlayerIndex, 'special', false);
       if (this.gameMode === 'online' && this.wsManager) {
-        console.debug('[KidsFightScene][WS SEND ATTACK]', { playerIndex: this.localPlayerIndex });
+        console.debug('[KidsFightScene][WS SEND SPECIAL]', { playerIndex: this.localPlayerIndex });
         this.wsManager.send({
-          type: 'attack',
+          type: 'special',
           playerIndex: this.localPlayerIndex
         });
       }
       setTimeout(() => {
         const p = this.players[this.localPlayerIndex];
-        if (p) p.setData('isAttacking', false);
+        if (p) p.setData('isSpecialAttacking', false);
       }, 300);
     } catch (error) {
-      console.error('[KidsFightScene][handleAttack] ERROR', error);
+      console.error('[KidsFightScene][handleSpecial] ERROR', error);
     }
   }
+}
 
-  private handleSpecial(): void {
+private handleRightUp(): void {
+  this.updateTouchControlState('right', false);
+  if (this.gameMode === 'online' && this.wsManager && this.players[this.localPlayerIndex]) {
+    // Immediately send position_update on stop
     const player = this.players[this.localPlayerIndex];
-    if (player) {
-      player.setData('isSpecialAttacking', true);
-    }
-    this.tryAction(this.localPlayerIndex, 'special', true);
+    const curr = {
+      x: player.x,
+      y: player.y,
+      velocityX: player.body?.velocity.x || 0,
+      velocityY: player.body?.velocity.y || 0,
+      flipX: player.flipX,
+      frame: (typeof player.frame === 'object' && player.frame !== null && 'name' in player.frame)
+        ? player.frame.name
+        : (typeof player.frame === 'string' || typeof player.frame === 'number')
+          ? player.frame
+          : (player.anims?.getFrameName?.() || null)
+    };
+    const positionMsg = {
+      type: 'position_update',
+      playerIndex: this.localPlayerIndex,
+      ...curr
+    };
+    this.wsManager.send(positionMsg);
+    this._lastSentPosition = { ...curr };
+  }
+}
+
+private handleJumpDown(): void {
+  this.updateTouchControlState('jump', true);
+  if (this.gameMode === 'online' && this.wsManager) {
+    this.wsManager.send({
+      type: 'jump',
+      playerIndex: this.localPlayerIndex
+    });
+  }
+}
+
+private handleJumpUp(): void {
+  this.updateTouchControlState('jump', false);
+}
+
+public updateTouchControlState(
+  control: 'left' | 'right' | 'jump' | 'attack' | 'special' | 'block',
+  active: boolean
+): void {
+  // Use correct player index in all modes
+  const player = this.players[this.localPlayerIndex];
+  if (!player) return;
+  switch (control) {
+    case 'left':
+      player.setVelocityX(active ? -160 : 0);
+      break;
+    case 'right':
+      player.setVelocityX(active ? 160 : 0);
+      break;
+    case 'jump':
+      if (active && player.body && ((player.body.blocked && player.body.blocked.down) || (player.body.touching && player.body.touching.down))) {
+        player.setVelocityY(-330); // Standard jump
+      }
+      break;
+    case 'attack':
+      if (active) this.handleAttack();
+      break;
+    case 'special':
+      if (active) this.handleSpecial();
+      break;
+    case 'block':
+      this.playerBlocking[this.localPlayerIndex] = active;
+  }
+}
+
+private handleSpecial(): void {
+  // Only allow special if player has enough pips
+  if (this.playerSpecial[this.localPlayerIndex] < 3) {
+    console.warn('[KidsFightScene][handleSpecial] Tried to play special animation without enough pips:', this.playerSpecial[this.localPlayerIndex]);
+    return;
+  }
+  const player = this.players[this.localPlayerIndex];
+  if (player) {
+    player.setData('isSpecialAttacking', true);
+  }
+  this.tryAction(this.localPlayerIndex, 'special', true);
+  if (this.gameMode === 'online' && this.wsManager) {
+    this.wsManager.send({
+      type: 'special',
+      playerIndex: this.localPlayerIndex
+    });
+  }
+  setTimeout(() => {
+    const p = this.players[this.localPlayerIndex];
+    if (p) p.setData('isSpecialAttacking', false);
+  }, 300);
+    this.tryAction(this.localPlayerIndex, 'special', false);
     if (this.gameMode === 'online' && this.wsManager) {
+      console.debug('[KidsFightScene][WS SEND SPECIAL]', { playerIndex: this.localPlayerIndex });
       this.wsManager.send({
         type: 'special',
         playerIndex: this.localPlayerIndex
@@ -1232,7 +1341,31 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
       const p = this.players[this.localPlayerIndex];
       if (p) p.setData('isSpecialAttacking', false);
     }, 300);
+
+}
+
+private handleAttack(): void {
+  try {
+    console.debug('[KidsFightScene][handleAttack] CALLED', { localPlayerIndex: this.localPlayerIndex, gameMode: this.gameMode });
+    const player = this.players[this.localPlayerIndex];
+    if (player) {
+      player.setData('isAttacking', true);
+    }
+    this.tryAction(this.localPlayerIndex, 'attack', false);
+    if (this.gameMode === 'online' && this.wsManager) {
+      this.wsManager.send({
+        type: 'attack',
+        playerIndex: this.localPlayerIndex
+      });
+    }
+    setTimeout(() => {
+      const p = this.players[this.localPlayerIndex];
+      if (p) p.setData('isAttacking', false);
+    }, 250);
+  } catch (error) {
+    console.error('[KidsFightScene][handleAttack] ERROR', error);
   }
+}
 
   private endGame(winnerIndex: number, message: string = ''): void {
     this.gameOver = true;
@@ -1453,34 +1586,51 @@ private tryAction(playerIndex: number, actionType: 'attack' | 'special', isSpeci
   const attacker = this.players[playerIndex];
   const targetIndex = playerIndex === 0 ? 1 : 0;
   const target = this.players[targetIndex];
-  if (attacker && target) {
-    this.tryAttack(playerIndex, targetIndex, now, isSpecial);
+  if (!attacker || !target) return;
+
+  if (isSpecial) {
+    if (this.playerSpecial[playerIndex] < 3) {
+      // Not enough pips for special attack
+      console.warn(`[KidsFightScene][tryAction] Player ${playerIndex + 1} tried special with only ${this.playerSpecial[playerIndex]} pips (need 3)`);
+      // Optionally: Provide UI feedback here
+      return;
+    } else {
+      // Enough pips: consume all pips
+      this.playerSpecial[playerIndex] = 0;
+      this.updateSpecialPips();
+    }
   }
+  this.tryAttack(playerIndex, targetIndex, now, isSpecial);
 }
 
 private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special: boolean) {
-  console.debug('[KidsFightScene][tryAttack] START', {
-    attackerIdx, defenderIdx, now, special,
+  // EXTREMELY DETAILED LOGGING FOR DEBUGGING
+  console.log('[DEBUG][tryAttack][START]', {
+    attackerIdx,
+    defenderIdx,
+    attackerHealth: this.players[attackerIdx]?.health,
+    defenderHealth: this.players[defenderIdx]?.health,
+    playerHealthArray: this.playerHealth.slice(),
+    DAMAGE: this.DAMAGE,
+    SPECIAL_DAMAGE: this.SPECIAL_DAMAGE,
+    TOTAL_HEALTH: this.TOTAL_HEALTH,
+    special,
     gameMode: this.gameMode,
-    wsManager: !!this.wsManager,
-    players: [
-      this.players[0] ? {health: this.players[0].health} : null,
-      this.players[1] ? {health: this.players[1].health} : null
-    ],
-    playerHealth: this.playerHealth.slice(),
-    playerSpecial: this.playerSpecial.slice(),
+    isHost: this.isHost,
+    localPlayerIndex: this.localPlayerIndex,
+    stack: new Error().stack
   });
-  console.debug('[KidsFightScene][tryAttack] CALLED', {
-    attackerIdx, defenderIdx, now, special,
-    gameMode: this.gameMode,
-    wsManager: !!this.wsManager,
-    players: [
-      this.players[0] ? {health: this.players[0].health} : null,
-      this.players[1] ? {health: this.players[1].health} : null
-    ]
-  });
-  // LOG: Before sending health update
-  const preAttackHealth = this.playerHealth.slice();
+  if (console.trace) console.trace('[DEBUG][tryAttack][TRACE]');
+  // Calculate damage using class fields, ensure hard cap
+  let damage = special ? this.SPECIAL_DAMAGE : this.DAMAGE;
+  if (damage > 20) {
+    console.error('[DEBUG][tryAttack][ERROR] Damage value too high:', damage);
+    damage = 20;
+  }
+  if (damage < 0) {
+    console.error('[DEBUG][tryAttack][ERROR] Damage value negative:', damage);
+    damage = 0;
+  }
   // Defensive guard: prevent attack if players aren't ready
   if (!this.players[0] || !this.players[1]) {
     console.warn('[SCENE] Players not ready for attack', this.players);
@@ -1500,25 +1650,11 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
     player2Health: this.players[1]?.health
   });
   
-  // Calculate damage using class fields
-  const damage = special ? this.SPECIAL_DAMAGE : this.DAMAGE;
-  
-  // Log before applying damage
-  console.debug('[KidsFightScene][tryAttack] BEFORE DAMAGE', {
-    defenderIdx,
-    defenderHealthBefore: defender.health,
-    playerHealthBefore: this.playerHealth[defenderIdx]
-  });
-  // Apply damage to both the player object and the health array
-  defender.health = Math.max(0, defender.health - damage);
-  this.playerHealth[defenderIdx] = Math.max(0, this.playerHealth[defenderIdx] - damage);
-  // Log after applying damage
-  console.debug('[KidsFightScene][tryAttack] AFTER DAMAGE', {
-    defenderIdx,
-    defenderHealthAfter: defender.health,
-    playerHealthAfter: this.playerHealth[defenderIdx]
-  });
-  
+  // --- FIX: Ensure health never goes below 0 and both health values stay in sync ---
+  const newHealth = Math.max(0, defender.health - damage);
+  defender.health = newHealth;
+  this.playerHealth[defenderIdx] = newHealth;
+
   console.log('[TRYATTACK] AFTER', {
     attackerIdx,
     defenderIdx,
@@ -1570,62 +1706,62 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
   }
 }
 
-private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: number): void {
-  const player = playerIndex === 0 ? this.players[0] : this.players[1];
-  if (!player) return;
-  // Debug log for animation frame
-  // console.log(`[DEBUG][Anim] Player ${playerIndex + 1} anim update`, {
-  //   key: player.texture.key,
-  //   frame: player.frame ? player.frame.name : undefined,
-  //   width: player.width,
-  //   height: player.height,
-  //   displayWidth: player.displayWidth,
-  //   displayHeight: player.displayHeight
-  // });
+  private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: number): void {
+    const player = playerIndex === 0 ? this.players[0] : this.players[1];
+    if (!player) return;
+    // Debug log for animation frame
+    // console.log(`[DEBUG][Anim] Player ${playerIndex + 1} anim update`, {
+    //   key: player.texture.key,
+    //   frame: player.frame ? player.frame.name : undefined,
+    //   width: player.width,
+    //   height: player.height,
+    //   displayWidth: player.displayWidth,
+    //   displayHeight: player.displayHeight
+    // });
 
-  // If called with isWalking parameter (legacy call)
-  if (isWalking !== undefined) {
-    // Use setFrame for walk animation
-    if (isWalking) {
-      // Alternate between frames 1 and 2 based on current time
-      const frame = (Math.floor(Date.now() / 120) % 2) + 1; // 1 or 2
-      player.setFrame(frame);
-    } else {
-      player.setFrame(0); // Idle frame
+    // If called with isWalking parameter (legacy call)
+    if (isWalking !== undefined) {
+      // Use setFrame for walk animation
+      if (isWalking) {
+        // Alternate between frames 1 and 2 based on current time
+        const frame = (Math.floor(Date.now() / 120) % 2) + 1; // 1 or 2
+        player.setFrame(frame);
+      } else {
+        player.setFrame(0); // Idle frame
+      }
+      return;
     }
-    return;
-  }
 
-  // New animation logic
-  if (player.getData('isHit')) {
-    // Optionally set a hit frame
-    player.setFrame(3); // Example: frame 3 for hit
-    // DEBUG
-    //console.log('ANIM: HIT', playerIndex);
-  } else if (player.getData('isSpecialAttacking')) {
-    player.setFrame(6); // Frame 6 for special attack (last valid frame)
-    // DEBUG
-    //console.log('ANIM: SPECIAL ATTACK', playerIndex);
-  } else if (player.getData('isAttacking')) {
-    player.setFrame(4); // Frame 4 for attack
-    // DEBUG
-    //console.log('ANIM: ATTACK', playerIndex);
-  } else if (player.body && !player.body.blocked.down) {
-    player.setFrame(0); // Use idle frame for jump (customize if needed)
-    // DEBUG
-    //console.log('ANIM: JUMP', playerIndex);
-  } else if (player.body && player.body.blocked.down && Math.abs(player.body.velocity.x) > 2) {
-    // Walking: alternate between frame 1 and 2
-    const frame = (Math.floor(Date.now() / 120) % 2) + 1;
-    player.setFrame(frame);
-    // DEBUG
-    //console.log('ANIM: WALK', playerIndex, player.body.velocity.x);
-  } else {
-    player.setFrame(0); // Idle
-    // DEBUG
-    //console.log('ANIM: IDLE', playerIndex);
+    // New animation logic
+    if (player.getData('isHit')) {
+      // Optionally set a hit frame
+      player.setFrame(3); // Example: frame 3 for hit
+      // DEBUG
+      //console.log('ANIM: HIT', playerIndex);
+    } else if (player.getData('isSpecialAttacking')) {
+      player.setFrame(6); // Frame 6 for special attack (last valid frame)
+      // DEBUG
+      //console.log('ANIM: SPECIAL ATTACK', playerIndex);
+    } else if (player.getData('isAttacking')) {
+      player.setFrame(4); // Frame 4 for attack
+      // DEBUG
+      //console.log('ANIM: ATTACK', playerIndex);
+    } else if (player.body && !player.body.blocked.down) {
+      player.setFrame(0); // Use idle frame for jump (customize if needed)
+      // DEBUG
+      //console.log('ANIM: JUMP', playerIndex);
+    } else if (player.body && player.body.blocked.down && Math.abs(player.body.velocity.x) > 2) {
+      // Walking: alternate between frame 1 and 2
+      const frame = (Math.floor(Date.now() / 120) % 2) + 1;
+      player.setFrame(frame);
+      // DEBUG
+      //console.log('ANIM: WALK', playerIndex, player.body.velocity.x);
+    } else {
+      player.setFrame(0); // Idle
+      // DEBUG
+      //console.log('ANIM: IDLE', playerIndex);
+    }
   }
-}
 
   private showTouchControls(visible: boolean): void {
     // Show/hide all known touch control buttons if they exist

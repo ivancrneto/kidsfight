@@ -143,21 +143,38 @@ describe('handleRemoteAction', () => {
       }
     ];
     scene = new TestableKidsFightScene();
+    scene.sys = { game: { canvas: { width: 800, height: 480 } } } as any;
+    scene.healthBar1 = { clear: jest.fn(), fillStyle: jest.fn(), fillRect: jest.fn(), setDepth: jest.fn(), setVisible: jest.fn() } as any;
+    scene.healthBar2 = { clear: jest.fn(), fillStyle: jest.fn(), fillRect: jest.fn(), setDepth: jest.fn(), setVisible: jest.fn() } as any;
+    scene.add = {
+      graphics: jest.fn(() => ({ clear: jest.fn(), fillStyle: jest.fn(), fillRect: jest.fn(), setDepth: jest.fn() })),
+      rectangle: jest.fn(),
+      text: jest.fn(() => ({ setOrigin: jest.fn().mockReturnThis(), setInteractive: jest.fn().mockReturnThis(), setDepth: jest.fn().mockReturnThis(), on: jest.fn().mockReturnThis() }))
+    } as any;
+    scene.cameras = { main: { width: 800, height: 480, shake: jest.fn() } } as any;
+    scene.physics = { pause: jest.fn() } as any;
     scene.players = playerMocks;
-    mockPlayer1 = playerMocks[0];
-    mockPlayer2 = playerMocks[1];
-    
-    // Set up test environment
+    scene.playerHealth = [100, 100];
+    scene.playerSpecial = [0, 0];
+    scene.gameOver = false;
+    scene.wsManager = {
+      send: jest.fn(),
+      isHost: true,
+      setHost: jest.fn(),
+      onMessage: jest.fn(),
+      close: jest.fn(),
+    } as any;
     (scene as any).isHost = true;
     (scene as any).gameMode = 'online';
     (scene as any).playerDirection = ['right', 'left'];
     (scene as any).playerBlocking = [false, false];
     (scene as any).lastAttackTime = [0, 0];
     (scene as any).lastSpecialTime = [0, 0];
-    (scene as any).gameOver = false;
     (scene as any).time = {
       delayedCall: jest.fn((time, callback) => callback())
     };
+    mockPlayer1 = playerMocks[0];
+    mockPlayer2 = playerMocks[1];
   });
 
   it('should handle move action for player 1', () => {
@@ -247,17 +264,21 @@ describe('handleRemoteAction', () => {
     const mockTryAttack = jest.fn();
     (scene as any).tryAttack = mockTryAttack;
     
+    // Set up required special pips (3) for player 1
+    (scene as any).playerSpecial = [3, 3];
+    
     // Test special for player 1
     scene.testHandleRemoteAction({ type: 'special', playerIndex: 0 });
-    expect(mockTryAttack).toHaveBeenCalled();
+    expect(mockTryAttack).toHaveBeenCalledWith(0, 1, now, true);
     
     // Test special for player 2
     jest.clearAllMocks();
     scene.testHandleRemoteAction({ type: 'special', playerIndex: 1 });
-    expect(mockTryAttack).toHaveBeenCalled();
+    expect(mockTryAttack).toHaveBeenCalledWith(1, 0, now, true);
     
     // Test special when not in online mode
     (scene as any).gameMode = 'local';
+    (scene as any).playerSpecial = [3, 3]; // Ensure player 2 has enough pips
     jest.clearAllMocks();
     scene.testHandleRemoteAction({ type: 'special', playerIndex: 1 });
     // Even in local mode, the special should be processed but not sent over the network

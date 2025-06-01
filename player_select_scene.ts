@@ -427,33 +427,25 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private handleGameStart(data: PlayerSelectWebSocketMessage): void {
-    if (data.type !== 'gameStart' || !('p1Char' in data) || !('p2Char' in data)) return;
+    if (data.type !== 'gameStart' && data.type !== 'game_start' || !('p1Char' in data) || !('p2Char' in data)) return;
 
-    const gameData = data as GameStartWebSocketMessage;
-    if (!this.isHost) {
-      console.log('[DEBUG] handleGameStart: Starting KidsFightScene with:', {
-        p1: data.p1Char, p2: data.p2Char, scenario: data.scenario, roomCode: data.roomCode
-      });
-      this.scene.start('KidsFightScene', {
-        gameMode: 'online',
-        isHost: false,
-        mode: 'online',
-        p1: data.p1Char,
-        p2: data.p2Char,
-        selected: { p1: data.p1Char, p2: data.p2Char },
-        scenario: data.scenario,
-        roomCode: data.roomCode,
-        wsManager: this.wsManager,
-      });
-    } else {
-      this.scene.start('GameScene', {
-        player1Character: gameData.p1Char,
-        player2Character: gameData.p2Char,
-        mode: 'online' as const,
-        roomCode: gameData.roomCode,
-        isHost: this.isHost
-      });
-    }
+    const gameData = data as GameStartWebSocketMessage & { isHost?: boolean; playerIndex?: number };
+    // Use isHost and playerIndex from the server message, fallback to local if missing
+    const isHost = typeof gameData.isHost === 'boolean' ? gameData.isHost : this.isHost;
+    const playerIndex = typeof gameData.playerIndex === 'number' ? gameData.playerIndex : (isHost ? 0 : 1);
+
+    this.scene.start('KidsFightScene', {
+      gameMode: 'online',
+      isHost,
+      playerIndex,
+      mode: 'online',
+      p1: data.p1Char,
+      p2: data.p2Char,
+      selected: { p1: data.p1Char, p2: data.p2Char },
+      scenario: data.scenario,
+      roomCode: data.roomCode,
+      wsManager: this.wsManager,
+    });
   }
 
   private cleanupWebSocketHandlers(): void {

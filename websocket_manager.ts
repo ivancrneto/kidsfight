@@ -83,7 +83,20 @@ class WebSocketManager {
     return this._roomCode;
   }
 
+  /**
+   * Connect to the WebSocket server. Uses Render in production, localhost in development.
+   * @param url Optional override URL (used for testing or custom endpoints)
+   */
   public async connect(url?: string, roomCode?: string): Promise<WebSocket> {
+    // Use Render in production, localhost in development
+    let wsUrl = url;
+    if (!wsUrl) {
+      if (process.env.NODE_ENV === 'production' || !DEV) {
+        wsUrl = 'wss://kidsfight-ws.onrender.com'; // Render production endpoint
+      } else {
+        wsUrl = 'ws://localhost:8080'; // Local dev endpoint
+      }
+    }
     if (this._ws) {
       console.warn(`[WSM] WebSocket already connected [${this._debugInstanceId}]`);
       return Promise.resolve(this._ws);

@@ -32,7 +32,9 @@ function startGame(room, roomCode) {
       p1Char: room.gameState.p1.character,
       p2Char: room.gameState.p2.character,
       scenario: room.gameState.scenario || 'scenario1',
-      roomCode
+      roomCode,
+      playerIndex: 0,
+      isHost: true
     }));
   }
   if (room.client) {
@@ -41,7 +43,9 @@ function startGame(room, roomCode) {
       p1Char: room.gameState.p1.character,
       p2Char: room.gameState.p2.character,
       scenario: room.gameState.scenario || 'scenario1',
-      roomCode
+      roomCode,
+      playerIndex: 1,
+      isHost: false
     }));
   }
 }
@@ -59,7 +63,12 @@ server.on('connection', (ws) => {
       switch (data.type) {
         case 'create_room':
           // Generate a unique room code
-          roomCode = '111111';
+          if (PORT === 8081 || process.env.NODE_ENV === 'development') {
+            roomCode = '111111';
+          } else {
+            // Generate a random 6-digit code as string
+            roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+          }
 
           // Create new room (no default characters)
           gameRooms.set(roomCode, {
@@ -101,7 +110,9 @@ server.on('connection', (ws) => {
           
           ws.send(JSON.stringify({ 
             type: 'game_joined',
-            roomCode: roomCode
+            roomCode: roomCode,
+            playerIndex: 1,
+            isHost: false
           }));
 
           console.log(`Player joined room: ${roomCode}`);
@@ -203,7 +214,9 @@ server.on('connection', (ws) => {
               p1Char: data.p1Char,
               p2Char: data.p2Char,
               scenario: data.scenario,
-              roomCode: data.roomCode
+              roomCode: data.roomCode,
+              playerIndex: 0,
+              isHost: true
             }));
           }
           
@@ -214,7 +227,9 @@ server.on('connection', (ws) => {
               p1Char: data.p1Char,
               p2Char: data.p2Char,
               scenario: data.scenario,
-              roomCode: data.roomCode
+              roomCode: data.roomCode,
+              playerIndex: 1,
+              isHost: false
             }));
           }
           

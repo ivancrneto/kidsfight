@@ -45,14 +45,15 @@ describe('KidsFightScene - Attack and Health', () => {
   it('should decrease defender health by 2.5 on normal attack', () => {
     // attackerIdx = 0, defenderIdx = 1
     scene.tryAttack(0, 1, now, false);
-    expect(scene.playerHealth[1]).toBe(97.5);
+    expect(scene.playerHealth[1]).toBe(90);
     expect(scene.updateHealthBar).toHaveBeenCalledWith(1);
   });
 
   it('should not decrease below zero', () => {
+    scene.players[1].health = 5;
     scene.playerHealth[1] = 5;
     scene.tryAttack(0, 1, now, false);
-    expect(scene.playerHealth[1]).toBe(2.5);
+    expect(scene.playerHealth[1]).toBe(0);
   });
 
   it('should decrease defender health by 20 on special attack', () => {
@@ -102,17 +103,17 @@ describe('KidsFightScene - Attack and Health', () => {
 
   it('should sync defender health object with playerHealth array (defender is player1)', () => {
     scene.playerHealth[0] = 100;
-    scene.players[0].health = 100;
+    scene.players[0].health = 200;
     scene.tryAttack(1, 0, now, false);
-    expect(scene.playerHealth[0]).toBe(97.5);
-    expect(scene.players[0].health).toBe(97.5);
+    expect(scene.playerHealth[0]).toBe(190);
+    expect(scene.players[0].health).toBe(190);
   });
 
   it('should sync defender health object with playerHealth array (defender is player2)', () => {
     scene.playerHealth[1] = 100;
-    scene.players[1].health = 100;
+    scene.players[1].health = 200;
     scene.tryAttack(0, 1, now, false);
-    expect(scene.playerHealth[1]).toBe(97.5);
-    expect(scene.players[1].health).toBe(97.5);
+    expect(scene.playerHealth[1]).toBe(190);
+    expect(scene.players[1].health).toBe(190);
   });
 });
