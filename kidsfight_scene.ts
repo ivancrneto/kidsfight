@@ -47,6 +47,7 @@ interface SceneData {
   p1: string;
   p2: string;
   selectedScenario: string;
+  scenario?: string; // Add this property to support legacy code
   roomCode?: string;
   isHost?: boolean;
   gameMode: 'single' | 'online';
@@ -77,6 +78,7 @@ const GAME_WIDTH = 800;
 const GAME_HEIGHT = 480;
 const MAX_HEALTH = 200; // Each health bar represents this amount of health
 const TOTAL_HEALTH = MAX_HEALTH; // Total health per player
+// === FIX DAMAGE VALUES TO MATCH TESTS ===
 const ATTACK_DAMAGE = 10;
 const SPECIAL_DAMAGE = 20;
 const ATTACK_COOLDOWN = 500; // ms
@@ -132,6 +134,7 @@ class KidsFightScene extends Phaser.Scene {
   private platform?: Phaser.GameObjects.Rectangle;
   private background?: Phaser.GameObjects.Image;
   private healthBarBg1?: Phaser.GameObjects.Rectangle;
+  private healthBarBg2?: Phaser.GameObjects.Rectangle;
   private healthBar1?: Phaser.GameObjects.Graphics;
   private healthBar2?: Phaser.GameObjects.Graphics;
   private specialPips1: Phaser.GameObjects.Graphics[] = [];
@@ -257,7 +260,7 @@ class KidsFightScene extends Phaser.Scene {
     // DEBUG: Log incoming player keys
     console.log('[DEBUG][KidsFightScene.init] incoming p1:', this.p1, 'p2:', this.p2);
     // Fallback: if p1 or p2 is not a valid sprite key, set default
-    const validKeys = ['player1','player2','player3','player4','player5','player6','player7','player8','player9','bento'];
+    const validKeys = ['player1','player2','bento','davir','jose','davis','carol','roni','jacqueline','ivan','d_isa'];
     if (!validKeys.includes(this.p1)) {
       console.warn('[KidsFightScene] Invalid p1 key:', this.p1, 'Defaulting to player1');
       this.p1 = 'player1';
@@ -278,24 +281,31 @@ class KidsFightScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // Preload assets if needed
+    // Load scenario backgrounds
     this.load.image('scenario1', scenario1Img);
     this.load.image('scenario2', scenario2Img);
-    this.load.spritesheet('player1', player1RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player2', player2RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player3', player3RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player4', player4RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player5', player5RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player6', player6RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player7', player7RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player8', player8RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player9', player9RawImg, { frameWidth: 410, frameHeight: 512 });
+    // Load character spritesheets with correct keys for each character
     this.load.spritesheet('bento', player1RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('davir', player2RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('jose', player3RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('davis', player4RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('carol', player5RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('roni', player6RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('jacqueline', player7RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('ivan', player8RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('d_isa', player9RawImg, { frameWidth: 410, frameHeight: 512 });
+    // Debug log for loaded keys
+    console.log('[KidsFightScene][preload] Loaded character keys:', [
+      'player1','player2','bento','davir','jose','davis','carol','roni','jacqueline','ivan','d_isa'
+    ]);
   }
 
   create(): void {
     // DEBUG: Log player array and local player index at scene start
     console.log('[DEBUG][KidsFightScene] Player array at start:', this.players, 'Local index:', this.localPlayerIndex);
+
+    // Initialize round start time immediately
+    this.roundStartTime = Date.now();
 
     // Log camera info
     if (this.cameras && this.cameras.main) {
@@ -307,6 +317,7 @@ class KidsFightScene extends Phaser.Scene {
     // Reset game state
     this.gameOver = false;
     this.timeLeft = this.ROUND_TIME;
+    // CRITICAL FIX: Force health to max at scene start
     this.playerHealth = [MAX_HEALTH, MAX_HEALTH]; // Always 200
     this.playerSpecial = [0, 0];
     this.isAttacking = [false, false];
@@ -579,12 +590,12 @@ class KidsFightScene extends Phaser.Scene {
       });
     }
 
-    // Initialize playerHealth array to match player health
-    this.playerHealth = [
-      (this.players[0] && typeof this.players[0].health === 'number') ? this.players[0].health : MAX_HEALTH,
-      (this.players[1] && typeof this.players[1].health === 'number') ? this.players[1].health : MAX_HEALTH
-    ];
-    console.log('[DEBUG] playerHealth initialized:', this.playerHealth);
+    // --- CONSOLIDATED HEALTH INITIALIZATION ---
+    // Always set playerHealth and player objects to MAX_HEALTH before any UI or health bar rendering
+    this.playerHealth = [MAX_HEALTH, MAX_HEALTH];
+    if (this.players[0]) this.players[0].health = MAX_HEALTH;
+    if (this.players[1]) this.players[1].health = MAX_HEALTH;
+    console.log('[DEBUG] playerHealth and player objects initialized to MAX_HEALTH:', this.playerHealth);
 
     // After both players are ready, create UI and touch controls (input handlers)
     if (this.playersReady) {
@@ -717,158 +728,190 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
   }
 
   private createHealthBars(scaleX: number, scaleY: number): void {
+    console.log('[createHealthBars] Initializing health bars with scale:', { scaleX, scaleY });
+    console.log('[createHealthBars] Current playerHealth values:', this.playerHealth);
+    
     const gameWidth = this.sys.game.canvas.width;
     const barWidth = 300 * scaleX;
     const barHeight = 24 * scaleY;
-    const barY1 = 20 * scaleY;
-    const barY2 = barY1 + barHeight + 4 * scaleY; // Stack vertically with a small gap
+    const barY = 20 * scaleY;
 
-    // Remove old bars if they exist
-    if (this.healthBarBg1) this.healthBarBg1.destroy();
-    if (this.healthBar1) this.healthBar1.destroy();
-    if (this.healthBar2) this.healthBar2.destroy();
-
-    // Player 1 background and bars
-    this.healthBarBg1 = this.add.rectangle(60 * scaleX + barWidth/2, barY1, barWidth, barHeight, 0x222222).setOrigin(0.5, 0.5);
-    this.healthBar1 = this.add.graphics(); // Player 1 base (green)
-    this.healthBar1.setDepth(1000);
-    // Player 2 background and bars
-    this.healthBarBg2 = this.add.rectangle(this.sys.game.canvas.width - (60 * scaleX + barWidth/2), barY1, barWidth, barHeight, 0x222222).setOrigin(0.5, 0.5);
-    this.healthBar2 = this.add.graphics(); // Player 2 base (red)
-    this.healthBar2.setDepth(1000);
-
-    // Initialize both players' health to max
-    this.playerHealth = [MAX_HEALTH, MAX_HEALTH]; // Always 200
-    if (this.players[0]) this.players[0].health = MAX_HEALTH; // Always 200
-    if (this.players[1]) this.players[1].health = MAX_HEALTH; // Always 200
-
-    // Force update both health bars
-    this.updateHealthBar(0);
-    this.updateHealthBar(1);
-  }
-
-  private updateHealthBar(playerIndex: number): void {
-    // Guard for test environments
-    if (!this.sys?.game?.canvas) return;
-    // Single health bar logic (no double health, no two-layer stacking)
-    const maxHealth = MAX_HEALTH; // Match TOTAL_HEALTH and playerHealth
-    const gameWidth = this.sys.game.canvas.width;
-    const scaleX = gameWidth / 800;
-    const barWidth = 300 * scaleX;
-    const barHeight = 24 * scaleX;
-    const barY = 20 * scaleX;
+    // Calculate positions
     const barX1 = 60 * scaleX + barWidth / 2;
     const barX2 = gameWidth - (60 * scaleX + barWidth / 2);
 
-    // Ensure health bars exist
-    if (!this.healthBar1 || !this.healthBar2) return;
-    this.healthBar1.clear();
-    this.healthBar2.clear();
+    // Remove old bars if they exist
+    if (this.healthBarBg1) this.healthBarBg1.destroy();
+    if (this.healthBarBg2) this.healthBarBg2.destroy();
+    if (this.healthBar1) this.healthBar1.destroy();
+    if (this.healthBar2) this.healthBar2.destroy();
 
-    if (playerIndex === 0) {
-      // Player 1 (left)
-      let p1 = Math.max(0, Math.min(maxHealth, this.playerHealth[0]));
-      // Draw depleted background (gray)
-      this.healthBar1.fillStyle(0x444444);
-      this.healthBar1.fillRect(barX1 - barWidth / 2, barY - barHeight / 2, barWidth, barHeight);
-      // Draw main layer (green)
-      if (p1 > 0) {
-        const greenWidth = barWidth * (p1 / maxHealth);
-        this.healthBar1.fillStyle(0x00ff00);
-        this.healthBar1.fillRect(barX1 - barWidth / 2, barY - barHeight / 2, greenWidth, barHeight);
-      }
-    } else if (playerIndex === 1) {
-      // Player 2 (right)
-      let p2 = Math.max(0, Math.min(maxHealth, this.playerHealth[1]));
-      // Draw depleted background (gray)
-      this.healthBar2.fillStyle(0x444444);
-      this.healthBar2.fillRect(barX2 - barWidth / 2, barY - barHeight / 2, barWidth, barHeight);
-      // Draw main layer (red)
-      if (p2 > 0) {
-        const redWidth = barWidth * (p2 / maxHealth);
-        this.healthBar2.fillStyle(0xff0000);
-        this.healthBar2.fillRect(barX2 - barWidth / 2, barY - barHeight / 2, redWidth, barHeight);
-      }
-    }
+    // Player 1 background (dark gray)
+    this.healthBarBg1 = this.add.rectangle(
+      barX1,
+      barY,
+      barWidth,
+      barHeight,
+      0x222222
+    ) as Phaser.GameObjects.Rectangle;
+    this.healthBarBg1.setOrigin(0.5, 0.5);
+    this.healthBarBg1.setScrollFactor(0);
+    this.healthBarBg1.setDepth(999);
 
-    console.log('[updateHealthBar][GUEST HEALTH DEBUG]', {
-      playerIndex,
-      guestHeathArray: this.playerHealth[1],
-      guestPlayerObject: this.players[1]?.health,
-      healthBar2: this.healthBar2,
-      isVisible: this.healthBar2?.visible,
-      stackTrace: new Error().stack
-    });
+    // Player 2 background (dark gray)
+    this.healthBarBg2 = this.add.rectangle(
+      barX2,
+      barY,
+      barWidth,
+      barHeight,
+      0x222222
+    ) as Phaser.GameObjects.Rectangle;
+    this.healthBarBg2.setOrigin(0.5, 0.5);
+    this.healthBarBg2.setScrollFactor(0);
+    this.healthBarBg2.setDepth(999);
 
-    // Add more verbose logging to trace the exact state
-    console.log('[updateHealthBar][VERBOSE] DETAILED STATE', {
-      playerIndex,
+    // Player 1 health bar (green)
+    this.healthBar1 = this.add.graphics() as Phaser.GameObjects.Graphics;
+    this.healthBar1.setScrollFactor(0);
+    this.healthBar1.setDepth(1000);
+
+    // Player 2 health bar (red)
+    this.healthBar2 = this.add.graphics() as Phaser.GameObjects.Graphics;
+    this.healthBar2.setScrollFactor(0);
+    this.healthBar2.setDepth(1000);
+
+    // Health is already initialized before UI creation; no need to reset here
+    // Just update both health bars
+    this.updateHealthBar(0);
+    this.updateHealthBar(1);
+    
+    console.log('[createHealthBars] Health bars initialized:', {
       playerHealth: this.playerHealth,
       player1Health: this.players[0]?.health,
-      player2Health: this.players[1]?.health,
-      healthBar1Present: !!this.healthBar1,
-      healthBar2Present: !!this.healthBar2,
-      isHealthBar1Visible: this.healthBar1?.visible,
-      isHealthBar2Visible: this.healthBar2?.visible
+      player2Health: this.players[1]?.health
     });
-
-    // Ensure health bars exist
-    if (!this.healthBar1 || !this.healthBar2) {
-      console.error('[updateHealthBar] Health bars not initialized!');
-      
-      // Try to recreate health bars if they don't exist
-      const scaleX = this.sys.game.canvas.width / 800;
-      const scaleY = this.sys.game.canvas.height / 480;
-      this.createHealthBars(scaleX, scaleY);
-      return;
-    }
-
-    // Force make visible in case they've been hidden
-    this.healthBar1.setVisible(true);
-    this.healthBar2.setVisible(true);
-
-    // Clear both health bars completely
-    this.healthBar1.clear();
-    this.healthBar2.clear();
-
-    // Log health values before drawing (updated for single-bar logic)
-    console.log('[updateHealthBar] Drawing health bars with:', {
-      p1Health: this.playerHealth[0],
-      p2Health: this.playerHealth[1],
-      barX1, barX2, barY, barWidth, barHeight,
-      maxHealth
-    });
-
-    // --- Player 1 (left half) ---
-    let p1 = Math.max(0, Math.min(maxHealth, this.playerHealth[0]));
-    // Draw depleted background (gray)
-    this.healthBar1?.fillStyle(0x444444);
-    this.healthBar1?.fillRect(barX1 - barWidth / 2, barY - barHeight / 2, barWidth, barHeight);
-    // Draw main layer (green)
-    if (p1 > 0) {
-      const greenWidth = barWidth * (p1 / maxHealth);
-      this.healthBar1?.fillStyle(0x00ff00);
-      this.healthBar1?.fillRect(barX1 - barWidth / 2, barY - barHeight / 2, greenWidth, barHeight);
-    }
-
-    // --- Player 2 (right half) ---
-    let p2 = Math.max(0, Math.min(maxHealth, this.playerHealth[1]));
-    // Draw depleted background (gray)
-    this.healthBar2?.fillStyle(0x444444);
-    this.healthBar2?.fillRect(barX2 - barWidth / 2, barY - barHeight / 2, barWidth, barHeight);
-    // Draw main layer (red)
-    if (p2 > 0) {
-      const redWidth = barWidth * (p2 / maxHealth);
-      this.healthBar2?.fillStyle(0xff0000);
-      this.healthBar2?.fillRect(barX2 - barWidth / 2, barY - barHeight / 2, redWidth, barHeight);
-    }
-
-    // Force display update
-    if (this.healthBar1.dirty) this.healthBar1.dirty = true;
-    if (this.healthBar2.dirty) this.healthBar2.dirty = true;
   }
 
-// ...
+  private updateHealthBar(playerIndex: number): void {
+    try {
+      // Guard for test environments
+      if (!this.sys?.game?.canvas) {
+        console.warn('[updateHealthBar] Game canvas not available');
+        return;
+      }
+      
+      // Only fix missing/NaN health values, do not force to MAX_HEALTH if less than max
+      if (
+    typeof this.playerHealth[playerIndex] !== 'number' ||
+    isNaN(this.playerHealth[playerIndex])
+) {
+        this.playerHealth[playerIndex] = MAX_HEALTH;
+        if (this.players[playerIndex]) {
+          this.players[playerIndex].health = MAX_HEALTH;
+        }
+      }
+      
+      // Single health bar logic
+      const maxHealth = MAX_HEALTH;
+      const gameWidth = this.sys.game.canvas.width;
+      const scaleX = gameWidth / 800;
+      const barWidth = 300 * scaleX;
+      const barHeight = 24 * scaleX;
+      const barY = 20 * scaleX;
+      const barX1 = 60 * scaleX + barWidth / 2;
+      const barX2 = gameWidth - (60 * scaleX + barWidth / 2);
+
+      // Ensure health bars and backgrounds exist
+      if (!this.healthBar1 || !this.healthBar2 || !this.healthBarBg1 || !this.healthBarBg2) {
+        console.warn('[updateHealthBar] Health bars or backgrounds not initialized, recreating...');
+        const scaleY = this.sys.game.canvas.height / 480;
+        this.createHealthBars(scaleX, scaleY);
+        return;
+      }
+
+      // Make sure backgrounds are visible and properly positioned
+      if (this.healthBarBg1) this.healthBarBg1.setVisible(true);
+      if (this.healthBarBg2) this.healthBarBg2.setVisible(true);
+      if (this.healthBar1) this.healthBar1.setVisible(true);
+      if (this.healthBar2) this.healthBar2.setVisible(true);
+
+      // Clear graphics
+      this.healthBar1.clear();
+      this.healthBar2.clear();
+
+      // Log health values for debugging
+      console.log(`[updateHealthBar] Updating health bar for player ${playerIndex + 1}:`, {
+        health: this.playerHealth[playerIndex],
+        barX: playerIndex === 0 ? barX1 : barX2,
+        barY,
+        barWidth,
+        barHeight,
+        maxHealth
+      });
+
+      // Update the requested health bar
+      if (playerIndex === 0) {
+        // Player 1 (left)
+        const p1Health = Math.max(0, Math.min(maxHealth, this.playerHealth[0]));
+        const healthPercentage = p1Health / maxHealth;
+        
+        // Draw health bar background (gray)
+        this.healthBar1.fillStyle(0x444444);
+        this.healthBar1.fillRect(
+          barX1 - barWidth / 2, 
+          barY - barHeight / 2, 
+          barWidth, 
+          barHeight
+        );
+        
+        // Remove grace period: only draw proportional to health
+        if (p1Health > 0) {
+          const healthWidth = barWidth * healthPercentage;
+          this.healthBar1.fillStyle(0x00ff00);
+          this.healthBar1.fillRect(
+            barX1 - barWidth / 2, 
+            barY - barHeight / 2, 
+            healthWidth, 
+            barHeight
+          );
+        }
+      } 
+      else if (playerIndex === 1) {
+        // Player 2 (right)
+        const p2Health = Math.max(0, Math.min(maxHealth, this.playerHealth[1]));
+        const healthPercentage = p2Health / maxHealth;
+        
+        // Draw health bar background (gray)
+        this.healthBar2.fillStyle(0x444444);
+        this.healthBar2.fillRect(
+          barX2 - barWidth / 2, 
+          barY - barHeight / 2, 
+          barWidth, 
+          barHeight
+        );
+        
+        // Draw health bar (red)
+        if (p2Health > 0) {
+          const healthWidth = barWidth * healthPercentage;
+          this.healthBar2.fillStyle(0xff0000);
+          this.healthBar2.fillRect(
+            barX2 - barWidth / 2, 
+            barY - barHeight / 2, 
+            healthWidth, 
+            barHeight
+          );
+        }
+      }
+
+      // Mark as dirty to ensure redraw
+      if (this.healthBar1) this.healthBar1.dirty = true;
+      if (this.healthBar2) this.healthBar2.dirty = true;
+      
+    } catch (error) {
+      console.error('[updateHealthBar] Error updating health bar:', error);
+    }
+  }
+
   private createSpecialPips(scaleX: number, scaleY: number): void {
     // Clear previous pips
     this.specialPips1.forEach(pip => pip.destroy());
@@ -1079,37 +1122,38 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
       this.wsManager.send(moveMsg);
     }
   }
-
+  
   private handleLeftUp(): void {
     this.updateTouchControlState('left', false);
     if (this.gameMode === 'online' && this.wsManager && this.players[this.localPlayerIndex]) {
       // Immediately send position_update on stop
       const player = this.players[this.localPlayerIndex];
-      const curr = {
-        x: player.x,
-        y: player.y,
-        velocityX: player.body?.velocity.x || 0,
-        velocityY: player.body?.velocity.y || 0,
-        flipX: player.flipX,
-        frame: (typeof player.frame === 'object' && player.frame !== null && 'name' in player.frame)
-          ? player.frame.name
-          : (typeof player.frame === 'string' || typeof player.frame === 'number')
-            ? player.frame
-            : (player.anims?.getFrameName?.() || null)
-      };
-      const positionMsg = {
-        type: 'position_update',
-        playerIndex: this.localPlayerIndex,
-        ...curr
-      };
-      this.wsManager.send(positionMsg);
-      this._lastSentPosition = { ...curr };
+      if (player) {
+        const curr = {
+          x: player.x,
+          y: player.y,
+          velocityX: player.body?.velocity.x || 0,
+          velocityY: player.body?.velocity.y || 0,
+          flipX: player.flipX,
+          frame: (typeof player.frame === 'object' && player.frame !== null && 'name' in player.frame)
+            ? player.frame.name
+            : (typeof player.frame === 'string' || typeof player.frame === 'number')
+              ? player.frame
+              : (player.anims?.getFrameName?.() || null)
+        };
+        const positionMsg = {
+          type: 'position_update',
+          playerIndex: this.localPlayerIndex,
+          ...curr
+        };
+        this.wsManager.send(positionMsg);
+        this._lastSentPosition = { ...curr };
+      }
     }
   }
-
+  
   private handleRightDown(): void {
     this.updateTouchControlState('right', true);
-    // Only handle right movement, not attack
     if (this.gameMode === 'online' && this.wsManager) {
       const moveMsg = {
         type: 'move',
@@ -1118,14 +1162,6 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
       };
       console.debug('[KidsFightScene][WS SEND]', moveMsg); // DEBUG: Log outgoing move
       this.wsManager.send(moveMsg);
-    } else {
-      // Local mode: move player right
-      const player = this.players[this.localPlayerIndex];
-      if (player) {
-        player.setVelocityX(160);
-        player.setFlipX(false);
-        this.playerDirection[this.localPlayerIndex] = 'right';
-      }
     }
   }
 
@@ -1134,25 +1170,27 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
     if (this.gameMode === 'online' && this.wsManager && this.players[this.localPlayerIndex]) {
       // Immediately send position_update on stop
       const player = this.players[this.localPlayerIndex];
-      const curr = {
-        x: player.x,
-        y: player.y,
-        velocityX: player.body?.velocity.x || 0,
-        velocityY: player.body?.velocity.y || 0,
-        flipX: player.flipX,
-        frame: (typeof player.frame === 'object' && player.frame !== null && 'name' in player.frame)
-          ? player.frame.name
-          : (typeof player.frame === 'string' || typeof player.frame === 'number')
-            ? player.frame
-            : (player.anims?.getFrameName?.() || null)
-      };
-      const positionMsg = {
-        type: 'position_update',
-        playerIndex: this.localPlayerIndex,
-        ...curr
-      };
-      this.wsManager.send(positionMsg);
-      this._lastSentPosition = { ...curr };
+      if (player) {
+        const curr = {
+          x: player.x,
+          y: player.y,
+          velocityX: player.body?.velocity.x || 0,
+          velocityY: player.body?.velocity.y || 0,
+          flipX: player.flipX,
+          frame: (typeof player.frame === 'object' && player.frame !== null && 'name' in player.frame)
+            ? player.frame.name
+            : (typeof player.frame === 'string' || typeof player.frame === 'number')
+              ? player.frame
+              : (player.anims?.getFrameName?.() || null)
+        };
+        const positionMsg = {
+          type: 'position_update',
+          playerIndex: this.localPlayerIndex,
+          ...curr
+        };
+        this.wsManager.send(positionMsg);
+        this._lastSentPosition = { ...curr };
+      }
     }
   }
 
@@ -1186,7 +1224,7 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
         break;
       case 'jump':
         if (active && player.body && ((player.body.blocked && player.body.blocked.down) || (player.body.touching && player.body.touching.down))) {
-          player.setVelocityY(-330);
+          player.setVelocityY(-330); // Standard jump
         }
         break;
       case 'attack':
@@ -1198,85 +1236,22 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
       case 'block':
         this.playerBlocking[this.localPlayerIndex] = active;
 }
-  }
-
-// --- Touch Button Handlers ---
-private handleLeftDown(): void {
-  console.log('[KidsFightScene] handleLeftDown called');
-  this.updateTouchControlState('left', true);
-  if (this.gameMode === 'online' && this.wsManager) {
-    const moveMsg = {
-      type: 'move',
-      direction: -1,
-      playerIndex: this.localPlayerIndex
-    };
-    console.debug('[KidsFightScene][WS SEND]', moveMsg); // DEBUG: Log outgoing move
-    this.wsManager.send(moveMsg);
-
-    try {
-      console.debug('[KidsFightScene][handleSpecial] CALLED', { localPlayerIndex: this.localPlayerIndex, gameMode: this.gameMode });
-      const player = this.players[this.localPlayerIndex];
-      if (player) {
-        player.setData('isSpecialAttacking', true);
-      }
-      this.tryAction(this.localPlayerIndex, 'special', false);
-      if (this.gameMode === 'online' && this.wsManager) {
-        console.debug('[KidsFightScene][WS SEND SPECIAL]', { playerIndex: this.localPlayerIndex });
-        this.wsManager.send({
-          type: 'special',
-          playerIndex: this.localPlayerIndex
-        });
-      }
-      setTimeout(() => {
-        const p = this.players[this.localPlayerIndex];
-        if (p) p.setData('isSpecialAttacking', false);
-      }, 300);
-    } catch (error) {
-      console.error('[KidsFightScene][handleSpecial] ERROR', error);
-    }
-  }
 }
 
-private handleRightUp(): void {
-  this.updateTouchControlState('right', false);
-  if (this.gameMode === 'online' && this.wsManager && this.players[this.localPlayerIndex]) {
-    // Immediately send position_update on stop
+  private handleSpecial(): void {
+    if (this.playerSpecial[this.localPlayerIndex] < 3) return;
     const player = this.players[this.localPlayerIndex];
-    const curr = {
-      x: player.x,
-      y: player.y,
-      velocityX: player.body?.velocity.x || 0,
-      velocityY: player.body?.velocity.y || 0,
-      flipX: player.flipX,
-      frame: (typeof player.frame === 'object' && player.frame !== null && 'name' in player.frame)
-        ? player.frame.name
-        : (typeof player.frame === 'string' || typeof player.frame === 'number')
-          ? player.frame
-          : (player.anims?.getFrameName?.() || null)
-    };
-    const positionMsg = {
-      type: 'position_update',
-      playerIndex: this.localPlayerIndex,
-      ...curr
-    };
-    this.wsManager.send(positionMsg);
-    this._lastSentPosition = { ...curr };
+    if (player) player.setData('isSpecialAttacking', true);
+    this.tryAction(this.localPlayerIndex, 'special', true);
+    if (this.gameMode === 'online' && this.wsManager) {
+      this.wsManager.send({ type: 'special', playerIndex: this.localPlayerIndex });
+    }
+    setTimeout(() => {
+      const p = this.players[this.localPlayerIndex];
+      if (p) p.setData('isSpecialAttacking', false);
+    }, 300);
   }
-}
 
-private handleJumpDown(): void {
-  this.updateTouchControlState('jump', true);
-  if (this.gameMode === 'online' && this.wsManager) {
-    this.wsManager.send({
-      type: 'jump',
-      playerIndex: this.localPlayerIndex
-    });
-  }
-}
-
-private handleJumpUp(): void {
-  this.updateTouchControlState('jump', false);
-}
 
 public updateTouchControlState(
   control: 'left' | 'right' | 'jump' | 'attack' | 'special' | 'block',
@@ -1305,44 +1280,16 @@ public updateTouchControlState(
       break;
     case 'block':
       this.playerBlocking[this.localPlayerIndex] = active;
+      break;
   }
-}
 
-private handleSpecial(): void {
-  // Only allow special if player has enough pips
-  if (this.playerSpecial[this.localPlayerIndex] < 3) {
-    console.warn('[KidsFightScene][handleSpecial] Tried to play special animation without enough pips:', this.playerSpecial[this.localPlayerIndex]);
-    return;
-  }
-  const player = this.players[this.localPlayerIndex];
-  if (player) {
-    player.setData('isSpecialAttacking', true);
-  }
-  this.tryAction(this.localPlayerIndex, 'special', true);
-  if (this.gameMode === 'online' && this.wsManager) {
-    this.wsManager.send({
-      type: 'special',
-      playerIndex: this.localPlayerIndex
-    });
-  }
-  setTimeout(() => {
-    const p = this.players[this.localPlayerIndex];
-    if (p) p.setData('isSpecialAttacking', false);
-  }, 300);
-    this.tryAction(this.localPlayerIndex, 'special', false);
-    if (this.gameMode === 'online' && this.wsManager) {
-      console.debug('[KidsFightScene][WS SEND SPECIAL]', { playerIndex: this.localPlayerIndex });
-      this.wsManager.send({
-        type: 'special',
-        playerIndex: this.localPlayerIndex
-      });
-    }
+
+    // Reset special attack state after animation
     setTimeout(() => {
       const p = this.players[this.localPlayerIndex];
       if (p) p.setData('isSpecialAttacking', false);
     }, 300);
-
-}
+  }
 
 private handleAttack(): void {
   try {

@@ -179,9 +179,13 @@ describe('KidsFightScene Touch Controls', () => {
   });
 
   it('should update health bar in updateHealthBar', () => {
-    // Mock clear method
-    scene.healthBar1.clear = jest.fn();
-    scene.healthBar2.clear = jest.fn();
+    // Ensure healthBar1 and healthBar2 are initialized before spying
+    scene.healthBar1.clear();
+    scene.healthBar2.clear();
+    
+    // Use jest.spyOn for .clear() and check for at least one call
+    const healthBar1ClearSpy = jest.spyOn(scene.healthBar1, 'clear');
+    const healthBar2ClearSpy = jest.spyOn(scene.healthBar2, 'clear');
     scene.healthBar1.fillStyle = jest.fn().mockReturnThis();
     scene.healthBar1.fillRect = jest.fn().mockReturnThis();
     scene.healthBar2.fillStyle = jest.fn().mockReturnThis();
@@ -205,7 +209,9 @@ describe('KidsFightScene Touch Controls', () => {
     scene.updateHealthBar(1);
     
     // Check if graphics methods were called
-    expect(scene.healthBar1.clear).toHaveBeenCalled();
-    expect(scene.healthBar2.clear).toHaveBeenCalled();
+    expect(healthBar1ClearSpy).toHaveBeenCalled();
+    expect(healthBar2ClearSpy).toHaveBeenCalled();
+    expect(healthBar1ClearSpy).toHaveBeenCalled();
+    expect(healthBar2ClearSpy).toHaveBeenCalled();
   });
 });

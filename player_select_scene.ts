@@ -28,6 +28,7 @@ interface PlayerSelectWebSocketMessage {
   p2Char?: string;
   roomCode?: string;
   isHost?: boolean;
+  scenario?: string;
 }
 
 interface GameStartWebSocketMessage extends PlayerSelectWebSocketMessage {
@@ -503,6 +504,16 @@ export default class PlayerSelectScene extends Phaser.Scene {
       if (!this.isHost) {
         this.setupWebSocketHandlers();
       }
+      
+      // Make sure to use the final selected character keys from CHARACTER_KEYS
+      const p1CharKey = this.CHARACTER_KEYS[this.selectedP1Index];
+      const p2CharKey = this.CHARACTER_KEYS[this.selectedP2Index];
+      
+      console.log('[PlayerSelectScene] Final selected characters:', { p1: p1CharKey, p2: p2CharKey });
+      
+      // Update the selected object to ensure it has the correct keys
+      this.selected = { p1: p1CharKey, p2: p2CharKey };
+      
       // Host and guest: always pass wsManager, roomCode, isHost to ScenarioSelectScene in online mode
       this.scene.start('ScenarioSelectScene', {
         mode: this.mode,
@@ -512,6 +523,15 @@ export default class PlayerSelectScene extends Phaser.Scene {
         wsManager: this.wsManager,
       });
     } else {
+      // For local mode, ensure selected characters match the indexes
+      const p1CharKey = this.CHARACTER_KEYS[this.selectedP1Index];
+      const p2CharKey = this.CHARACTER_KEYS[this.selectedP2Index];
+      
+      console.log('[PlayerSelectScene] Final selected characters:', { p1: p1CharKey, p2: p2CharKey });
+      
+      // Update the selected object
+      this.selected = { p1: p1CharKey, p2: p2CharKey };
+      
       // Local mode: transition to scenario selection
       this.scene.start('ScenarioSelectScene', {
         mode: this.mode,

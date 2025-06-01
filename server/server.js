@@ -63,20 +63,21 @@ server.on('connection', (ws) => {
       switch (data.type) {
         case 'create_room':
           // Generate a unique room code
-          if (PORT === 8081 || process.env.NODE_ENV === 'development') {
+          if (process.env.NODE_ENV === 'development' && PORT !== 8081) {
+            // Use fixed code only in development for easier testing
             roomCode = '111111';
           } else {
-            // Generate a random 6-digit code as string
+            // Generate a random 6-digit code as string for production and typical development
             roomCode = Math.floor(100000 + Math.random() * 900000).toString();
           }
 
-          // Create new room (no default characters)
+          // Create new room with default characters
           gameRooms.set(roomCode, {
             host: ws,
             client: null,
             gameState: {
-              p1: {},
-              p2: {}
+              p1: { character: 'bento' },  // Default character for p1
+              p2: { character: 'davir' }   // Default character for p2
             }
           });
           

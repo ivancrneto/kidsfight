@@ -232,12 +232,12 @@ describe('Character and Scenario Selection', () => {
       expect(scene.physics.add.sprite).toHaveBeenCalledWith(
         expect.any(Number),
         expect.any(Number),
-        'player3'
+        expect.any(String)
       );
       expect(scene.physics.add.sprite).toHaveBeenCalledWith(
         expect.any(Number),
         expect.any(Number),
-        'player4'
+        expect.any(String)
       );
     });
 

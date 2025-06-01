@@ -65,12 +65,38 @@ class ScenarioSelectScene extends Phaser.Scene {
     this.roomCode = data.roomCode || null;
     this.isHost = data.isHost || false;
     
+    // CRITICAL: Always initialize gameStarted to false when the scene starts
+    this.gameStarted = false;
+    this.hostReady = false;
+    this.guestReady = false;
+    
+    console.debug('[ScenarioSelectScene][init] Initialized with:', {
+      mode: this.mode,
+      roomCode: this.roomCode,
+      isHost: this.isHost,
+      gameStarted: this.gameStarted,
+      hostReady: this.hostReady,
+      guestReady: this.guestReady
+    });
+    
     // If wsManager is passed in data, use it
     if (data.wsManager) {
       console.log('[ScenarioSelectScene] Received wsManager from previous scene');
       this.wsManager = data.wsManager;
     } else {
       console.log('[ScenarioSelectScene] No wsManager received from previous scene');
+    }
+
+    // --- PATCH: Always re-send selection to server on entry (online mode) ---
+    if (this.mode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
+      const playerKey = this.isHost ? 'p1' : 'p2';
+      const characterKey = this.isHost ? this.selected.p1 : this.selected.p2;
+      console.log('[ScenarioSelectScene] Re-sending character selection to server:', { playerKey, characterKey });
+      this.wsManager.send({
+        type: 'player_selected',
+        player: playerKey,
+        character: characterKey
+      });
     }
   }
 
@@ -126,53 +152,102 @@ class ScenarioSelectScene extends Phaser.Scene {
           });
           if (data.type === 'player_ready') {
             console.debug('[ScenarioSelectScene][WebSocket] player_ready received:', data);
+            console.debug('[ScenarioSelectScene][WebSocket] Readiness BEFORE assignment:', {
+              isHost: this.isHost,
+              hostReady: this.hostReady,
+              guestReady: this.guestReady,
+              gameStarted: this.gameStarted
+            });
             if (data.player === 'host') {
               this.hostReady = true;
               console.debug('[ScenarioSelectScene][WebSocket] Marked host as ready');
-            }
-            if (data.player === 'guest') {
+            } else if (data.player === 'guest') {
               this.guestReady = true;
               console.debug('[ScenarioSelectScene][WebSocket] Marked guest as ready');
             }
             this.updateReadyUI();
+            console.debug('[ScenarioSelectScene][WebSocket] Readiness AFTER assignment:', {
+              isHost: this.isHost,
+              hostReady: this.hostReady,
+              guestReady: this.guestReady,
+              gameStarted: this.gameStarted
+            });
+            
+            // Debug: print readiness state before checking if we should start game
+            console.debug('[ScenarioSelectScene][WebSocket] Checking if should start game:', {
+              isHost: this.isHost,
+              hostReady: this.hostReady,
+              guestReady: this.guestReady,
+              gameStarted: this.gameStarted,
+              condition: this.isHost && this.hostReady && this.guestReady && !this.gameStarted
+            });
+            
             if (this.isHost && this.hostReady && this.guestReady && !this.gameStarted) {
+              console.debug('[ScenarioSelectScene][WebSocket] Readiness before starting game:', {
+                isHost: this.isHost,
+                hostReady: this.hostReady,
+                guestReady: this.guestReady,
+                gameStarted: this.gameStarted
+              });
               this.gameStarted = true;
               console.debug('[ScenarioSelectScene][WebSocket] Both ready! Host sending game_start.', {
-                p1: this.selected.p1,
-                p2: this.selected.p2,
-                scenario: SCENARIOS[this.selectedScenario].key,
-                roomCode: this.roomCode
+                hostReady: this.hostReady,
+                guestReady: this.guestReady,
+                gameStarted: this.gameStarted
               });
               const gameStartMsg = {
                 type: 'game_start',
-                p1Char: this.selected.p1,
-                p2Char: this.selected.p2,
                 scenario: SCENARIOS[this.selectedScenario].key,
-                roomCode: this.roomCode
+                roomCode: this.roomCode,
+                p1Char: this.selected.p1.replace('_select', ''),
+                p2Char: this.selected.p2.replace('_select', ''),
+                isHost: true
               };
               this.wsManager.send(gameStartMsg);
+              const p1Clean = this.selected.p1.replace('_select', '');
+              const p2Clean = this.selected.p2.replace('_select', '');
+              console.log('[ScenarioSelectScene] Starting KidsFightScene with characters:', { p1: p1Clean, p2: p2Clean });
               this.scene.start('KidsFightScene', {
                 gameMode: 'online',
                 mode: this.mode,
-                p1: this.selected.p1.replace('_select', ''),
-                p2: this.selected.p2.replace('_select', ''),
+                p1: p1Clean,
+                p2: p2Clean,
+                selected: { p1: p1Clean, p2: p2Clean },
                 scenario: SCENARIOS[this.selectedScenario].key,
                 roomCode: this.roomCode,
-                isHost: true
+                isHost: true,
+                wsManager: this.wsManager
               });
             }
-          } else if ((data.type === 'game_start' || data.type === 'gameStart') && !this.gameStarted) {
+          } else if (data.type === 'game_start' || data.type === 'gameStart') {
+            console.debug('[ScenarioSelectScene][WebSocket] game_start received, state BEFORE processing:', {
+              data,
+              isHost: this.isHost,
+              hostReady: this.hostReady,
+              guestReady: this.guestReady,
+              gameStarted: this.gameStarted,
+              roomCode: this.roomCode
+            });
+            
+            // Always set gameStarted to true when we receive game_start
             this.gameStarted = true;
-            console.debug('[ScenarioSelectScene][WebSocket] game_start received:', data);
+            console.debug('[ScenarioSelectScene][WebSocket] gameStarted set to true, starting game scene');
+            
+            // Always use the character keys from the server message
+            // Note: We always process game_start messages regardless of gameStarted flag
+            // This ensures the host doesn't get stuck on the scenario selection screen
+            console.debug('[ScenarioSelectScene][WebSocket] Transitioning to KidsFightScene with data:', data);
             this.scene.start('KidsFightScene', {
               gameMode: 'online',
               mode: this.mode,
-              p1: data.p1Char.replace('_select', ''),
-              p2: data.p2Char.replace('_select', ''),
+              p1: data.p1Char,
+              p2: data.p2Char,
+              selected: { p1: data.p1Char, p2: data.p2Char },
               scenario: data.scenario,
               roomCode: data.roomCode,
               isHost: data.isHost,
-              playerIndex: data.playerIndex
+              playerIndex: data.playerIndex,
+              wsManager: this.wsManager
             });
           }
         } catch (e) {
@@ -218,90 +293,134 @@ class ScenarioSelectScene extends Phaser.Scene {
 
   private createActionButtons(): void {
     const { width, height } = this.cameras.main;
-    const buttonStyle = {
-      fontSize: '24px',
-      color: '#fff',
-      backgroundColor: '#4a4a4a',
-      padding: { x: 20, y: 10 }
-    };
-
-    // Ready button
-    this.readyButton = this.add.text(width * 0.7, height * 0.85, 'Pronto!', buttonStyle)
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+    const buttonStyle = { fontSize: '24px', color: '#fff', fontFamily: 'monospace' };
 
     // Back button
-    this.backButton = this.add.text(width * 0.3, height * 0.85, 'Voltar', buttonStyle)
+    this.backButton = this.add.text(100, height - 80, 'VOLTAR', buttonStyle)
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-
-    // Button hover effects
-    [this.readyButton, this.backButton].forEach(button => {
-      button.on('pointerover', () => button.setBackgroundColor('#666666'));
-      button.on('pointerout', () => button.setBackgroundColor('#4a4a4a'));
-    });
-
-    // Online mode: ready button for both host and guest
-    if (this.mode === 'online') {
-      this.readyButton.on('pointerdown', () => {
-        console.debug('[ScenarioSelectScene][ReadyButton] pointerdown fired', {
-          isHost: this.isHost,
-          hostReady: this.hostReady,
-          guestReady: this.guestReady,
-          roomCode: this.roomCode
-        });
-        if (this.isHost && this.hostReady) {
-          console.debug('[ScenarioSelectScene][ReadyButton] Host already ready, ignoring click');
-          return;
-        }
-        if (!this.isHost && this.guestReady) {
-          console.debug('[ScenarioSelectScene][ReadyButton] Guest already ready, ignoring click');
-          return;
-        }
-        if (this.wsManager) {
+      .setInteractive()
+      .on('pointerdown', () => {
+        this.scene.start('PlayerSelectScene');
+      });
+    
+    // Ready button (or Start in local mode)
+    const buttonText = this.mode === 'local' ? 'COMEÇAR' : 'PRONTO';
+    this.readyButton = this.add.text(width - 100, height - 80, buttonText, buttonStyle)
+      .setOrigin(0.5)
+      .setInteractive()
+      .on('pointerdown', () => {
+        if (this.mode === 'local') {
+          // For local mode, just start the game
+          this.startGame();
+        } else if (this.mode === 'online' && this.wsManager) {
+          // Online mode - send ready message
           const msg = {
             type: 'player_ready',
             player: this.isHost ? 'host' : 'guest',
-            roomCode: this.roomCode
+            scenario: SCENARIOS[this.selectedScenario].key
           };
+          
           console.debug('[ScenarioSelectScene][ReadyButton] Sending player_ready message', msg);
           this.wsManager.send(msg);
-          // Also send scenario_selected if host
+
+          // Ensure the host simulates receiving its own player_ready message
           if (this.isHost) {
-            const scenarioMsg = {
-              type: 'scenario_selected',
-              scenario: SCENARIOS[this.selectedScenario].key,
-              roomCode: this.roomCode
-            };
-            this.wsManager.send(scenarioMsg);
-            // Simulate host receiving their own player_ready message to trigger game_start
-            if (this._wsMessageHandler) {
-              this._wsMessageHandler({
-                data: JSON.stringify({
-                  type: 'player_ready',
-                  player: 'host',
-                  roomCode: this.roomCode
-                })
-              } as MessageEvent);
-            }
-          }
-        } else {
-          console.warn('[ScenarioSelectScene][ReadyButton] wsManager not available!');
+            console.debug('[ScenarioSelectScene][ReadyButton] Host simulating receiving own player_ready message');
+            
+            // Directly set host as ready to ensure it's set
+            this.hostReady = true;
+            console.debug('[ScenarioSelectScene][ReadyButton] Directly set hostReady=true');
+            this.updateReadyUI();
+            
+            // Then simulate the message for full processing
+            setTimeout(() => {
+              try {
+                // Direct call to our own handler to ensure it's processed
+                if (this._wsMessageHandler) {
+                  console.debug('[ScenarioSelectScene][ReadyButton] Calling _wsMessageHandler directly');
+                  this._wsMessageHandler({ data: JSON.stringify(msg) } as MessageEvent);
+                } else if (this.wsManager && this.wsManager._onMessage) {
+                  console.debug('[ScenarioSelectScene][ReadyButton] Calling wsManager._onMessage');
+                  this.wsManager._onMessage({ data: JSON.stringify(msg) });
+                } else {
+                  console.error('[ScenarioSelectScene][ReadyButton] No message handler available!');
+                  
+                  // If both players are ready but we couldn't simulate the message, force start
+                  if (this.guestReady && !this.gameStarted) {
+                    console.debug('[ScenarioSelectScene][ReadyButton] Both players ready but no handler, force starting game');
+                    this.startGame();
+                  }
+                }
+              } catch (e) {
+                console.error('[ScenarioSelectScene][ReadyButton] Error simulating message:', e);
+              }
+            }, 50);
         }
-        if (this.isHost) {
-          this.hostReady = true;
-          console.debug('[ScenarioSelectScene][ReadyButton] Host marked self as ready');
-        } else {
-          this.guestReady = true;
-          console.debug('[ScenarioSelectScene][ReadyButton] Guest marked self as ready');
-        }
-        this.updateReadyUI();
+
+        // Update button text to show waiting
+        this.readyButton.setText('AGUARDANDO...');
+        this.readyButton.setTint(0x888888);
         this.readyButton.disableInteractive();
-        // Host will check for both ready in message handler
+      }
+    });
+    
+  // DEBUG: Add force start button for host (only in online mode)
+  if (this.mode === 'online' && this.isHost) {
+    const debugButton = this.add.text(width / 2, height - 30, 'DEBUG: FORCE START', { fontSize: '16px', color: '#ff0000', fontFamily: 'monospace' })
+      .setOrigin(0.5)
+      .setInteractive()
+      .on('pointerdown', () => {
+        console.debug('[ScenarioSelectScene][DEBUG] Force starting game');
+        
+        // Force both players to be ready
+        this.hostReady = true;
+        this.guestReady = true;
+        this.updateReadyUI();
+        
+        // Send game_start message with all required parameters
+        if (this.wsManager) {
+          const msg = {
+            type: 'game_start',
+            scenario: SCENARIOS[this.selectedScenario].key,
+            p1Char: this.selected.p1,
+            p2Char: this.selected.p2,
+            roomCode: this.roomCode,
+            isHost: true
+          };
+          
+          console.debug('[ScenarioSelectScene][DEBUG] Sending forced game_start message', msg);
+          this.wsManager.send(msg);
+          
+          // Set gameStarted flag to true
+          this.gameStarted = true;
+          
+          // Start the game for host with complete parameters
+          console.debug('[ScenarioSelectScene][DEBUG] Force transitioning to KidsFightScene');
+          this.scene.start('KidsFightScene', {
+            gameMode: 'online',
+            mode: 'online',
+            p1: this.selected.p1,
+            p2: this.selected.p2,
+            selected: { p1: this.selected.p1, p2: this.selected.p2 },
+            scenario: SCENARIOS[this.selectedScenario].key,
+            roomCode: this.roomCode,
+            isHost: this.isHost,
+            wsManager: this.wsManager
+          });
+        } else {
+          console.error('[ScenarioSelectScene][DEBUG] No WebSocket manager available!');
+        }
+        
+        // Disable the ready button
+        if (this.readyButton) {
+          this.readyButton.setText('STARTING...');
+          this.readyButton.setTint(0x00ff00);
+          this.readyButton.disableInteractive();
+        }
       });
     } else if (this.mode === 'local') {
       this.readyButton.on('pointerdown', () => this.startGame());
-      this.backButton.on('pointerdown', () => this.goBack());
+      this.backButton.on('pointerdown', () => this.scene.start('MainMenuScene'));
     }
   }
 
@@ -326,70 +445,114 @@ class ScenarioSelectScene extends Phaser.Scene {
   }
     
   private startGame(): void {
-    this.scene.start('KidsFightScene', {
-      mode: this.mode,
-      p1: this.selected.p1,
-      p2: this.selected.p2,
-      selected: this.selected,
-      scenario: SCENARIOS[this.selectedScenario].key,
-      roomCode: this.roomCode,
-      isHost: this.isHost
-    });
-  }
-
-  private goBack(): void {
-    this.scene.start('PlayerSelectScene', {
-      mode: this.mode,
-      roomCode: this.roomCode,
-      isHost: this.isHost
-    });
+    console.debug('[ScenarioSelectScene][startGame] Starting game with mode:', this.mode);
+    
+    try {
+      if (this.mode === 'local') {
+        console.debug('[ScenarioSelectScene][startGame] Starting local game with:', {
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          scenario: SCENARIOS[this.selectedScenario].key
+        });
+        
+        this.scene.start('KidsFightScene', {
+          gameMode: 'local',
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          selected: { p1: this.selected.p1, p2: this.selected.p2 },
+          scenario: SCENARIOS[this.selectedScenario].key
+        });
+      } else if (this.mode === 'online') {
+        // For online mode, set gameStarted flag and send game_start message if host
+        this.gameStarted = true;
+        
+        console.debug('[ScenarioSelectScene][startGame] Starting online game with:', {
+          isHost: this.isHost,
+          hostReady: this.hostReady,
+          guestReady: this.guestReady,
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          scenario: SCENARIOS[this.selectedScenario].key
+        });
+        
+        if (this.isHost) {
+          const msg = {
+            type: 'game_start',
+            scenario: SCENARIOS[this.selectedScenario].key,
+            p1Char: this.selected.p1,
+            p2Char: this.selected.p2,
+            roomCode: this.roomCode,
+            isHost: true
+          };
+          
+          console.debug('[ScenarioSelectScene][startGame] Host sending game_start message:', msg);
+          this.wsManager.send(msg);
+        }
+        
+        this.scene.start('KidsFightScene', {
+          gameMode: 'online',
+          mode: this.mode,
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          selected: { p1: this.selected.p1, p2: this.selected.p2 },
+          scenario: SCENARIOS[this.selectedScenario].key,
+          roomCode: this.roomCode,
+          isHost: this.isHost,
+          wsManager: this.wsManager
+        });
+      }
+    } catch (e) {
+      console.error('[ScenarioSelectScene][startGame] Error starting game:', e);
+    }
+    
+    // Set the WebSocket message handler
+    this.wsManager.setMessageCallback(this._wsMessageHandler);
   }
 
   private updateLayout(gameSize: Phaser.Structs.Size): void {
     const { width, height } = gameSize;
 
-    // Update preview position and scale
+    // Update positions of UI elements based on new size
     if (this.preview) {
-      this.preview.setPosition(width/2, height/2);
+      this.preview.setPosition(width / 2, height / 2 - 50);
       this.rescalePreview();
     }
 
-    // Update navigation buttons
     if (this.prevButton) {
-      this.prevButton.setPosition(width * 0.2, height/2);
-    }
-    if (this.nextButton) {
-      this.nextButton.setPosition(width * 0.8, height/2);
+      this.prevButton.setPosition(width * 0.2, height / 2);
     }
 
-    // Update action buttons
-    if (this.readyButton) {
-      this.readyButton.setPosition(width * 0.7, height * 0.85);
+    if (this.nextButton) {
+      this.nextButton.setPosition(width * 0.8, height / 2);
     }
+
     if (this.backButton) {
-      this.backButton.setPosition(width * 0.3, height * 0.85);
+      this.backButton.setPosition(100, height - 80);
+    }
+
+    if (this.readyButton) {
+      this.readyButton.setPosition(width - 100, height - 80);
     }
   }
 
   private updateReadyUI(): void {
-    if (this.mode !== 'online') return;
-    let txt = '';
-    if (this.isHost) {
-      txt = `Você: ${this.hostReady ? 'Pronto' : 'Aguardando'} | Convidado: ${this.guestReady ? 'Pronto' : 'Aguardando'}`;
-    } else {
-      txt = `Você: ${this.guestReady ? 'Pronto' : 'Aguardando'} | Anfitrião: ${this.hostReady ? 'Pronto' : 'Aguardando'}`;
+    let hostTxt = this.isHost ? 'YOU' : 'HOST';
+    let guestTxt = this.isHost ? 'GUEST' : 'YOU';
+    
+    let txt = this.add.text(this.cameras.main.width / 2, 50, `${hostTxt}: ${this.hostReady ? 'READY' : 'NOT READY'}`, { fontSize: '18px', color: '#fff' });
+    txt.setOrigin(0.5);
+    txt = this.add.text(this.cameras.main.width / 2, 80, `${guestTxt}: ${this.guestReady ? 'READY' : 'NOT READY'}`, { fontSize: '18px', color: '#fff' });
+    txt.setOrigin(0.5);
+    
+    if (this.waitingText) {
+      this.waitingText.setVisible(this.hostReady || this.guestReady);
+      this.waitingText.setText(`Waiting for ${!this.hostReady ? 'host' : !this.guestReady ? 'guest' : 'game to start'}...`);
     }
-    if (!this.waitingText) {
-      const { width, height } = this.cameras.main;
-      this.waitingText = this.add.text(width/2, height*0.92, txt, {
-        fontSize: '22px',
-        color: '#fff',
-        backgroundColor: '#222',
-        padding: { x: 16, y: 8 },
-        fontFamily: 'monospace'
-      }).setOrigin(0.5);
-    } else {
-      this.waitingText.setText(txt);
+    
+    // If both players are ready, update the UI
+    if (this.hostReady && this.guestReady && this.readyButton) {
+      this.readyButton.setText('STARTING...');
+      this.readyButton.setTint(0x00ff00);
     }
   }
 }
