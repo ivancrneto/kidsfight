@@ -728,68 +728,58 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
   }
 
   private createHealthBars(scaleX: number, scaleY: number): void {
-    console.log('[createHealthBars] Initializing health bars with scale:', { scaleX, scaleY });
-    console.log('[createHealthBars] Current playerHealth values:', this.playerHealth);
-    
-    const gameWidth = this.sys.game.canvas.width;
-    const barWidth = 300 * scaleX;
-    const barHeight = 24 * scaleY;
-    const barY = 20 * scaleY;
+    try {
+      console.log('[createHealthBars] Creating health bars with scale:', { scaleX, scaleY });
+      
+      const gameWidth = this.sys.game.canvas.width;
+      const barWidth = 300 * scaleX;
+      const barHeight = 24 * scaleY;
+      const barY = 20 * scaleY;
+      const barX1 = 60 * scaleX + barWidth / 2;
+      const barX2 = gameWidth - (60 * scaleX + barWidth / 2);
 
-    // Calculate positions
-    const barX1 = 60 * scaleX + barWidth / 2;
-    const barX2 = gameWidth - (60 * scaleX + barWidth / 2);
+      // Clean up existing bars if they exist
+      if (this.healthBar1) this.healthBar1.destroy();
+      if (this.healthBar2) this.healthBar2.destroy();
+      if (this.healthBarBg1) this.healthBarBg1.destroy();
+      if (this.healthBarBg2) this.healthBarBg2.destroy();
 
-    // Remove old bars if they exist
-    if (this.healthBarBg1) this.healthBarBg1.destroy();
-    if (this.healthBarBg2) this.healthBarBg2.destroy();
-    if (this.healthBar1) this.healthBar1.destroy();
-    if (this.healthBar2) this.healthBar2.destroy();
+      // Create health bar backgrounds (gray)
+      this.healthBarBg1 = this.add.rectangle(barX1, barY, barWidth, barHeight, 0x444444)
+        .setScrollFactor(0)
+        .setDepth(999);
+      
+      this.healthBarBg2 = this.add.rectangle(barX2, barY, barWidth, barHeight, 0x444444)
+        .setScrollFactor(0)
+        .setDepth(999);
 
-    // Player 1 background (dark gray)
-    this.healthBarBg1 = this.add.rectangle(
-      barX1,
-      barY,
-      barWidth,
-      barHeight,
-      0x222222
-    ) as Phaser.GameObjects.Rectangle;
-    this.healthBarBg1.setOrigin(0.5, 0.5);
-    this.healthBarBg1.setScrollFactor(0);
-    this.healthBarBg1.setDepth(999);
+      // Create health bars (initially empty, will be filled by updateHealthBar)
+      this.healthBar1 = this.add.graphics()
+        .setScrollFactor(0)
+        .setDepth(1000);
+      
+      this.healthBar2 = this.add.graphics()
+        .setScrollFactor(0)
+        .setDepth(1000);
 
-    // Player 2 background (dark gray)
-    this.healthBarBg2 = this.add.rectangle(
-      barX2,
-      barY,
-      barWidth,
-      barHeight,
-      0x222222
-    ) as Phaser.GameObjects.Rectangle;
-    this.healthBarBg2.setOrigin(0.5, 0.5);
-    this.healthBarBg2.setScrollFactor(0);
-    this.healthBarBg2.setDepth(999);
-
-    // Player 1 health bar (green)
-    this.healthBar1 = this.add.graphics() as Phaser.GameObjects.Graphics;
-    this.healthBar1.setScrollFactor(0);
-    this.healthBar1.setDepth(1000);
-
-    // Player 2 health bar (red)
-    this.healthBar2 = this.add.graphics() as Phaser.GameObjects.Graphics;
-    this.healthBar2.setScrollFactor(0);
-    this.healthBar2.setDepth(1000);
-
-    // Health is already initialized before UI creation; no need to reset here
-    // Just update both health bars
-    this.updateHealthBar(0);
-    this.updateHealthBar(1);
-    
-    console.log('[createHealthBars] Health bars initialized:', {
-      playerHealth: this.playerHealth,
-      player1Health: this.players[0]?.health,
-      player2Health: this.players[1]?.health
-    });
+      console.log('[createHealthBars] Health bars created, updating...');
+      
+      // Update both health bars
+      this.updateHealthBar(0);
+      this.updateHealthBar(1);
+      
+      console.log('[createHealthBars] Health bars initialized:', {
+        playerHealth: this.playerHealth,
+        barsExist: {
+          bar1: !!this.healthBar1,
+          bar2: !!this.healthBar2,
+          bg1: !!this.healthBarBg1,
+          bg2: !!this.healthBarBg2
+        }
+      });
+    } catch (error) {
+      console.error('[createHealthBars] Error creating health bars:', error);
+    }
   }
 
   private updateHealthBar(playerIndex: number): void {
@@ -799,20 +789,31 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
         console.warn('[updateHealthBar] Game canvas not available');
         return;
       }
+
+      // Ensure health bars exist, recreate if needed
+      if (!this.healthBar1 || !this.healthBar2 || !this.healthBarBg1 || !this.healthBarBg2) {
+        console.warn('[updateHealthBar] Health bars not found, recreating...');
+        const gameWidth = this.sys.game.canvas.width;
+        const gameHeight = this.sys.game.canvas.height;
+        const scaleX = gameWidth / 800;
+        const scaleY = gameHeight / 480;
+        this.createHealthBars(scaleX, scaleY);
+        // Wait for next frame to ensure health bars are created
+        return;
+      }
       
-      // Only fix missing/NaN health values, do not force to MAX_HEALTH if less than max
-      if (
-    typeof this.playerHealth[playerIndex] !== 'number' ||
-    isNaN(this.playerHealth[playerIndex])
-) {
-        this.playerHealth[playerIndex] = MAX_HEALTH;
+      // Ensure health value is valid and within bounds
+      const currentHealth = this.playerHealth[playerIndex];
+      if (typeof currentHealth !== 'number' || isNaN(currentHealth) || currentHealth < 0 || currentHealth > MAX_HEALTH) {
+        console.warn(`[HEALTH] Invalid health value for player ${playerIndex + 1}: ${currentHealth}, resetting to max`);
+        const fixedHealth = Math.max(0, Math.min(MAX_HEALTH, isNaN(currentHealth) ? MAX_HEALTH : currentHealth));
+        this.playerHealth[playerIndex] = fixedHealth;
         if (this.players[playerIndex]) {
-          this.players[playerIndex].health = MAX_HEALTH;
+          this.players[playerIndex].health = fixedHealth;
         }
       }
       
-      // Single health bar logic
-      const maxHealth = MAX_HEALTH;
+      // Calculate dimensions and positions
       const gameWidth = this.sys.game.canvas.width;
       const scaleX = gameWidth / 800;
       const barWidth = 300 * scaleX;
@@ -820,88 +821,68 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
       const barY = 20 * scaleX;
       const barX1 = 60 * scaleX + barWidth / 2;
       const barX2 = gameWidth - (60 * scaleX + barWidth / 2);
+      const healthPercent = Math.max(0, Math.min(1, this.playerHealth[playerIndex] / MAX_HEALTH));
+      
+      // Get the target health bar and background
+      const healthBar = playerIndex === 0 ? this.healthBar1 : this.healthBar2;
+      const healthBarBg = playerIndex === 0 ? this.healthBarBg1 : this.healthBarBg2;
+      const barX = playerIndex === 0 ? barX1 : barX2;
+      const healthColor = playerIndex === 0 ? 0x00ff00 : 0xff0000; // Green for P1, Red for P2
 
-      // Ensure health bars and backgrounds exist
-      if (!this.healthBar1 || !this.healthBar2 || !this.healthBarBg1 || !this.healthBarBg2) {
-        console.warn('[updateHealthBar] Health bars or backgrounds not initialized, recreating...');
-        const scaleY = this.sys.game.canvas.height / 480;
-        this.createHealthBars(scaleX, scaleY);
-        return;
+      // Update background position and visibility
+      if (healthBarBg) {
+        healthBarBg.setPosition(barX, barY);
+        healthBarBg.setSize(barWidth, barHeight);
+        healthBarBg.setVisible(true);
+        healthBarBg.setDepth(999);
       }
 
-      // Make sure backgrounds are visible and properly positioned
-      if (this.healthBarBg1) this.healthBarBg1.setVisible(true);
-      if (this.healthBarBg2) this.healthBarBg2.setVisible(true);
-      if (this.healthBar1) this.healthBar1.setVisible(true);
-      if (this.healthBar2) this.healthBar2.setVisible(true);
+      // Clear and redraw health bar
+      if (healthBar) {
+        healthBar.clear();
+        healthBar.setVisible(true);
+        healthBar.setDepth(1000);
+        
+        // Draw health bar background (dark gray)
+        healthBar.fillStyle(0x444444);
+        healthBar.fillRect(
+          barX - barWidth / 2,
+          barY - barHeight / 2,
+          barWidth,
+          barHeight
+        );
+        
+        // Draw health fill (green/red)
+        healthBar.fillStyle(healthColor);
+        healthBar.fillRect(
+          barX - barWidth / 2,
+          barY - barHeight / 2,
+          barWidth * healthPercent,
+          barHeight
+        );
+        
+        // Draw border
+        healthBar.lineStyle(2, 0xffffff, 1);
+        healthBar.strokeRect(
+          barX - barWidth / 2,
+          barY - barHeight / 2,
+          barWidth,
+          barHeight
+        );
+      }
 
-      // Clear graphics
-      this.healthBar1.clear();
-      this.healthBar2.clear();
-
-      // Log health values for debugging
-      console.log(`[updateHealthBar] Updating health bar for player ${playerIndex + 1}:`, {
+      // Debug logging
+      console.log(`[updateHealthBar] Player ${playerIndex + 1} health:`, {
         health: this.playerHealth[playerIndex],
-        barX: playerIndex === 0 ? barX1 : barX2,
-        barY,
-        barWidth,
-        barHeight,
-        maxHealth
+        percent: (healthPercent * 100).toFixed(1) + '%',
+        position: { x: barX, y: barY },
+        size: { width: barWidth, height: barHeight },
+        timestamp: Date.now()
       });
-
-      // Update the requested health bar
-      if (playerIndex === 0) {
-        // Player 1 (left)
-        const p1Health = Math.max(0, Math.min(maxHealth, this.playerHealth[0]));
-        const healthPercentage = p1Health / maxHealth;
-        
-        // Draw health bar background (gray)
-        this.healthBar1.fillStyle(0x444444);
-        this.healthBar1.fillRect(
-          barX1 - barWidth / 2, 
-          barY - barHeight / 2, 
-          barWidth, 
-          barHeight
-        );
-        
-        // Remove grace period: only draw proportional to health
-        if (p1Health > 0) {
-          const healthWidth = barWidth * healthPercentage;
-          this.healthBar1.fillStyle(0x00ff00);
-          this.healthBar1.fillRect(
-            barX1 - barWidth / 2, 
-            barY - barHeight / 2, 
-            healthWidth, 
-            barHeight
-          );
-        }
-      } 
-      else if (playerIndex === 1) {
-        // Player 2 (right)
-        const p2Health = Math.max(0, Math.min(maxHealth, this.playerHealth[1]));
-        const healthPercentage = p2Health / maxHealth;
-        
-        // Draw health bar background (gray)
-        this.healthBar2.fillStyle(0x444444);
-        this.healthBar2.fillRect(
-          barX2 - barWidth / 2, 
-          barY - barHeight / 2, 
-          barWidth, 
-          barHeight
-        );
-        
-        // Draw health bar (red)
-        if (p2Health > 0) {
-          const healthWidth = barWidth * healthPercentage;
-          this.healthBar2.fillStyle(0xff0000);
-          this.healthBar2.fillRect(
-            barX2 - barWidth / 2, 
-            barY - barHeight / 2, 
-            healthWidth, 
-            barHeight
-          );
-        }
-      }
+      
+      // The health bar was already drawn above with the correct colors:
+      // - Player 1 (index 0): Green (0x00ff00)
+      // - Player 2 (index 1): Red (0xff0000)
 
       // Mark as dirty to ensure redraw
       if (this.healthBar1) this.healthBar1.dirty = true;
@@ -959,29 +940,37 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
     }
   }
 
+  // Helper for display name - used throughout the class
+  private getDisplayName(key: string): string {
+    // Map known keys to real names, fallback to key if not found
+    const nameMap: Record<string, string> = {
+      player1: 'Bento',
+      player2: 'Davi R',
+      player3: 'José',
+      player4: 'Davi S',
+      player5: 'Carol',
+      player6: 'Roni',
+      player7: 'Jacqueline',
+      player8: 'Ivan',
+      player9: 'D. Isa',
+      bento: 'Bento',
+      davir: 'Davi R',
+      jose: 'José',
+      davis: 'Davi S',
+      carol: 'Carol',
+      roni: 'Roni',
+      jacqueline: 'Jacqueline',
+      ivan: 'Ivan',
+      d_isa: 'D. Isa'
+    };
+    return nameMap[key] || key;
+  }
+
   private createPlayerNames(scaleX: number, scaleY: number): void {
     const gameWidth = this.sys.game.canvas.width;
 
     // Create player name texts with proper scaling
     const fontSize = Math.max(16, Math.floor(24 * scaleY)); // Ensure minimum readable size
-
-    // Prefer character display names if available
-    const getDisplayName = (key: string) => {
-      // Map known keys to real names, fallback to key if not found
-      const nameMap: Record<string, string> = {
-        player1: 'Bento',
-        player2: 'Davi R',
-        player3: 'José',
-        player4: 'Davi S',
-        player5: 'Carol',
-        player6: 'Roni',
-        player7: 'Jacqueline',
-        player8: 'Ivan',
-        player9: 'D. Isa',
-        bento: 'Bento',
-      };
-      return nameMap[key] || key;
-    };
 
     // Draw a semi-transparent dark rectangle behind each name for contrast
     const nameBgWidth = 160 * scaleX;
@@ -1007,7 +996,7 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
     ).setOrigin(0.5).setDepth(10);
 
     const playerName1 = this.add.text(
-        10 * scaleX, 70 * scaleY, getDisplayName(this.p1), {
+        10 * scaleX, 70 * scaleY, this.getDisplayName(this.p1), {
           fontSize: `${fontSize}px`,
           color: '#fff',
           fontStyle: 'bold',
@@ -1024,7 +1013,7 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
     playerName1.setDepth(11);
 
     const playerName2 = this.add.text(
-        gameWidth - (210 * scaleX), 70 * scaleY, getDisplayName(this.p2), {
+        gameWidth - (210 * scaleX), 70 * scaleY, this.getDisplayName(this.p2), {
           fontSize: `${fontSize}px`,
           color: '#fff',
           fontStyle: 'bold',
@@ -1252,92 +1241,37 @@ if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.connec
     }, 300);
   }
 
-
-public updateTouchControlState(
-  control: 'left' | 'right' | 'jump' | 'attack' | 'special' | 'block',
-  active: boolean
-): void {
-  // Use correct player index in all modes
-  const player = this.players[this.localPlayerIndex];
-  if (!player) return;
-  switch (control) {
-    case 'left':
-      player.setVelocityX(active ? -160 : 0);
-      break;
-    case 'right':
-      player.setVelocityX(active ? 160 : 0);
-      break;
-    case 'jump':
-      if (active && player.body && ((player.body.blocked && player.body.blocked.down) || (player.body.touching && player.body.touching.down))) {
-        player.setVelocityY(-330); // Standard jump
+  private handleAttack(): void {
+    try {
+      console.debug('[KidsFightScene][handleAttack] CALLED', { localPlayerIndex: this.localPlayerIndex, gameMode: this.gameMode });
+      const player = this.players[this.localPlayerIndex];
+      if (player) {
+        player.setData('isAttacking', true);
       }
-      break;
-    case 'attack':
-      if (active) this.handleAttack();
-      break;
-    case 'special':
-      if (active) this.handleSpecial();
-      break;
-    case 'block':
-      this.playerBlocking[this.localPlayerIndex] = active;
-      break;
-  }
-
-
-    // Reset special attack state after animation
-    setTimeout(() => {
-      const p = this.players[this.localPlayerIndex];
-      if (p) p.setData('isSpecialAttacking', false);
-    }, 300);
-  }
-
-private handleAttack(): void {
-  try {
-    console.debug('[KidsFightScene][handleAttack] CALLED', { localPlayerIndex: this.localPlayerIndex, gameMode: this.gameMode });
-    const player = this.players[this.localPlayerIndex];
-    if (player) {
-      player.setData('isAttacking', true);
+      this.tryAction(this.localPlayerIndex, 'attack', false);
+      if (this.gameMode === 'online' && this.wsManager) {
+        this.wsManager.send({
+          type: 'attack',
+          playerIndex: this.localPlayerIndex
+        });
+      }
+      setTimeout(() => {
+        const p = this.players[this.localPlayerIndex];
+        if (p) p.setData('isAttacking', false);
+      }, 250);
+    } catch (error) {
+      console.error('[KidsFightScene][handleAttack] ERROR', error);
     }
-    this.tryAction(this.localPlayerIndex, 'attack', false);
-    if (this.gameMode === 'online' && this.wsManager) {
-      this.wsManager.send({
-        type: 'attack',
-        playerIndex: this.localPlayerIndex
-      });
-    }
-    setTimeout(() => {
-      const p = this.players[this.localPlayerIndex];
-      if (p) p.setData('isAttacking', false);
-    }, 250);
-  } catch (error) {
-    console.error('[KidsFightScene][handleAttack] ERROR', error);
   }
-}
 
   private endGame(winnerIndex: number, message: string = ''): void {
     this.gameOver = true;
     let winMsg = message;
     if (!message) {
-      // Use real character name instead of 'Player 1'/'Player 2'
-      const getDisplayName = (key: string) => {
-        const nameMap: Record<string, string> = {
-          player1: 'Bento',
-          player2: 'Davi R',
-          player3: 'José',
-          player4: 'Davi S',
-          player5: 'Carol',
-          player6: 'Roni',
-          player7: 'Jacqueline',
-          player8: 'Ivan',
-          player9: 'D. Isa',
-          bento: 'Bento',
-        };
-        return nameMap[key] || key;
-      };
       if (winnerIndex === 0) {
-        winMsg = `${getDisplayName(this.p1)} Venceu!`;
+        winMsg = `${this.getDisplayName(this.p1)} Venceu!`;
       } else if (winnerIndex === 1) {
-        winMsg = `${getDisplayName(this.p2)} Venceu!`;
+        winMsg = `${this.getDisplayName(this.p2)} Venceu!`;
       } else {
         winMsg = 'Empate!';
       }
@@ -1384,7 +1318,9 @@ private handleAttack(): void {
 
     rematchBtn.on('pointerdown', () => {
       if (this.gameMode === 'online' && this.wsManager) {
-        this.wsManager.sendReplayRequest(this.roomCode, this.isHost ? 'host' : 'guest');
+        // Ensure roomCode is a string before sending
+        const roomCode = this.roomCode || '';
+        this.wsManager.sendReplayRequest(roomCode, this.isHost ? 'host' : 'guest');
         rematchBtn.setText('Aguardando...');
         rematchBtn.disableInteractive();
       } else {
@@ -1598,9 +1534,20 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
   });
   
   // --- FIX: Ensure health never goes below 0 and both health values stay in sync ---
-  const newHealth = Math.max(0, defender.health - damage);
+  const currentHealth = Math.max(0, Math.min(MAX_HEALTH, defender.health));
+  const newHealth = Math.max(0, currentHealth - damage);
+  
+  console.log(`[HEALTH] Player ${defenderIdx + 1} health: ${currentHealth} -> ${newHealth} (damage: ${damage})`);
+  
+  // Update both health references
   defender.health = newHealth;
   this.playerHealth[defenderIdx] = newHealth;
+  
+  // Force sync the other player's health reference if needed
+  if (this.players[defenderIdx] && this.players[defenderIdx].health !== newHealth) {
+    console.warn(`[HEALTH] Health out of sync for player ${defenderIdx + 1}, fixing...`);
+    this.players[defenderIdx].health = newHealth;
+  }
 
   console.log('[TRYATTACK] AFTER', {
     attackerIdx,
@@ -1612,10 +1559,41 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
   
   // Update health bar UI and check for winner
   console.debug('[KidsFightScene][tryAttack] Updating health bars...');
-  this.updateHealthBar(0); // Update both health bars
-  this.updateHealthBar(1);
-  console.debug('[KidsFightScene][tryAttack] Checking winner...');
-  this.checkWinner();
+  
+  try {
+    // Update both health bars to ensure they're in sync
+    this.updateHealthBar(0);
+    this.updateHealthBar(1);
+    
+    // Force a render update
+    this.scene.systems.displayList.depthSort();
+    
+    // Debug log the current health state
+    console.log('[HEALTH] Updated health state:', {
+      player1: { 
+        health: this.playerHealth[0], 
+        obj: this.players[0]?.health,
+        barVisible: this.healthBar1?.visible,
+        barExists: !!this.healthBar1
+      },
+      player2: { 
+        health: this.playerHealth[1], 
+        obj: this.players[1]?.health,
+        barVisible: this.healthBar2?.visible,
+        barExists: !!this.healthBar2
+      },
+      timestamp: Date.now()
+    });
+    
+    console.debug('[KidsFightScene][tryAttack] Checking winner...');
+    this.checkWinner();
+  } catch (error) {
+    console.error('Error updating health bars:', error);
+    // Try to recreate health bars on error
+    const scaleX = this.sys.game.canvas.width / 800;
+    const scaleY = this.sys.game.canvas.height / 480;
+    this.createHealthBars(scaleX, scaleY);
+  }
 
   // --- Send health update to remote player in online mode ---
   if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
@@ -1655,17 +1633,10 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
 
   private updatePlayerAnimation(playerIndex: number, isWalking?: boolean, time?: number): void {
     const player = playerIndex === 0 ? this.players[0] : this.players[1];
+    
+    // If player doesn't exist, do nothing
     if (!player) return;
-    // Debug log for animation frame
-    // console.log(`[DEBUG][Anim] Player ${playerIndex + 1} anim update`, {
-    //   key: player.texture.key,
-    //   frame: player.frame ? player.frame.name : undefined,
-    //   width: player.width,
-    //   height: player.height,
-    //   displayWidth: player.displayWidth,
-    //   displayHeight: player.displayHeight
-    // });
-
+    
     // If called with isWalking parameter (legacy call)
     if (isWalking !== undefined) {
       // Use setFrame for walk animation
@@ -1679,31 +1650,31 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
       return;
     }
 
-    // New animation logic
-    if (player.getData('isHit')) {
+    // New animation logic - safely check if player exists before each operation
+    if (player && player.getData && player.getData('isHit')) {
       // Optionally set a hit frame
       player.setFrame(3); // Example: frame 3 for hit
       // DEBUG
       //console.log('ANIM: HIT', playerIndex);
-    } else if (player.getData('isSpecialAttacking')) {
+    } else if (player && player.getData && player.getData('isSpecialAttacking')) {
       player.setFrame(6); // Frame 6 for special attack (last valid frame)
       // DEBUG
       //console.log('ANIM: SPECIAL ATTACK', playerIndex);
-    } else if (player.getData('isAttacking')) {
+    } else if (player && player.getData && player.getData('isAttacking')) {
       player.setFrame(4); // Frame 4 for attack
       // DEBUG
       //console.log('ANIM: ATTACK', playerIndex);
-    } else if (player.body && !player.body.blocked.down) {
+    } else if (player && player.body && !player.body.blocked.down) {
       player.setFrame(0); // Use idle frame for jump (customize if needed)
       // DEBUG
       //console.log('ANIM: JUMP', playerIndex);
-    } else if (player.body && player.body.blocked.down && Math.abs(player.body.velocity.x) > 2) {
+    } else if (player && player.body && player.body.blocked.down && Math.abs(player.body.velocity.x) > 2) {
       // Walking: alternate between frame 1 and 2
       const frame = (Math.floor(Date.now() / 120) % 2) + 1;
       player.setFrame(frame);
       // DEBUG
       //console.log('ANIM: WALK', playerIndex, player.body.velocity.x);
-    } else {
+    } else if (player) {
       player.setFrame(0); // Idle
       // DEBUG
       //console.log('ANIM: IDLE', playerIndex);
@@ -1721,112 +1692,27 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
     }
   }
 
-  // private tryAttack(playerIdx: number, attacker: any, defender: any, now: number, special: boolean) {
-  //   // Robustly determine defenderIdx
-  //   let defenderIdx = undefined;
-  //   if (defender === this.player1) defenderIdx = 0;
-  //   else if (defender === this.player2) defenderIdx = 1;
-  //   else {
-  //     console.error('[TRYATTACK] Could not determine defenderIdx!', defender, this.player1, this.player2);
-  //     return;
-  //   }
-  //   if (!attacker || !defender) return;
-  //   console.log('[TRYATTACK] BEFORE', {
-  //     playerIdx,
-  //     defenderIdx,
-  //     playerHealth: this.playerHealth.slice(),
-  //     player1Health: this.players[0]?.health,
-  //     player2Health: this.players[1]?.health
-  //   });
-  //   // Call the actual attack logic from gameUtils
-  //   tryAttack(this, playerIdx, attacker, defender, now, special);
-  //   console.log('[TRYATTACK] AFTER', {
-  //     playerIdx,
-  //     defenderIdx,
-  //     playerHealth: this.playerHealth.slice(),
-  //     player1Health: this.players[0]?.health,
-  //     player2Health: this.players[1]?.health
-  //   });
-  //   // Update health bar UI
-  //   this.updateHealthBar(defenderIdx);
-  //   this.checkWinner();
-
-  //   // --- Send health update to remote player in online mode ---
-  //   if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
-  //     console.debug('[KidsFightScene][tryAttack] About to send health update', {
-  //       attackerIdx, defenderIdx, gameMode: this.gameMode, wsManager: !!this.wsManager,
-  //       healthUpdateTarget: defenderIdx,
-  //       healthUpdateValue: this.players[defenderIdx]?.health,
-  //       // playerHealth: this.playerHealth.slice(),
-  //       players: [
-  //         this.players[0] ? {health: this.players[0].health} : null,
-  //         this.players[1] ? {health: this.players[1].health} : null
-  //       ]
-  //     });
-  //     const healthUpdate = {
-  //       type: 'health_update',
-  //       playerIndex: defenderIdx,
-  //       health: this.players[defenderIdx]?.health
-  //     };
-  //     console.debug('[KidsFightScene][WS SEND HEALTH UPDATE]', healthUpdate);
-  //     this.wsManager.send(JSON.stringify(healthUpdate));
-  //   }
-
-  //   // Update special pips after attack
-  //   this.updateSpecialPips();
-
-  //   // Award special points for successful hits
-  //   if (!special && attackerIdx === 0) {
-  //     this.playerSpecial[0] = Math.min(3, this.playerSpecial[0] + 1);
-  //     console.log('[DEBUG] Player 1 special:', this.playerSpecial[0]);
-  //     this.updateSpecialPips();
-  //   }
-  //   if (!special && attackerIdx === 1) {
-  //     this.playerSpecial[1] = Math.min(3, this.playerSpecial[1] + 1);
-  //     console.log('[DEBUG] Player 2 special:', this.playerSpecial[1]);
-  //     this.updateSpecialPips();
-  //   }
-  // }
-
   private checkWinner(): boolean {
     if (this.gameOver) return false;
     
-    // Check if player health is defined and less than or equal to 0
+    // Get current health values
     const p1Health = this.players[0]?.health ?? this.playerHealth[0];
     const p2Health = this.players[1]?.health ?? this.playerHealth[1];
-    
-    // Helper for display name
-    const getDisplayName = (key: string) => {
-      // Map known keys to real names, fallback to key if not found
-      const nameMap: Record<string, string> = {
-        player1: 'Bento',
-        player2: 'Davi R',
-        player3: 'José',
-        player4: 'Davi S',
-        player5: 'Carol',
-        player6: 'Roni',
-        player7: 'Jacqueline',
-        player8: 'Ivan',
-        player9: 'D. Isa',
-        bento: 'Bento',
-      };
-      return nameMap[key] || key;
-    };
 
     if (p1Health <= 0) {
       // Player 2 won
-      this.endGame(1, `${getDisplayName(this.p2)} Venceu!`);
+      this.endGame(1, `${this.getDisplayName(this.p2)} Venceu!`);
       return true;
     } else if (p2Health <= 0) {
       // Player 1 won
-      this.endGame(0, `${getDisplayName(this.p1)} Venceu!`);
+      this.endGame(0, `${this.getDisplayName(this.p1)} Venceu!`);
       return true;
     } else if (this.timeLeft <= 0) {
       // Time's up - check who has more health
       if (p1Health > p2Health) {
-        this.endGame(0, `${getDisplayName(this.p1)} Venceu!`);
+        this.endGame(0, `${this.getDisplayName(this.p1)} Venceu!`);
       } else if (p2Health > p1Health) {
-        this.endGame(1, `${getDisplayName(this.p2)} Venceu!`);
+        this.endGame(1, `${this.getDisplayName(this.p2)} Venceu!`);
       } else {
         this.endGame(-1, 'Empate!');
       }
@@ -1862,12 +1748,15 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
 
     if (this.gameMode === 'online' && this.wsManager && this.players[this.localPlayerIndex]) {
       const player = this.players[this.localPlayerIndex];
+      if (!player) return; // Safety check
+      
+      // Create position update with null checks
       const curr = {
         x: player.x,
         y: player.y,
         velocityX: player.body?.velocity.x || 0,
         velocityY: player.body?.velocity.y || 0,
-        flipX: player.flipX,
+        flipX: player.flipX || false,
         frame: (typeof player.frame === 'object' && player.frame !== null && 'name' in player.frame)
           ? player.frame.name
           : (typeof player.frame === 'string' || typeof player.frame === 'number')
@@ -1876,12 +1765,14 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
       };
 
       if (!this._lastSentPosition ||
-        curr.x !== this._lastSentPosition.x ||
-        curr.y !== this._lastSentPosition.y ||
-        curr.velocityX !== this._lastSentPosition.velocityX ||
-        curr.velocityY !== this._lastSentPosition.velocityY ||
-        curr.flipX !== this._lastSentPosition.flipX ||
-        curr.frame !== this._lastSentPosition.frame) {
+        (curr && this._lastSentPosition && (
+          curr.x !== this._lastSentPosition.x ||
+          curr.y !== this._lastSentPosition.y ||
+          curr.velocityX !== this._lastSentPosition.velocityX ||
+          curr.velocityY !== this._lastSentPosition.velocityY ||
+          curr.flipX !== this._lastSentPosition.flipX ||
+          curr.frame !== this._lastSentPosition.frame
+        ))) {
         const positionMsg = {
           type: 'position_update',
           playerIndex: this.localPlayerIndex,

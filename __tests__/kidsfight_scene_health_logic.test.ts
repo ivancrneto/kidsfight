@@ -4,17 +4,53 @@ import { jest } from '@jest/globals';
 // Helper to create a fresh scene with mock players
 function createTestScene() {
   const scene: any = new KidsFightScene();
-  scene.playerHealth = [200, 200];
-  scene.playerSpecial = [0, 0];
-  scene.players = [
-    { health: 200, setData: jest.fn(), getData: jest.fn(), setFrame: jest.fn() },
-    { health: 200, setData: jest.fn(), getData: jest.fn(), setFrame: jest.fn() },
-  ];
+  
+  // Mock Phaser sys and game objects
+  scene.sys = {
+    game: {
+      canvas: { width: 800, height: 600 },
+      device: { os: { android: false, iOS: false } }
+    },
+    displayList: {
+      depthSort: jest.fn()
+    }
+  };
+  
+  // Mock health bar methods
+  scene.createHealthBars = jest.fn();
   scene.updateHealthBar = jest.fn();
   scene.updateSpecialPips = jest.fn();
   scene.checkWinner = jest.fn();
-  scene.wsManager = { send: jest.fn() };
+  
+  // Mock WebSocket manager
+  scene.wsManager = { 
+    send: jest.fn(),
+    isHost: true
+  };
+  
+  // Initialize player properties
+  scene.playerHealth = [200, 200];
+  scene.playerSpecial = [0, 0];
+  scene.players = [
+    { 
+      health: 200, 
+      setData: jest.fn(), 
+      getData: jest.fn(), 
+      setFrame: jest.fn(),
+      body: { velocity: { x: 0, y: 0 } }
+    },
+    { 
+      health: 200, 
+      setData: jest.fn(), 
+      getData: jest.fn(), 
+      setFrame: jest.fn(),
+      body: { velocity: { x: 0, y: 0 } }
+    },
+  ];
+  
   scene.gameMode = 'single';
+  scene.gameOver = false;
+  
   return scene;
 }
 

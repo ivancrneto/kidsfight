@@ -364,61 +364,8 @@ class ScenarioSelectScene extends Phaser.Scene {
       }
     });
     
-  // DEBUG: Add force start button for host (only in online mode)
-  if (this.mode === 'online' && this.isHost) {
-    const debugButton = this.add.text(width / 2, height - 30, 'DEBUG: FORCE START', { fontSize: '16px', color: '#ff0000', fontFamily: 'monospace' })
-      .setOrigin(0.5)
-      .setInteractive()
-      .on('pointerdown', () => {
-        console.debug('[ScenarioSelectScene][DEBUG] Force starting game');
-        
-        // Force both players to be ready
-        this.hostReady = true;
-        this.guestReady = true;
-        this.updateReadyUI();
-        
-        // Send game_start message with all required parameters
-        if (this.wsManager) {
-          const msg = {
-            type: 'game_start',
-            scenario: SCENARIOS[this.selectedScenario].key,
-            p1Char: this.selected.p1,
-            p2Char: this.selected.p2,
-            roomCode: this.roomCode,
-            isHost: true
-          };
-          
-          console.debug('[ScenarioSelectScene][DEBUG] Sending forced game_start message', msg);
-          this.wsManager.send(msg);
-          
-          // Set gameStarted flag to true
-          this.gameStarted = true;
-          
-          // Start the game for host with complete parameters
-          console.debug('[ScenarioSelectScene][DEBUG] Force transitioning to KidsFightScene');
-          this.scene.start('KidsFightScene', {
-            gameMode: 'online',
-            mode: 'online',
-            p1: this.selected.p1,
-            p2: this.selected.p2,
-            selected: { p1: this.selected.p1, p2: this.selected.p2 },
-            scenario: SCENARIOS[this.selectedScenario].key,
-            roomCode: this.roomCode,
-            isHost: this.isHost,
-            wsManager: this.wsManager
-          });
-        } else {
-          console.error('[ScenarioSelectScene][DEBUG] No WebSocket manager available!');
-        }
-        
-        // Disable the ready button
-        if (this.readyButton) {
-          this.readyButton.setText('STARTING...');
-          this.readyButton.setTint(0x00ff00);
-          this.readyButton.disableInteractive();
-        }
-      });
-    } else if (this.mode === 'local') {
+  // Local mode button handlers
+  if (this.mode === 'local') {
       this.readyButton.on('pointerdown', () => this.startGame());
       this.backButton.on('pointerdown', () => this.scene.start('MainMenuScene'));
     }
