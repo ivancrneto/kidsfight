@@ -65,6 +65,10 @@ describe('KidsFightScene', () => {
   let player2;
   
   beforeEach(() => {
+  if (typeof scene !== 'undefined') {
+    if (!scene.textures) scene.textures = { list: {} };
+    else scene.textures.list = {};
+  }
     scene = new KidsFightScene();
     // Ensure add.sprite is a jest mock for hit effect tests
     scene.add = {

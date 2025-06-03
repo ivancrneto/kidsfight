@@ -83,14 +83,17 @@ describe('Character and Scenario Selection', () => {
     // Reset all mocks before each test
     jest.clearAllMocks();
     WebSocketManager.resetInstance();
+    // Use the real KidsFightScene instance
+    scene = new KidsFightScene() as KidsFightSceneTest;
+    setupMockScene(scene);
+    // Mock textures.list for KidsFightScene
+    if (!scene.textures) scene.textures = { list: {} };
+    else scene.textures.list = {};
+
     if (mockWebSocket) {
       mockWebSocket.readyState = 1;
       if (mockWebSocket.send) mockWebSocket.send.mockClear();
     }
-
-    // Use the real KidsFightScene instance
-    scene = new KidsFightScene() as KidsFightSceneTest;
-    setupMockScene(scene);
     // Patch sys.game.device.os for mobile detection in create()
     if (!scene.sys.game.device) scene.sys.game.device = {};
     scene.sys.game.device.os = { android: false, iOS: false };

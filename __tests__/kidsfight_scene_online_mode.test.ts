@@ -180,6 +180,12 @@ class TestKidsFightScene extends KidsFightScene {
 }
 
 describe('KidsFightScene - Online Mode', () => {
+  beforeEach(() => {
+    if (typeof scene !== 'undefined') {
+      if (!scene.textures) scene.textures = { list: {} };
+      else scene.textures.list = {};
+    }
+  });
   describe('Player Movement', () => {
     let scene: TestKidsFightScene;
     

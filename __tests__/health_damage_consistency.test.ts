@@ -114,13 +114,20 @@ jest.mock('phaser', () => ({
 describe('Health Damage Consistency Tests', () => {
   let scene: KidsFightScene;
   let mockWsManager: any;
+  const wsFactory = () => ({
+    send: jest.fn(),
+    close: jest.fn(),
+    readyState: 1,
+    addEventListener: jest.fn(),
+    resetMocks: jest.fn()
+  });
   
   beforeEach(() => {
     // Reset WebSocketManager instance
     WebSocketManager.resetInstance();
     
     // Get a fresh instance of the mock WebSocketManager
-    mockWsManager = WebSocketManager.getInstance();
+    mockWsManager = WebSocketManager.getInstance(wsFactory);
     
     // Mock WebSocketManager methods
     mockWsManager.send = jest.fn();

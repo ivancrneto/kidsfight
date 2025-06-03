@@ -240,6 +240,7 @@ class ScenarioSelectScene extends Phaser.Scene {
                 p2: p2Clean,
                 selected: { p1: p1Clean, p2: p2Clean },
                 scenario: SCENARIOS[this.selectedScenario].key,
+                selectedScenario: SCENARIOS[this.selectedScenario].key,
                 roomCode: this.roomCode,
                 isHost: true,
                 wsManager: this.wsManager
@@ -270,6 +271,7 @@ class ScenarioSelectScene extends Phaser.Scene {
               p2: data.p2Char,
               selected: { p1: data.p1Char, p2: data.p2Char },
               scenario: data.scenario,
+              selectedScenario: data.scenario,
               roomCode: data.roomCode,
               isHost: data.isHost,
               playerIndex: data.playerIndex,
@@ -446,11 +448,12 @@ class ScenarioSelectScene extends Phaser.Scene {
         });
         
         this.scene.start('KidsFightScene', {
-          gameMode: 'local',
+          gameMode: 'single', // Changed from 'local' to 'single' to match the expected value in KidsFightScene
           p1: this.selected.p1,
           p2: this.selected.p2,
           selected: { p1: this.selected.p1, p2: this.selected.p2 },
-          scenario: SCENARIOS[this.selectedScenario].key
+          scenario: SCENARIOS[this.selectedScenario].key,
+          selectedScenario: SCENARIOS[this.selectedScenario].key // Adding this as a fallback
         });
       } else if (this.mode === 'online') {
         // For online mode, set gameStarted flag and send game_start message if host
@@ -486,6 +489,7 @@ class ScenarioSelectScene extends Phaser.Scene {
           p2: this.selected.p2,
           selected: { p1: this.selected.p1, p2: this.selected.p2 },
           scenario: SCENARIOS[this.selectedScenario].key,
+          selectedScenario: SCENARIOS[this.selectedScenario].key,
           roomCode: this.roomCode,
           isHost: this.isHost,
           wsManager: this.wsManager

@@ -30,6 +30,7 @@ jest.mock('../websocket_manager', () => {
     WebSocketManager: {
       getInstance: jest.fn(() => wsManagerMockInstance),
     },
+    getWebSocketUrl: jest.fn(() => 'ws://mocked-url'),
   };
 });
 
@@ -174,6 +175,11 @@ describe('OnlineModeScene', () => {
     });
 
     it('should set up WebSocket connection on create', () => {
+      // Set the mock to return the expected value for this test
+      const { getWebSocketUrl } = require('../websocket_manager');
+      (getWebSocketUrl as jest.Mock).mockReturnValue('ws://localhost:8081');
+      // Re-run scene.create to use the new mock value
+      scene.create.call(scene);
       expect(mockConnect).toHaveBeenCalledWith('ws://localhost:8081');
       expect(mockSetMessageCallback).toHaveBeenCalled();
       expect(mockSetConnectionCallback).toHaveBeenCalled();

@@ -8,6 +8,10 @@ describe('KidsFightScene - Platform & Player Positioning', () => {
   let platformHeight = 510;
 
   beforeEach(() => {
+  if (typeof scene !== 'undefined') {
+    if (!scene.textures) scene.textures = { list: {} };
+    else scene.textures.list = {};
+  }
     scene = new KidsFightScene();
     // Mock sys.game.canvas.width/height and device.os
     scene.sys = { 

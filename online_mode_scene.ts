@@ -3,6 +3,8 @@ console.log('*** TESTING online_mode_scene.ts');
 import Phaser from 'phaser';
 import { WebSocketManager } from './websocket_manager';
 
+import { getWebSocketUrl } from './websocket_manager';
+
 interface ButtonStyle {
   fontSize: string;
   color: string;
@@ -227,7 +229,7 @@ export default class OnlineModeScene extends Phaser.Scene {
     this.wsManager.setMessageCallback((event: MessageEvent) => this.handleWebSocketMessage(event));
 
     // Connect to WebSocket server first
-    this.wsManager.connect('ws://localhost:8081').then(() => {
+    this.wsManager.connect(getWebSocketUrl()).then(() => {
       // Only set as host after connection is established
       console.log('WebSocket connected, ready to create or join room');
     }).catch(error => {
@@ -325,7 +327,7 @@ export default class OnlineModeScene extends Phaser.Scene {
       if (data.type === 'room_created') {
         // Don't reconnect if already connected
         if (!this.wsManager.isConnected()) {
-          const ws = await this.wsManager.connect('ws://localhost:8081', data.roomCode);
+          const ws = await this.wsManager.connect(getWebSocketUrl(), data.roomCode);
           if (!ws) {
             console.error('Failed to connect to WebSocket server');
             return;
@@ -337,7 +339,7 @@ export default class OnlineModeScene extends Phaser.Scene {
       } else if (data.type === 'room_joined') {
         // Don't reconnect if already connected
         if (!this.wsManager.isConnected()) {
-          const ws = await this.wsManager.connect('ws://localhost:8081', data.roomCode);
+          const ws = await this.wsManager.connect(getWebSocketUrl(), data.roomCode);
           if (!ws) {
             console.error('Failed to connect to WebSocket server');
             return;
@@ -487,7 +489,7 @@ export default class OnlineModeScene extends Phaser.Scene {
       this.wsManager.setHost(true);
       
       // Connect to WebSocket server
-      const ws = await this.wsManager.connect('ws://localhost:8081', roomCode);
+      const ws = await this.wsManager.connect(getWebSocketUrl(), roomCode);
       
       // Store room code
       this.roomCode = roomCode;
@@ -513,7 +515,7 @@ export default class OnlineModeScene extends Phaser.Scene {
       this.wsManager.setHost(false);
       
       // Connect to WebSocket server
-      const ws = await this.wsManager.connect('ws://localhost:8081', roomCode);
+      const ws = await this.wsManager.connect(getWebSocketUrl(), roomCode);
       
       // Store room code
       this.roomCode = roomCode;

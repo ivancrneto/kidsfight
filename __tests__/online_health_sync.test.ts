@@ -4,6 +4,18 @@ jest.mock('../websocket_manager');
 // Import the mock objects from the mock file
 import { WebSocketManager } from '../websocket_manager';
 
+// Import MockWebSocket
+import { MockWebSocket } from '../__mocks__/websocket_manager';
+
+// Define wsFactory
+const wsFactory = () => ({
+  send: jest.fn(),
+  close: jest.fn(),
+  readyState: 1,
+  addEventListener: jest.fn(),
+  resetMocks: jest.fn()
+});
+
 // Import KidsFightScene after mocking WebSocketManager
 import KidsFightScene from '../kidsfight_scene';
 
@@ -117,7 +129,7 @@ function setupScene(localPlayerIndex = 0) {
   WebSocketManager.resetInstance();
   
   // Get a fresh instance of the mock WebSocketManager
-  const mockWsManager = WebSocketManager.getInstance();
+  const mockWsManager = WebSocketManager.getInstance(wsFactory);
   
   // Mock WebSocketManager methods
   mockWsManager.send = jest.fn();

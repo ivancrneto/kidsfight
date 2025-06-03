@@ -277,7 +277,15 @@ class KidsFightScene extends Phaser.Scene {
       console.warn('[KidsFightScene] Invalid p2 key:', this.p2, 'Defaulting to player2');
       this.p2 = 'player2';
     }
-    this.selectedScenario = data.scenario || data.selectedScenario || 'scenario1';
+    
+    // Enhanced scenario handling with better logging
+    const incomingScenario = data.scenario || data.selectedScenario || 'scenario1';
+    this.selectedScenario = incomingScenario;
+    console.log('[KidsFightScene] Setting selected scenario to:', this.selectedScenario, 'from data:', {
+      scenario: data.scenario, 
+      selectedScenario: data.selectedScenario
+    });
+    
     this.gameMode = data.gameMode || 'single'; // <-- CRITICAL: set gameMode from data
     if (data.wsManager) {
       this.wsManager = data.wsManager; // <-- CRITICAL: set wsManager from data
@@ -292,16 +300,23 @@ class KidsFightScene extends Phaser.Scene {
     // Load scenario backgrounds
     this.load.image('scenario1', scenario1Img);
     this.load.image('scenario2', scenario2Img);
+    
+    // Log the loaded scenario assets
+    console.log('[KidsFightScene][preload] Loaded scenario images:', {
+      scenario1: scenario1Img,
+      scenario2: scenario2Img
+    });
+    
     // Load character spritesheets with correct keys for each character
     this.load.spritesheet('bento', player1RawImg, { frameWidth: 410, frameHeight: 512 });
     this.load.spritesheet('davir', player2RawImg, { frameWidth: 410, frameHeight: 512 });
     this.load.spritesheet('jose', player3RawImg, { frameWidth: 410, frameHeight: 512 });
     this.load.spritesheet('davis', player4RawImg, { frameWidth: 410, frameHeight: 512 });
     this.load.spritesheet('carol', player5RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('roni', player6RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('jacqueline', player7RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('ivan', player8RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('d_isa', player9RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('roni', player6RawImg, { frameWidth: 450, frameHeight: 512 });
+    this.load.spritesheet('jacqueline', player7RawImg, { frameWidth: 450, frameHeight: 512 });
+    this.load.spritesheet('ivan', player8RawImg, { frameWidth: 450, frameHeight: 512 });
+    this.load.spritesheet('d_isa', player9RawImg, { frameWidth: 450, frameHeight: 512 });
     // Debug log for loaded keys
     console.log('[KidsFightScene][preload] Loaded character keys:', [
       'player1','player2','bento','davir','jose','davis','carol','roni','jacqueline','ivan','d_isa'
@@ -366,10 +381,35 @@ class KidsFightScene extends Phaser.Scene {
     console.log('[KidsFightScene] wsManager:', this.wsManager);
     
     // Setup scene with proper scaling
+    console.log('[KidsFightScene] Creating background with scenario key:', this.selectedScenario);
+    
+    // Verify that the selected scenario is a valid key, defaulting to scenario1 if not
+    if (!['scenario1', 'scenario2'].includes(this.selectedScenario)) {
+      console.warn('[KidsFightScene] Invalid scenario key detected:', this.selectedScenario, 'Defaulting to scenario1');
+      this.selectedScenario = 'scenario1';
+    }
+    
     this.background = this.add.image(0, 0, this.selectedScenario)
       .setOrigin(0, 0)
       .setDisplaySize(gameWidth, gameHeight) as Phaser.GameObjects.Image;
-
+    
+    // Show debug text on screen for scenario selection
+    const debugText = this.add.text(10, 10, `Scenario: ${this.selectedScenario}`, {
+      fontSize: '18px',
+      color: '#ff0000',
+      backgroundColor: '#fff',
+      padding: { x: 8, y: 4 }
+    });
+    if (debugText.setScrollFactor) debugText.setScrollFactor(0);
+    if (debugText.setDepth) debugText.setDepth(1000);
+    if (debugText.setName) debugText.setName('scenarioDebugText');
+    
+    // Debug log the loaded textures to verify the scenario is available
+    if (this.textures && this.textures.list) {
+      console.log('[KidsFightScene] Available textures:', 
+        Object.keys(this.textures.list).filter(key => !key.startsWith('__')));
+    }
+    
     // Set camera and physics bounds to match the actual game size
     if (this.cameras && this.cameras.main && typeof this.cameras.main.setBounds === 'function') {
       this.cameras.main.setBounds(0, 0, gameWidth, gameHeight);
@@ -429,42 +469,29 @@ class KidsFightScene extends Phaser.Scene {
     upperPlatformVisual2.setAlpha(0);
     // --- PLAYER SPRITES ---
     // Use consistent scale and origin for all modes
-    const playerScale = 0.25;
-    this.players[0] = this.physics.add.sprite(gameWidth * 0.25, upperPlatformY2, this.p1) as Phaser.Physics.Arcade.Sprite & PlayerProps;
-    this.players[1] = this.physics.add.sprite(gameWidth * 0.75, upperPlatformY2, this.p2) as Phaser.Physics.Arcade.Sprite & PlayerProps;
-    // Debug log for sprite creation
-    console.log('[DEBUG][SpriteCreation] Player 1:', {
-      key: this.p1,
-      width: this.players[0].width,
-      height: this.players[0].height,
-      displayWidth: this.players[0].displayWidth,
-      displayHeight: this.players[0].displayHeight,
-      frame: this.players[0].frame ? this.players[0].frame.name : undefined
-    });
-    console.log('[DEBUG][SpriteCreation] Player 2:', {
-      key: this.p2,
-      width: this.players[1].width,
-      height: this.players[1].height,
-      displayWidth: this.players[1].displayWidth,
-      displayHeight: this.players[1].displayHeight,
-      frame: this.players[1].frame ? this.players[1].frame.name : undefined
-    });
-    this.players[0].setOrigin(0.5, 1.0);
-    this.players[1].setOrigin(0.5, 1.0);
-    this.players[0].y = upperPlatformY2;
-    this.players[1].y = upperPlatformY2;
-    this.players[0].setScale(playerScale);
-    this.players[1].setScale(playerScale);
-    // Flip player 2
-    this.players[1]?.setFlipX(true);
-    // Colliders
-    this.physics.add.collider(this.players[0], upperPlatform2);
-    this.physics.add.collider(this.players[1], upperPlatform2);
+    const playerScale = 0.4;
+    const widerPlayers = ['player6', 'player7', 'player8', 'player9'];
 
-    // After creating player2 sprite, ensure it is flipped horizontally
-    if (this.players[1]) {
-      this.players[1]?.setFlipX(true);
-    }
+    // Player 1
+    const isP1Wider = widerPlayers.includes(this.p1);
+    this.players[0] = this.physics.add.sprite(gameWidth * 0.25, upperPlatformY2, this.p1) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+    this.players[0].setOrigin(
+      0.5 + (isP1Wider ? ((450 - 410) / 2) / 450 : 0),
+      1.0
+    );
+    this.players[0].setScale(isP1Wider ? playerScale * (410 / 450) : playerScale);
+    this.players[0].y = upperPlatformY2;
+
+    // Player 2
+    const isP2Wider = widerPlayers.includes(this.p2);
+    this.players[1] = this.physics.add.sprite(gameWidth * 0.75, upperPlatformY2, this.p2) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+    this.players[1].setOrigin(
+      0.5 + (isP2Wider ? ((450 - 410) / 2) / 450 : 0),
+      1.0
+    );
+    this.players[1].setScale(isP2Wider ? playerScale * (410 / 450) : playerScale);
+    this.players[1].y = upperPlatformY2;
+    this.players[1]?.setFlipX(true);
 
     // Enable collision between players and the new upper platform
     this.physics.add.collider(this.players[0], upperPlatform);
@@ -502,101 +529,21 @@ class KidsFightScene extends Phaser.Scene {
       console.log('[DEBUG] About to call wsManager.connect and setMessageCallback in KidsFightScene.create');
       this.wsManager.connect().then(() => {
         console.log('[DEBUG] wsManager.onMessage callback registered in KidsFightScene.create');
-        this.wsManager.onMessage((event: MessageEvent) => {
-          console.debug('[WSM][KidsFightScene] Message received (raw):', event);
+        const prevCallback = this.wsManager._cascade_prevScenarioCallback || null;
+        const self = this;
+        this.wsManager.setMessageCallback(function(event: MessageEvent) {
+          let handled = false;
           try {
-            const action = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-            console.debug('[WSM][KidsFightScene] Message received (parsed):', action);
-            // Only handle gameplay actions here
-            if (action.type === 'attack') {
-              if (typeof action.playerIndex === 'number') {
-                // Only the host should process the attack and apply damage
-                if (this.wsManager.isHost) {
-                  console.debug('[KidsFightScene][WS HANDLE ATTACK][HOST]', action);
-                  this.tryAction(action.playerIndex, 'attack', !!action.isSpecial);
-                } else {
-                  console.debug('[KidsFightScene][WS HANDLE ATTACK][GUEST] Ignoring attack action, waiting for health_update', action);
-                }
-              }
-            } else if (action.type === 'health_update') {
-              console.debug('[KidsFightScene][WS HEALTH UPDATE][RECEIVED]', action);
-              const idx = action.playerIndex;
-              if (idx !== undefined && this.players[idx]) {
-                console.debug('[KidsFightScene][WS HEALTH UPDATE][BEFORE]', {
-                  playerIndex: idx,
-                  playerObjectHealth: this.players[idx].health,
-                  playerHealthArray: this.playerHealth[idx],
-                  allPlayers: [
-                    this.players[0] ? {health: this.players[0].health} : null,
-                    this.players[1] ? {health: this.players[1].health} : null
-                  ],
-                  allHealthArray: this.playerHealth.slice(),
-                });
-                
-                // Only update if we're receiving a health update for the remote player
-                // or if the health value is significantly different
-                const isRemotePlayer = idx !== this.localPlayerIndex;
-                const significantDifference = Math.abs(this.playerHealth[idx] - action.health) > 10;
-                
-                if (isRemotePlayer || significantDifference) {
-                  // Update both the player object AND the health array
-                  this.players[idx].health = action.health;
-                  this.playerHealth[idx] = action.health;
-                  console.debug('[KidsFightScene][WS HEALTH UPDATE][AFTER]', {
-                    playerIndex: idx,
-                    newHealth: action.health,
-                    playerObjectHealth: this.players[idx].health,
-                    playerHealthArray: this.playerHealth[idx],
-                    allPlayers: [
-                      this.players[0] ? {health: this.players[0].health} : null,
-                      this.players[1] ? {health: this.players[1].health} : null
-                    ],
-                    allHealthArray: this.playerHealth.slice(),
-                  });
-                  
-                  console.debug('[KidsFightScene][WS HEALTH UPDATE] Updating health bars...');
-                  this.updateHealthBar(0);
-                  this.updateHealthBar(1);
-                  this.checkWinner();
-                } else {
-                  console.debug('[KidsFightScene][WS HEALTH UPDATE] Ignoring echo for local player update', {
-                    localPlayerIndex: this.localPlayerIndex,
-                    updatedPlayerIndex: idx,
-                    currentHealth: this.playerHealth[idx],
-                    receivedHealth: action.health
-                  });
-                }
-              } else {
-                console.warn('[KidsFightScene][WS HEALTH UPDATE] Player object missing for index', idx, action);
-              }
-              return;
-            } else if ([
-              'move',
-              'jump',
-              'attack',
-              'special',
-              'block',
-              'replay_request',
-              'position_update'
-            ].includes(action.type)) {
-              if (action.type === 'replay_request') {
-                this.showReplayRequestPopup(action);
-              } else {
-                this.handleRemoteAction(action);
-              }
-            } else if (action.type === 'replay_response') {
-              console.log('[KidsFightScene][RECV replay_response]', action);
-              if (action.accepted) {
-                this.scene.restart();
-              }
-            } else {
-              // Ignore navigation/scene actions
-              console.log('Ignoring non-gameplay action:', action.type);
+            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+            if (data && data.type === 'scenario_selected' && (data.scenario === 'scenario1' || data.scenario === 'scenario2')) {
+              self.handleScenarioChange(data.scenario);
+              handled = true;
             }
-          } catch (e) {
-            console.error('[KidsFightScene] Failed to parse remote action:', e, event);
-          }
+          } catch (e) {}
+          if (prevCallback && typeof prevCallback === 'function' && !handled) prevCallback(event);
         });
+        // Save previous callback in case of scene restart
+        this.wsManager._cascade_prevScenarioCallback = prevCallback;
       });
     }
 
@@ -1670,179 +1617,95 @@ private tryAttack(attackerIdx: number, defenderIdx: number, now: number, special
 }
 
 private updatePlayerAnimation(playerIndex: number): void {
+  const BASE_PLAYER_SCALE = 0.40; // Set your intended base scale here
+  const PLATFORM_Y = 380; // Must match upperPlatformY2 in create()
   const player = this.players[playerIndex];
-  if (player && player.getData && player.getData('isHit')) {
-    player.setFrame(3); // Example: frame 3 for hit
+  if (!player || !player.texture) return;
+
+  const frameCount = player.texture.frameTotal ?? 1;
+
+  // Animation logic
+  if (player.getData && player.getData('isHit')) {
+    this.setSafeFrame(player, 3); // Hit frame
+    if (player.setScale) player.setScale(BASE_PLAYER_SCALE);
     // DEBUG
     //console.log('ANIM: HIT', playerIndex);
-  } else if (player && (this.playerBlocking[playerIndex] || (player.getData && player.getData('isBlocking')))) {
-    // Add blocking animation - use frame 5 (or another appropriate frame)
-    player.setFrame(5);
-    // Add a slight crouch effect by scaling the player
-    if (player.setScale) {
-      player.setScale(0.9, 1.0);
-    }
-    // DEBUG
+  } else if (this.playerBlocking[playerIndex] || (player.getData && player.getData('isBlocking'))) {
+    this.setSafeFrame(player, 5); // Block frame
+    // Use special block scale as expected by tests
+    if (player.setScale) player.setScale(0.9, 1.0);
     console.log('ANIM: BLOCKING', playerIndex);
-  } else if (player && player.getData && player.getData('isSpecialAttacking')) {
-    player.setFrame(6); // Frame 6 for special attack (last valid frame)
-    // Make the special attack frame 30% larger
-    if (player.setScale) {
-      player.setScale(1.3);
+  } else if (player.getData && player.getData('isSpecialAttacking')) {
+    this.setSafeFrame(player, 6); // Special attack frame
+    if (player.setScale) player.setScale(BASE_PLAYER_SCALE);
+  } else if (player.getData && player.getData('isAttacking')) {
+    this.setSafeFrame(player, 4); // Attack frame
+    if (player.setScale) player.setScale(BASE_PLAYER_SCALE);
+  } else if (player.body && !player.body.blocked.down) {
+    this.setSafeFrame(player, 0); // Jump/idle frame
+    if (player.setScale) player.setScale(BASE_PLAYER_SCALE);
+  } else if (player.body && player.body.blocked.down && Math.abs(player.body.velocity.x) > 2) {
+    // Walking: alternate between frame 1 and 2, but only if they exist
+    const walkFrame = frameCount > 2 ? (Math.floor(Date.now() / 120) % 2) + 1 : 0;
+    this.setSafeFrame(player, walkFrame);
+    if (player.setScale) player.setScale(BASE_PLAYER_SCALE);
+  } else {
+    this.setSafeFrame(player, 0); // Idle
+    if (player.setScale) player.setScale(BASE_PLAYER_SCALE);
+  }
+
+  // --- Fix: Only reset y-position for local player in local/single mode ---
+  if (
+    this.gameMode !== 'online' &&
+    playerIndex === this.localPlayerIndex &&
+    player.body && player.body.blocked && player.body.blocked.down
+  ) {
+    player.y = PLATFORM_Y;
+    if (player.body.updateFromGameObject) {
+      player.body.updateFromGameObject();
     }
-    // DEBUG
-    //console.log('ANIM: SPECIAL ATTACK', playerIndex);
-  } else if (player && player.getData && player.getData('isAttacking')) {
-    player.setFrame(4); // Frame 4 for attack
-    // Make attack frame 15% larger (but still smaller than special attack)
-    if (player.setScale) {
-      player.setScale(1.15);
+  }
+  // Online mode: clamp remote/networked player y to platform ONLY if just below (within 10px) and not moving vertically
+  if (
+    this.gameMode === 'online' &&
+    playerIndex !== this.localPlayerIndex &&
+    player.body && player.body.blocked && player.body.blocked.down &&
+    player.y > PLATFORM_Y && player.y < PLATFORM_Y + 10 &&
+    player.body.velocity && Math.abs(player.body.velocity.y) < 1
+  ) {
+    player.y = PLATFORM_Y;
+    if (player.body.updateFromGameObject) {
+      player.body.updateFromGameObject();
     }
-    // DEBUG
-    //console.log('ANIM: ATTACK', playerIndex);
-  } else if (player && player.body && !player.body.blocked.down) {
-    player.setFrame(0); // Use idle frame for jump (customize if needed)
-    // Reset scale to normal if coming from special attack
-    if (player.setScale) {
-      player.setScale(1.0);
-    }
-    // DEBUG
-    //console.log('ANIM: JUMP', playerIndex);
-  } else if (player && player.body && player.body.blocked.down && Math.abs(player.body.velocity.x) > 2) {
-    // Walking: alternate between frame 1 and 2
-    const frame = (Math.floor(Date.now() / 120) % 2) + 1;
-    player.setFrame(frame);
-    // Reset scale to normal if coming from special attack
-    if (player.setScale) {
-      player.setScale(1.0);
-    }
-    // DEBUG
-    //console.log('ANIM: WALK', playerIndex, player.body.velocity.x);
-  } else if (player) {
-    player.setFrame(0); // Idle
-    // Reset scale to normal if coming from special attack
-    if (player.setScale) {
-      player.setScale(1.0);
-    }
-    // DEBUG
-    //console.log('ANIM: IDLE', playerIndex);
   }
 }
 
-
-private createAttackEffect(x: number, y: number): void {
-  // Simple flash effect for normal attacks
-  const flash = this.add.rectangle(x, y, 40, 40, 0xffffff, 0.5);
-  this.tweens.add({
-    targets: flash,
-    alpha: 0,
-    duration: 200,
-    onComplete: () => flash.destroy()
-  });
+// Helper to safely set a frame if it exists, else fallback to the last frame
+private setSafeFrame(player: Phaser.GameObjects.Sprite, desiredFrame: number) {
+  if (!player || !player.setFrame || !player.texture) return;
+  const frameCount = player.texture.frameTotal ?? 1;
+  const safeFrame = Math.min(desiredFrame, frameCount - 1);
+  player.setFrame(safeFrame);
 }
 
-private createSpecialAttackEffect(x: number, y: number): void {
-  // Simple larger flash for special attacks
-  const flash = this.add.rectangle(x, y, 80, 80, 0xff00ff, 0.7);
-  this.tweens.add({
-    targets: flash,
-    alpha: 0,
-    duration: 350,
-    onComplete: () => flash.destroy()
-  });
+// --- Live scenario switching ---
+private handleScenarioChange(newScenario: string): void {
+  if (!['scenario1', 'scenario2'].includes(newScenario)) return;
+  if (this.selectedScenario === newScenario) return;
+  this.selectedScenario = newScenario;
+  if (this.background) this.background.destroy();
+  const gameWidth = this.sys.game.canvas.width;
+  const gameHeight = this.sys.game.canvas.height;
+  this.background = this.add.image(0, 0, this.selectedScenario)
+    .setOrigin(0, 0)
+    .setDisplaySize(gameWidth, gameHeight) as Phaser.GameObjects.Image;
+  // Update debug label if present
+  const debugText = this.children.getByName('scenarioDebugText') as Phaser.GameObjects.Text;
+  if (debugText) debugText.setText(`Scenario: ${this.selectedScenario}`);
+  console.log('[KidsFightScene] Scenario changed to', this.selectedScenario);
 }
 
-private createHitEffect(x: number, y: number): void {
-  // Create a hit effect (simple circle that fades out)
-  const hitEffect = this.add.circle(x, y, 15, 0xffff00, 0.8);
-  hitEffect.setDepth(100); // Ensure it's above players
-  
-  // Store in array for cleanup
-  this.hitEffects.push(hitEffect);
-
-  // Add random hit particles
-  const colors = [0xff0000, 0xffff00, 0xffffff, 0xffa500]; // Example colors
-  for (let i = 0; i < 5; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const distance = Math.random() * 30 + 20;
-    const size = Math.random() * 10 + 5;
-    const particleX = x + Math.cos(angle) * distance;
-    const particleY = y + Math.sin(angle) * distance;
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    const particle = this.add.circle(particleX, particleY, size, color, 0.8);
-    particle.setDepth(100);
-    this.hitEffects.push(particle);
-    this.tweens.add({
-      targets: particle,
-      x: particleX + Math.cos(angle) * 20,
-      y: particleY + Math.sin(angle) * 20,
-      alpha: 0,
-      duration: 400,
-      ease: 'Power2',
-      onComplete: () => {
-        particle.destroy();
-      }
-    });
-  }
-  // Fade out and destroy the main hit effect
-  this.tweens.add({
-    targets: hitEffect,
-    alpha: 0,
-    duration: 300,
-    onComplete: () => hitEffect.destroy()
-  });
-}
-
-private showTouchControls(visible: boolean): void {
-  // Show/hide all known touch control buttons if they exist
-  const buttons = ['leftButton', 'rightButton', 'jumpButton', 'attackButton', 'specialButton', 'blockButton'];
-  for (const btnName of buttons) {
-    const btn = (this as any)[btnName];
-    if (btn && typeof btn.setVisible === 'function') {
-      btn.setVisible(visible);
-      }
-    }
-  }
-
-  private checkWinner(): boolean {
-    if (this.gameOver) return false;
-    
-    // Always use playerHealth array as the source of truth for health values
-    const p1Health = this.playerHealth[0] ?? MAX_HEALTH;
-    const p2Health = this.playerHealth[1] ?? MAX_HEALTH;
-
-    // Debug log health values
-    console.log(`[DEBUG][checkWinner] Player 1 Health: ${p1Health}, Player 2 Health: ${p2Health}`);
-
-    if (p1Health <= 0 || p2Health <= 0) {
-      // Determine the winner based on who still has health
-      if (p1Health <= 0 && p2Health <= 0) {
-        // Both players hit 0 health at the same time (unlikely but possible)
-        this.endGame(-1, 'Empate!');
-      } else if (p1Health <= 0) {
-        // Player 2 won
-        this.endGame(1, `${this.getDisplayName(this.p2)} Venceu!`);
-      } else {
-        // Player 1 won
-        this.endGame(0, `${this.getDisplayName(this.p1)} Venceu!`);
-      }
-      return true;
-    } else if (this.timeLeft <= 0) {
-      // Time's up - check who has more health
-      if (p1Health > p2Health) {
-        this.endGame(0, `${this.getDisplayName(this.p1)} Venceu!`);
-      } else if (p2Health > p1Health) {
-        this.endGame(1, `${this.getDisplayName(this.p2)} Venceu!`);
-      } else {
-        this.endGame(-1, 'Empate!');
-      }
-      return true;
-    }
-    
-    return false;
-  }
-
-  update(time: number, delta: number): void {
+update(time: number, delta: number): void {
     // Call animation update for both players every frame
     this.updatePlayerAnimation(0);
     this.updatePlayerAnimation(1);
@@ -1902,7 +1765,43 @@ private showTouchControls(visible: boolean): void {
         this._lastSentPosition = { ...curr };
       }
     }
+   }
+
+  private checkWinner(): boolean {
+    if ((this as any).gameOver) return false;
+    // Assume playerHealth and p1/p2 keys exist on this
+    const playerHealth = (this as any).playerHealth || [100, 100];
+    const p1Key = (this as any).p1 || 'player1';
+    const p2Key = (this as any).p2 || 'player2';
+    const timeLeft = (this as any).timeLeft ?? 60;
+    if (playerHealth[0] <= 0) {
+      const winner = this.getCharacterName(p2Key);
+      if (this.endGame) this.endGame(1, `${winner} Venceu!`);
+      return true;
+    } else if (playerHealth[1] <= 0) {
+      const winner = this.getCharacterName(p1Key);
+      if (this.endGame) this.endGame(0, `${winner} Venceu!`);
+      return true;
+    } else if (timeLeft <= 0) {
+      if (playerHealth[0] > playerHealth[1]) {
+        const winner = this.getCharacterName(p1Key);
+        if (this.endGame) this.endGame(0, `${winner} Venceu!`);
+      } else if (playerHealth[1] > playerHealth[0]) {
+        const winner = this.getCharacterName(p2Key);
+        if (this.endGame) this.endGame(1, `${winner} Venceu!`);
+      } else {
+        if (this.endGame) this.endGame(-1, 'Empate!');
+      }
+      return true;
+    }
+    return false;
   }
+
+  private getCharacterName(key: string): string {
+    // TODO: Replace with real mapping if you have a display name map
+    return key;
+  }
+
 }
 
 export default KidsFightScene;

@@ -7,17 +7,70 @@ class MockWebSocket {
   onclose: ((event: CloseEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
+  private _listeners: { [key: string]: Function[] } = {
+    open: [],
+    message: [],
+    close: [],
+    error: []
+  };
+  private _lastMessageCallback: Function | null = null; // Track the last bound message callback
+
+
   constructor() {
     this.readyState = 1;
     this.send.mockClear();
     this.close.mockClear();
   }
-  _trigger(eventType, event = {}) {
-    if (eventType === 'open' && typeof this.onopen === 'function') this.onopen(event);
-    if (eventType === 'close' && typeof this.onclose === 'function') this.onclose(event);
-    if (eventType === 'error' && typeof this.onerror === 'function') this.onerror(event);
-    if (eventType === 'message' && typeof this.onmessage === 'function') this.onmessage(event);
+
+  addEventListener(eventType: string, callback: Function) {
+    if (!this._listeners[eventType]) {
+      this._listeners[eventType] = [];
+    }
+    this._listeners[eventType].push(callback);
+    console.log(`[MOCK WS] addEventListener: ${eventType}, cb:`, callback, 'listeners:', this._listeners[eventType]);
   }
+
+  removeEventListener(eventType: string, callback: Function) {
+    if (!this._listeners[eventType]) return;
+    this._listeners[eventType] = this._listeners[eventType].filter((cb: Function) => cb !== callback);
+    console.log(`[MOCK WS] removeEventListener: ${eventType}, cb:`, callback, 'listeners:', this._listeners[eventType]);
+  }
+
+  _trigger(eventType: string, data: any = {}) {
+    if (eventType === 'open') {
+      this.readyState = 1;
+      const openEvent = new Event('open');
+      console.log('[MOCK WS][DIAG] _trigger open: calling onopen?', !!this.onopen);
+      if (this.onopen) this.onopen(openEvent);
+      (this._listeners['open'] || []).forEach((cb: Function) => cb(openEvent));
+    } else if (eventType === 'message') {
+      let event = data;
+      if (!(event instanceof MessageEvent)) {
+        event = new MessageEvent('message', { data: data.data });
+      }
+      // Only call the last registered message callback
+      if (this._listeners['message'] && this._listeners['message'].length > 0) {
+        const lastCb = this._listeners['message'][this._listeners['message'].length - 1];
+        console.log('[MOCK WS] _trigger: message, _lastMessageCallback:', lastCb);
+        lastCb(event);
+      }
+      // (Removed: do not call all listeners)
+    } else if (eventType === 'close') {
+      this.readyState = 3;
+      const closeEvent = new CloseEvent('close', {
+        code: data?.code || 1000,
+        reason: data?.reason || '',
+        wasClean: true
+      });
+      if (this.onclose) this.onclose(closeEvent);
+      (this._listeners['close'] || []).forEach((cb: Function) => cb(closeEvent));
+    } else if (eventType === 'error') {
+      const errorEvent = new Event('error');
+      if (this.onerror) this.onerror(errorEvent);
+      (this._listeners['error'] || []).forEach((cb: Function) => cb(errorEvent));
+    }
+  }
+
   resetMocks() {
     this.readyState = 1;
     this.send.mockClear();
@@ -26,12 +79,14 @@ class MockWebSocket {
     this.onclose = null;
     this.onerror = null;
     this.onmessage = null;
+    this._listeners = { open: [], message: [], close: [], error: [] };
   }
 }
 
 let mockWebSocket: MockWebSocket | null = null;
 
-export { mockWebSocket };
+export { MockWebSocket, mockWebSocket };
+
 
 export class WebSocketManager {
   private static instance: WebSocketManager | null = null;
@@ -76,16 +131,40 @@ export class WebSocketManager {
     return Promise.resolve(this._ws);
   }
 
+  private _boundMessageCallback: ((event: MessageEvent) => void) | null = null;
+
   public setMessageCallback(callback: (event: MessageEvent) => void): void {
+    console.log('[MOCK WSM] setMessageCallback: Setting new callback', callback);
     this._onMessageCallback = callback;
-    this._ws.onmessage = (event: MessageEvent) => {
-      if (this._onMessageCallback) this._onMessageCallback(event);
-    };
+    
+    // Always attach the handler, regardless of connection state (for test robustness)
+    if (this._ws) {
+      // Remove previous event listener if it exists
+      if (this._boundMessageCallback && typeof this._ws.removeEventListener === 'function') {
+        console.log('[MOCK WSM] setMessageCallback: Removing previous callback', this._boundMessageCallback);
+        this._ws.removeEventListener('message', this._boundMessageCallback);
+      }
+      
+      // Create a new bound callback and store it for later removal
+      this._boundMessageCallback = (event: MessageEvent) => {
+        console.log('[MOCK WSM] _boundMessageCallback: Calling message callback');
+        if (this._onMessageCallback) this._onMessageCallback(event);
+      };
+      
+      // Set both onmessage and addEventListener for compatibility
+      this._ws.onmessage = this._boundMessageCallback;
+      
+      if (typeof this._ws.addEventListener === 'function') {
+        console.log('[MOCK WSM] setMessageCallback: Adding new callback', this._boundMessageCallback);
+        this._ws.addEventListener('message', this._boundMessageCallback);
+      }
+    }
   }
 
   public onMessage(callback: (event: MessageEvent) => void): void {
     this.setMessageCallback(callback);
   }
+
   public onClose(callback: (event: CloseEvent) => void): void {
     this._onCloseCallback = callback;
     this._ws.onclose = (event: CloseEvent) => {

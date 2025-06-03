@@ -382,7 +382,12 @@ setVisible: jest.fn().mockReturnThis(),
     patchPlayerBodies(scene);
   });
 
-  describe('Player Movement', () => {
+  beforeEach(() => {
+  if (!scene.textures) scene.textures = { list: {} };
+  else scene.textures.list = {};
+});
+
+describe('Player Movement', () => {
     it('should allow players[1] movement as guest in online mode', () => {
       scene.isHost = false;
       scene.gameMode = 'online';

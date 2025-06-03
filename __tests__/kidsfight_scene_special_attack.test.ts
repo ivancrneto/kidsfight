@@ -4,6 +4,15 @@ import { WebSocketManager } from '../websocket_manager';
 import { setupPhaserMocks } from './test_helpers/mock_phaser';
 // Don't import Graphics directly, we'll mock it instead
 
+// Use a plain object as the mock WebSocket
+const wsFactory = () => ({
+  send: jest.fn(),
+  close: jest.fn(),
+  readyState: 1,
+  addEventListener: jest.fn(),
+  resetMocks: jest.fn()
+});
+
 // Mock Phaser and WebSocketManager
 jest.mock('phaser');
 jest.mock('../websocket_manager');
@@ -76,7 +85,7 @@ describe('KidsFightScene - Special Attack', () => {
     
     // Mock WebSocketManager
     // Use getInstance method instead of direct constructor
-    mockWsManager = WebSocketManager.getInstance() as jest.Mocked<WebSocketManager>;
+    mockWsManager = WebSocketManager.getInstance(wsFactory) as jest.Mocked<WebSocketManager>;
     mockWsManager.send = jest.fn();
     jest.spyOn(WebSocketManager, 'getInstance').mockReturnValue(mockWsManager);
     scene['wsManager'] = mockWsManager;

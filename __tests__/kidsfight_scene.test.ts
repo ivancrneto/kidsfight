@@ -429,6 +429,12 @@ class TestKidsFightScene extends KidsFightScene {
 }
 
 describe('KidsFightScene', () => {
+  beforeEach(() => {
+    if (typeof scene !== 'undefined') {
+      if (!scene.textures) scene.textures = { list: {} };
+      else scene.textures.list = {};
+    }
+  });
   let scene: KidsFightScene;
   let sceneAny: any;
   

@@ -22,6 +22,21 @@ export interface WebSocketMessage {
 
 export type WebSocketFactory = (url: string) => WebSocket;
 
+// Returns the correct WebSocket URL for the current environment
+export function getWebSocketUrl(): string {
+  // Prefer browser-based detection
+  if (typeof window !== 'undefined' && window.location) {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal) return 'ws://localhost:8081';
+    return 'wss://kidsfight-ws.onrender.com';
+  }
+  // Fallback for Node/test environments
+  if (process.env.NODE_ENV === 'production' || !(typeof DEV === 'undefined' ? false : DEV)) {
+    return 'wss://kidsfight-ws.onrender.com';
+  }
+  return 'ws://localhost:8081';
+}
+
 class WebSocketManager {
 
   public get isHost(): boolean {
@@ -56,17 +71,8 @@ class WebSocketManager {
   public static resetInstance(): void {
     if (WebSocketManager.instance) {
       WebSocketManager.instance.disconnect();
-      // Reset all relevant state to ensure a clean singleton for tests
-      WebSocketManager.instance._isHost = false;
-      WebSocketManager.instance._roomCode = null;
-      WebSocketManager.instance._onMessageCallback = null;
-      WebSocketManager.instance._onCloseCallback = null;
-      WebSocketManager.instance._onErrorCallback = null;
-      WebSocketManager.instance._boundMessageCallback = null;
-      // Defensive: ensure _ws is null
-      WebSocketManager.instance._ws = null;
-      WebSocketManager.instance = null;
     }
+    WebSocketManager.instance = null;
   }
 
   public setHost(isHost: boolean): void {
@@ -88,14 +94,11 @@ class WebSocketManager {
    * @param url Optional override URL (used for testing or custom endpoints)
    */
   public async connect(url?: string, roomCode?: string): Promise<WebSocket> {
+    console.log('[WSM][DIAG] connect() called', { url, roomCode });
     // Use Render in production, localhost in development
     let wsUrl = url;
     if (!wsUrl) {
-      if (process.env.NODE_ENV === 'production' || !DEV) {
-        wsUrl = 'wss://kidsfight-ws.onrender.com'; // Render production endpoint
-      } else {
-        wsUrl = 'ws://localhost:8080'; // Local dev endpoint
-      }
+      wsUrl = getWebSocketUrl();
     }
     if (this._ws) {
       console.warn(`[WSM] WebSocket already connected [${this._debugInstanceId}]`);
@@ -106,9 +109,11 @@ class WebSocketManager {
       try {
         this._isHost = false;
         this._ws = this._webSocketFactory(url!);
+        console.log('[WSM][DIAG] _ws created', { ws: !!this._ws, url: this._ws?.url });
         
         // Set up event handlers
         this._ws.onopen = () => {
+          console.log('[WSM][DIAG] _ws.onopen called');
           console.log(`[WSM] Connected to server [${this._debugInstanceId}]`);
           this._onConnectionCallback?.(true);
           if (this._onMessageCallback) {
@@ -166,12 +171,12 @@ class WebSocketManager {
 
         this._ws.onerror = (error: Event) => {
           console.error(`[WSM] WebSocket error [${this._debugInstanceId}]:`, error);
+          console.log('[WSM][DIAG] connect() onerror');
           this._onErrorCallback?.(error);
           reject(error);
         };
       } catch (error) {
-        console.error(`[WSM] Failed to connect to ${url}:`, error);
-        this._onErrorCallback?.(error as Event);
+        console.error('[WSM][DIAG] connect() threw', error);
         reject(error);
       }
     });
@@ -321,6 +326,9 @@ class WebSocketManager {
   public setMessageCallback(callback: ((event: MessageEvent) => void) | null): void {
     this._onMessageCallback = callback;
     if (this._ws && this.isConnected()) {
+      if (this._boundMessageCallback) {
+        this._ws.removeEventListener('message', this._boundMessageCallback);
+      }
       this._boundMessageCallback = (e: MessageEvent) => this._onMessageCallback?.(e);
       this._ws.addEventListener('message', this._boundMessageCallback);
     }

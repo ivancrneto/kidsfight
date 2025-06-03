@@ -1,6 +1,14 @@
 import { WebSocketManager } from '../websocket_manager';
 import KidsFightScene from '../kidsfight_scene';
 
+const wsFactory = () => ({
+  send: jest.fn(),
+  close: jest.fn(),
+  readyState: 1,
+  addEventListener: jest.fn(),
+  resetMocks: jest.fn()
+});
+
 describe('KidsFightScene - showHitEffect', () => {
   let scene: any;
   let mockSprite: any;
@@ -9,18 +17,8 @@ describe('KidsFightScene - showHitEffect', () => {
 
   beforeEach(() => {
     // Initialize WebSocketManager singleton with a mock factory
-    const mockWebSocketFactory = (url: string) => {
-      const mockWebSocket = {
-        readyState: WebSocket.OPEN,
-        send: jest.fn(),
-        close: jest.fn(),
-        addEventListener: jest.fn(),
-        dispatchEvent: jest.fn()
-      } as unknown as WebSocket;
-      return mockWebSocket;
-    };
     WebSocketManager.resetInstance();
-    WebSocketManager.getInstance(mockWebSocketFactory);
+    WebSocketManager.getInstance(wsFactory);
 
     // Create a minimal scene instance
     scene = new KidsFightScene();

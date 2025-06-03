@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { getWebSocketUrl } from './websocket_manager';
 import scenarioImg from './scenario1.png';
 import player1RawImg from './sprites-bento3.png';
 import player2RawImg from './sprites-davir3.png';
@@ -171,15 +172,15 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
   preload(): void {
     // Load character sprites as spritesheets (assuming 96x96 frame size)
-    this.load.spritesheet('player1', player1RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player2', player2RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player3', player3RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player4', player4RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player5', player5RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player6', player6RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player7', player7RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player8', player8RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player9', player9RawImg, { frameWidth: 410, frameHeight: 512 });
+    this.load.spritesheet('player1', player1RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player2', player2RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player3', player3RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player4', player4RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player5', player5RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player6', player6RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player7', player7RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player8', player8RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('player9', player9RawImg, { frameWidth: 450, frameHeight: 512 });
     
     // Note: Removed selector.png and will use Phaser shapes instead
     

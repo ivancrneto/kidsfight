@@ -2,8 +2,17 @@
 import './setup'; // Ensure the mock is set up before anything else
 jest.mock('../websocket_manager');
 
-import { WebSocketManager, mockWebSocket } from '../__mocks__/websocket_manager';
+import { WebSocketManager, mockWebSocket, MockWebSocket } from '../__mocks__/websocket_manager';
 import { jest } from '@jest/globals';
+
+// Use a plain object as the mock WebSocket
+const wsFactory = () => ({
+  send: jest.fn(),
+  close: jest.fn(),
+  readyState: 1,
+  addEventListener: jest.fn(),
+  resetMocks: jest.fn()
+});
 
 beforeEach(() => {
   WebSocketManager.resetInstance();
@@ -16,13 +25,13 @@ describe('WebSocketManager Position and Health Updates', () => {
 
   beforeEach(() => {
     WebSocketManager.resetInstance();
-    wsManager = WebSocketManager.getInstance();
+    wsManager = WebSocketManager.getInstance(wsFactory);
     if (mockWebSocket) mockWebSocket.readyState = 1;
     if (mockWebSocket && mockWebSocket.send) mockWebSocket.send.mockClear();
   });
 
   afterEach(() => {
-    wsManager.disconnect();
+    if (wsManager) wsManager.disconnect();
     WebSocketManager.resetInstance();
     jest.clearAllMocks();
   });

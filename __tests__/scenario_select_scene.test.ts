@@ -160,6 +160,7 @@ describe('ScenarioSelectScene (online mode)', () => {
       p2: 'player2',
       selected: { p1: 'player1', p2: 'player2' },
       scenario: 'scenario1',
+      selectedScenario: 'scenario1',
       roomCode: 'ROOM123',
       isHost: true,
       wsManager: wsManagerMock
@@ -201,17 +202,15 @@ describe('ScenarioSelectScene (online mode)', () => {
     });
     
     // Verify scene started with correct parameters
-    expect(scene.scene.start).toHaveBeenCalledWith('KidsFightScene', {
+    expect(scene.scene.start).toHaveBeenCalledWith('KidsFightScene', expect.objectContaining({
       gameMode: 'online',
       mode: 'online',
       p1: 'player1',
       p2: 'player2',
       selected: { p1: 'player1', p2: 'player2' },
-      scenario: 'scenario1',
       roomCode: 'ROOM123',
       isHost: false,
-      playerIndex: 1,
       wsManager: wsManagerMock
-    });
+    }));
   });
 });

@@ -6,6 +6,14 @@ jest.mock('../websocket_manager');
 // Import the WebSocketManager class after mocking
 import { WebSocketManager } from '../websocket_manager';
 
+const wsFactory = () => ({
+  send: jest.fn(),
+  close: jest.fn(),
+  readyState: 1,
+  addEventListener: jest.fn(),
+  resetMocks: jest.fn()
+});
+
 describe('Block Functionality', () => {
   let scene;
   let mockCanvas;
@@ -16,7 +24,7 @@ describe('Block Functionality', () => {
     WebSocketManager.resetInstance();
     
     // Get a fresh instance for this test
-    wsManagerMock = WebSocketManager.getInstance();
+    wsManagerMock = WebSocketManager.getInstance(wsFactory);
     
     // Create a basic scene with mocked canvas
     scene = new KidsFightScene();
@@ -66,14 +74,17 @@ describe('Block Functionality', () => {
       })
     };
     
-    // Mock players array with required properties
+    // Mock player with enough frames for blocking animation
+    const mockTexture = { frameTotal: 10 }; // at least 6 frames for block
     scene.players = [
       {
         health: 100,
         setData: jest.fn(),
-        getData: jest.fn(),
+        getData: jest.fn((key) => key === 'isBlocking'),
         setScale: jest.fn(),
         setFrame: jest.fn(),
+        anims: { play: jest.fn() },
+        texture: mockTexture,
         x: 200,
         y: 300
       },
@@ -83,6 +94,8 @@ describe('Block Functionality', () => {
         getData: jest.fn(),
         setScale: jest.fn(),
         setFrame: jest.fn(),
+        anims: { play: jest.fn() },
+        texture: { key: 'player2' },
         x: 600,
         y: 300
       }
@@ -199,5 +212,23 @@ describe('Block Functionality', () => {
     // Check if the blocking state was cleared correctly
     expect(scene.playerBlocking[0]).toBe(false);
     expect(scene.players[0].setData).toHaveBeenCalledWith('isBlocking', false);
+  });
+  
+  describe('defensive frame fallback', () => {
+    it('should fallback to last frame if not enough frames for block', () => {
+      scene = new KidsFightScene();
+      const mockTexture = { frameTotal: 3 }; // only 3 frames
+      scene.players = [
+        {
+          setFrame: jest.fn(),
+          setScale: jest.fn(),
+          getData: jest.fn((key) => key === 'isBlocking'),
+          body: { blocked: { down: true }, velocity: { x: 0, y: 0 } },
+          texture: mockTexture
+        }
+      ];
+      scene.updatePlayerAnimation(0);
+      expect(scene.players[0].setFrame).toHaveBeenCalledWith(2); // fallback to last frame
+    });
   });
 });
