@@ -38,6 +38,7 @@ export function getWebSocketUrl(): string {
 }
 
 class WebSocketManager {
+  _cascade_prevScenarioCallback?: (() => void) | null;
 
   public get isHost(): boolean {
     return this._isHost;
@@ -48,6 +49,8 @@ class WebSocketManager {
   private _debugInstanceId: string = Math.random().toString(36).substr(2, 6);
   private _roomCode: string | null = null;
   private _onMessageCallback: ((event: MessageEvent) => void) | null = null;
+  // Buffer for messages received when no handler is set
+  private _pendingMessages: MessageEvent[] = []; // <-- PATCH: buffer for undelivered messages
   private _messageCallbackId: number = 0;
   private _currentCallbackId: number = 0;
   private _onCloseCallback: ((event: CloseEvent) => void) | null = null;
@@ -55,6 +58,14 @@ class WebSocketManager {
   private _onConnectionCallback: ((isConnected: boolean) => void) | null = null;
   private _boundMessageCallback: ((event: MessageEvent) => void) | null = null;
   private _webSocketFactory: (url: string) => WebSocket;
+  private _lastProcessedMessage: { type: string, timestamp: number } | null = null;
+  private _messageQueue: Array<{ data: any, timestamp: number }> = [];
+  private _isProcessingQueue: boolean = false;
+  private _connectionState: 'disconnected' | 'connecting' | 'connected' = 'disconnected';
+  private _reconnectAttempts: number = 0;
+  private _maxReconnectAttempts: number = 5;
+  private _reconnectDelay: number = 1000;
+  private _reconnectTimeout: NodeJS.Timeout | null = null;
 
   private constructor(webSocketFactory?: (url: string) => WebSocket) {
     this._webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
@@ -64,6 +75,9 @@ class WebSocketManager {
   public static getInstance(webSocketFactory?: (url: string) => WebSocket): WebSocketManager {
     if (!WebSocketManager.instance) {
       WebSocketManager.instance = new WebSocketManager(webSocketFactory);
+      console.log(`[WSM][getInstance] New instance created`);
+    } else {
+      console.log(`[WSM][getInstance] Existing instance reused`);
     }
     return WebSocketManager.instance;
   }
@@ -76,7 +90,9 @@ class WebSocketManager {
   }
 
   public setHost(isHost: boolean): void {
+    const prev = this._isHost;
     this._isHost = isHost;
+    console.log(`[WSM][setHost] Host status changed from ${prev} to ${isHost}. Stack:`, new Error().stack);
     this.send({ type: 'host_status', isHost });
   }
 
@@ -89,37 +105,109 @@ class WebSocketManager {
     return this._roomCode;
   }
 
+  public send(message: any): void {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      console.warn('[WSM] Tried to send on closed socket', message);
+      return;
+    }
+    console.log('[WSM][SEND] Sending:', message);
+    this._ws.send(typeof message === 'string' ? message : JSON.stringify(message));
+  }
+
   /**
    * Connect to the WebSocket server. Uses Render in production, localhost in development.
    * @param url Optional override URL (used for testing or custom endpoints)
    */
+  private _updateConnectionState(newState: 'disconnected' | 'connecting' | 'connected'): void {
+    if (this._connectionState === newState) return;
+    
+    console.log(`[WSM] Connection state changed: ${this._connectionState} -> ${newState}`);
+    this._connectionState = newState;
+    
+    if (newState === 'connected') {
+      this._reconnectAttempts = 0;
+      this._onConnectionCallback?.(true);
+    } else if (newState === 'disconnected') {
+      this._onConnectionCallback?.(false);
+    }
+  }
+
+  private _scheduleReconnect(): void {
+    if (this._reconnectAttempts >= this._maxReconnectAttempts) {
+      console.log(`[WSM] Max reconnection attempts (${this._maxReconnectAttempts}) reached`);
+      return;
+    }
+
+    this._reconnectAttempts++;
+    const delay = Math.min(this._reconnectDelay * Math.pow(2, this._reconnectAttempts - 1), 30000);
+    
+    console.log(`[WSM] Will attempt to reconnect in ${delay}ms (attempt ${this._reconnectAttempts}/${this._maxReconnectAttempts})`);
+    
+    this._reconnectTimeout = setTimeout(() => {
+      if (this._ws) {
+        this._ws.close();
+        this._ws = null;
+      }
+      this.connect();
+    }, delay);
+  }
+
   public async connect(url?: string, roomCode?: string): Promise<WebSocket> {
     console.log('[WSM][DIAG] connect() called', { url, roomCode });
-    // Use Render in production, localhost in development
-    let wsUrl = url;
-    if (!wsUrl) {
-      wsUrl = getWebSocketUrl();
+    
+    if (this._connectionState === 'connected') {
+      console.warn(`[WSM] Already connected [${this._debugInstanceId}]`);
+      return Promise.resolve(this._ws!);
     }
-    if (this._ws) {
-      console.warn(`[WSM] WebSocket already connected [${this._debugInstanceId}]`);
-      return Promise.resolve(this._ws);
+    
+    if (this._connectionState === 'connecting') {
+      console.warn(`[WSM] Connection already in progress [${this._debugInstanceId}]`);
+      return Promise.reject(new Error('Connection already in progress'));
     }
+    
+    this._updateConnectionState('connecting');
+    
+    // Clear any existing reconnect timeout
+    if (this._reconnectTimeout) {
+      clearTimeout(this._reconnectTimeout);
+      this._reconnectTimeout = null;
+    }
+    
+    let wsUrl = url || getWebSocketUrl();
     
     return new Promise((resolve, reject) => {
       try {
         this._isHost = false;
         this._ws = this._webSocketFactory(url!);
         console.log('[WSM][DIAG] _ws created', { ws: !!this._ws, url: this._ws?.url });
+
+        // Add raw event logs for debugging
+        if (this._ws) {
+          this._ws.onopen = (e) => { console.log(`[WSM][onopen][${this._debugInstanceId}] WebSocket opened`, e); };
+          this._ws.onclose = (e) => { console.warn(`[WSM][onclose][${this._debugInstanceId}] WebSocket closed`, e); };
+          this._ws.onerror = (e) => { console.error(`[WSM][onerror][${this._debugInstanceId}] WebSocket error`, e); };
+          // Aggressive diagnostic: log when addEventListener is called
+          this._ws.addEventListener('message', (e) => {
+            console.log(`[WSM][DIAG][${this._debugInstanceId}] addEventListener('message') fired:`, e.data);
+          });
+        }
         
         // Set up event handlers
         this._ws.onopen = () => {
           console.log('[WSM][DIAG] _ws.onopen called');
           console.log(`[WSM] Connected to server [${this._debugInstanceId}]`);
-          this._onConnectionCallback?.(true);
-          if (this._onMessageCallback) {
+          
+          this._updateConnectionState('connected');
+          // --- PATCH: Always register message handler after connect ---
+          if (this._onMessageCallback && !this._boundMessageCallback) {
+            this._boundMessageCallback = (e: MessageEvent) => this._onMessageCallback?.(e);
+            this._ws!.addEventListener('message', this._boundMessageCallback);
+            console.log(`[WSM][DIAG][${this._debugInstanceId}] Registered _boundMessageCallback after connect`, this._boundMessageCallback);
+          }
+          // Set up message handler if not already set
+          if (this._onMessageCallback && !this._boundMessageCallback) {
             this._boundMessageCallback = (e: MessageEvent) => {
-              console.warn(`[WSM] _boundMessageCallback (connect) INVOKED. Current callback ID: ${this._currentCallbackId}`);
-              console.log('[WSM] Raw message event:', e.data);
+              console.log('[WSM][RAW INCOMING]', e.data); // Debug: log all incoming messages
               try {
                 // Parse the message data if it's a string
                 let parsedData = e.data;
@@ -131,22 +219,40 @@ class WebSocketManager {
                     parsedData = e.data;
                   }
                 }
-                this._onMessageCallback?.({ ...e, data: parsedData });
+                
+                // Add to message queue for processing
+                this._messageQueue.push({
+                  data: { ...e, data: parsedData },
+                  timestamp: Date.now()
+                });
+                
+                // Process queue if not already doing so
+                if (!this._isProcessingQueue) {
+                  this._processMessageQueue();
+                }
               } catch (error) {
                 console.error('[WSM] Error processing message:', error);
               }
             };
+            
             this._ws?.addEventListener('message', this._boundMessageCallback);
-            console.log('[WSM] Message event listener registered', { ws: !!this._ws, callback: !!this._boundMessageCallback });
+            console.log('[WSM] Message event listener registered', { 
+              ws: !!this._ws, 
+              callback: !!this._boundMessageCallback 
+            });
           }
           // Add LOGGING to all incoming messages
           if (this._ws) {
-            this._ws.addEventListener('message', (event) => {
-              try {
-                const msg = JSON.parse(event.data);
-                console.log('[WSM][RECV]', msg);
-              } catch (e) {
-                console.error('[WSM][RECV][ERROR]', event.data, e);
+            this._ws.addEventListener('message', (event: MessageEvent) => {
+              // Robust PATCH: Always buffer all messages
+              this._pendingMessages.push(event);
+              // If a handler is set, deliver all buffered messages in order
+              if (this._onMessageCallback) {
+                while (this._pendingMessages.length > 0) {
+                  const bufferedEvent = this._pendingMessages.shift();
+                  console.log('[WSM] Delivering buffered message to handler:', bufferedEvent);
+                  this._onMessageCallback(bufferedEvent!);
+                }
               }
             });
           }
@@ -155,25 +261,43 @@ class WebSocketManager {
 
         this._ws.onclose = (event: CloseEvent) => {
           console.log(`[WSM] Disconnected from server [${this._debugInstanceId}]`, event);
+          
+          // Clean up WebSocket reference
           if (this._boundMessageCallback) {
             this._ws?.removeEventListener('message', this._boundMessageCallback);
             this._boundMessageCallback = null;
           }
-          // Only null out after cleanup to ensure isConnected() works during cleanup
+          
           const wasConnected = this.isConnected();
           this._ws = null;
-          // Only trigger close callback if we were actually connected
+          
+          // Only trigger callbacks if we were actually connected
           if (wasConnected) {
             this._onCloseCallback?.(event);
+            this._updateConnectionState('disconnected');
+            
+            // Schedule reconnection if this wasn't an intentional disconnect
+            if (event.code !== 1000) { // 1000 = Normal closure
+              this._scheduleReconnect();
+            }
           }
-          this._onConnectionCallback?.(false);
         };
 
         this._ws.onerror = (error: Event) => {
           console.error(`[WSM] WebSocket error [${this._debugInstanceId}]:`, error);
           console.log('[WSM][DIAG] connect() onerror');
+          
           this._onErrorCallback?.(error);
-          reject(error);
+          
+          // Only reject if we're in the initial connection phase
+          if (this._connectionState === 'connecting') {
+            this._updateConnectionState('disconnected');
+            reject(error);
+          } else {
+            // For errors after connection, trigger reconnection
+            this._updateConnectionState('disconnected');
+            this._scheduleReconnect();
+          }
         };
       } catch (error) {
         console.error('[WSM][DIAG] connect() threw', error);
@@ -183,31 +307,80 @@ class WebSocketManager {
   }
 
   public disconnect(code?: number, reason?: string): void {
+    console.log(`[WSM] Disconnecting...`);
+    
+    // Clear any pending reconnect attempts
+    if (this._reconnectTimeout) {
+      clearTimeout(this._reconnectTimeout);
+      this._reconnectTimeout = null;
+    }
+    
     if (this._ws) {
       try {
+        // Remove all event listeners
+        this._ws.onopen = null;
+        this._ws.onclose = null;
+        this._ws.onerror = null;
+        
         if (this._boundMessageCallback) {
           this._ws.removeEventListener('message', this._boundMessageCallback);
           this._boundMessageCallback = null;
         }
-        this._ws.close(code, reason);
+        
+        // Only try to close if not already closing or closed
+        if (this._ws.readyState === WebSocket.OPEN) {
+          this._ws.close(code, reason);
+        }
+        
+        this._ws = null;
+        this._updateConnectionState('disconnected');
       } catch (error) {
         console.error('[WSM] Error during disconnect:', error);
       } finally {
         this._ws = null;
+        this._updateConnectionState('disconnected');
       }
     }
+    
+    // Clear message queue on disconnect
+    this._messageQueue = [];
+    this._isProcessingQueue = false;
   }
 
   public isConnected(): boolean {
-    return !!this._ws && this._ws.readyState === WebSocket.OPEN;
+    return this._connectionState === 'connected' && 
+           !!this._ws && 
+           this._ws.readyState === WebSocket.OPEN;
   }
 
   public send(message: any): boolean {
-    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-      console.log('[WSM] Sending message, type:', typeof message, 'content:', message);
+    if (!this.isConnected()) {
+      console.log('[WSM] Cannot send message - not connected, readyState:', this._ws?.readyState);
+      return false;
+    }
+
+    try {
       const msgToSend = typeof message === 'string' ? message : JSON.stringify(message);
+      
+      // Skip duplicate messages
+      if (typeof message === 'object' && message.type) {
+        if (this._lastProcessedMessage && 
+            this._lastProcessedMessage.type === message.type && 
+            (Date.now() - this._lastProcessedMessage.timestamp < 1000)) {
+          console.log(`[WSM] Skipping duplicate message: ${message.type}`);
+          return false;
+        }
+        this._lastProcessedMessage = {
+          type: message.type,
+          timestamp: Date.now()
+        };
+      }
+      
+      console.log('[WSM] Sending message, type:', typeof message, 'content:', message);
       console.log('[WSM] Stringified message to send:', msgToSend);
-      this._ws.send(msgToSend);
+      
+      this._ws!.send(msgToSend);
+      
       // Log human-readable message
       if (typeof message === 'string') {
         try {
@@ -218,10 +391,12 @@ class WebSocketManager {
       } else {
         console.log('[WSM] Message sent:', message);
       }
+      
       return true;
+    } catch (error) {
+      console.error('[WSM] Error sending message:', error);
+      return false;
     }
-    console.log('[WSM] Cannot send message - not connected, readyState:', this._ws?.readyState);
-    return false;
   }
 
   public sendGameAction(action: string, data: Record<string, any> = {}): boolean {
@@ -303,6 +478,31 @@ class WebSocketManager {
     }
   }
 
+  private _processMessageQueue(): void {
+    if (this._isProcessingQueue || this._messageQueue.length === 0) return;
+    
+    this._isProcessingQueue = true;
+    const message = this._messageQueue.shift();
+    
+    if (message) {
+      try {
+        if (this._onMessageCallback) {
+          console.log(`[WSM][DIAG][${this._debugInstanceId}] _processMessageQueue: calling _onMessageCallback with:`, message.data, 'Callback:', this._onMessageCallback);
+          this._onMessageCallback(message.data);
+        }
+      } catch (error) {
+        console.error('[WSM] Error processing message from queue:', error);
+      }
+    }
+    
+    this._isProcessingQueue = false;
+    
+    // Process next message in queue if any
+    if (this._messageQueue.length > 0) {
+      setImmediate(() => this._processMessageQueue());
+    }
+  }
+
   public onMessage(callback: (event: MessageEvent) => void): void {
     this._messageCallbackId++;
     const cbId = this._messageCallbackId;
@@ -314,7 +514,23 @@ class WebSocketManager {
       this._ws?.removeEventListener('message', this._boundMessageCallback);
     }
 
-    this._onMessageCallback = callback;
+    this._onMessageCallback = (event: MessageEvent) => {
+      try {
+        // Queue the message for processing
+        console.log(`[WSM][DIAG][${this._debugInstanceId}] Pushing message to queue. Event:`, event, 'Current queue:', this._messageQueue);
+        this._messageQueue.push({
+          data: event,
+          timestamp: Date.now()
+        });
+        console.log(`[WSM][DIAG][${this._debugInstanceId}] After push: queue=`, this._messageQueue, '_onMessageCallback=', this._onMessageCallback);
+        // Start processing queue if not already doing so
+        if (!this._isProcessingQueue) {
+          this._processMessageQueue();
+        }
+      } catch (error) {
+        console.error('[WSM] Error in message callback:', error);
+      }
+    };
 
     // If WebSocket is already connected, set up the new listener
     if (this.isConnected()) {
@@ -323,14 +539,35 @@ class WebSocketManager {
     }
   }
 
-  public setMessageCallback(callback: ((event: MessageEvent) => void) | null): void {
-    this._onMessageCallback = callback;
+  public setMessageCallback(cb: (event: MessageEvent) => void): void {
+    console.log(`[WSM] setMessageCallback called [${this._debugInstanceId}]. Handler:`, cb, 'Pending messages:', this._pendingMessages.length, '_onMessageCallback:', this._onMessageCallback);
+    this._messageCallback = cb;
+    this._onMessageCallback = cb; // <-- THIS IS CRUCIAL
+    // Always register the real message handler if connected
     if (this._ws && this.isConnected()) {
       if (this._boundMessageCallback) {
         this._ws.removeEventListener('message', this._boundMessageCallback);
       }
       this._boundMessageCallback = (e: MessageEvent) => this._onMessageCallback?.(e);
       this._ws.addEventListener('message', this._boundMessageCallback);
+      console.log(`[WSM][DIAG][${this._debugInstanceId}] Registered _boundMessageCallback in setMessageCallback`, this._boundMessageCallback);
+    }
+    // Always register the real message handler if connected
+    // if (this._ws && this.isConnected()) {
+    //   if (this._boundMessageCallback) {
+    //     this._ws.removeEventListener('message', this._boundMessageCallback);
+    //   }
+    //   this._boundMessageCallback = (e: MessageEvent) => this._onMessageCallback?.(e);
+    //   this._ws.addEventListener('message', this._boundMessageCallback);
+    //   console.log(`[WSM][DIAG][${this._debugInstanceId}] Registered _boundMessageCallback in setMessageCallback`, this._boundMessageCallback);
+    // }
+    // Deliver any buffered messages
+    if (this._pendingMessages.length > 0 && cb) {
+      while (this._pendingMessages.length > 0) {
+        const event = this._pendingMessages.shift();
+        console.log('[WSM] Delivering buffered message to new callback:', event);
+        cb(event!);
+      }
     }
   }
 
@@ -417,4 +654,6 @@ class WebSocketManager {
 
 // Export the WebSocketManager class and singleton instance
 // export const wsManager = WebSocketManager.getInstance();
+
+
 export { WebSocketManager };

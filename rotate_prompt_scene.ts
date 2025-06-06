@@ -53,25 +53,8 @@ class RotatePromptScene extends Phaser.Scene {
         console.log('[RotatePromptScene] 🛑 Detected landscape orientation - transitioning to main menu');
         
         try {
-          // First, make sure all needed scenes are registered
-          if (!this.scene.get('GameModeScene')) {
-            console.log('[RotatePromptScene] Adding GameModeScene');
-            this.scene.add('GameModeScene', GameModeScene, false);
-          }
-          if (!this.scene.get('OnlineModeScene')) {
-            this.scene.add('OnlineModeScene', OnlineModeScene, false);
-          }
-          if (!this.scene.get('PlayerSelectScene')) {
-            this.scene.add('PlayerSelectScene', PlayerSelectScene, false);
-          }
-          if (!this.scene.get('ScenarioSelectScene')) {
-            this.scene.add('ScenarioSelectScene', ScenarioSelectScene, false);
-          }
-          if (!this.scene.get('KidsFightScene')) {
-            this.scene.add('KidsFightScene', KidsFightScene, false);
-          }
-          
-          // Mark scenes as added to prevent duplicate additions
+          // The scenes are already registered in main.ts, so we don't need to add them here
+          // Just mark that we've handled the orientation change
           this.scenesAdded = true;
           
           // Record the orientation change time for other scenes to reference

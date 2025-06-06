@@ -20,25 +20,57 @@ export default class BootDebugScene extends Phaser.Scene {
     // Preload all scenario and player assets needed for KidsFightScene
     this.load.image('scenario1', scenario1Img);
     this.load.image('scenario2', scenario2Img);
-    // Use correct frame size for 3072x512 spritesheets: 256x256
-    this.load.spritesheet('player1', player1RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player2', player2RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player3', player3RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player4', player4RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player5', player5RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player6', player6RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player7', player7RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player8', player8RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('player9', player9RawImg, { frameWidth: 410, frameHeight: 512 });
+    // Load raw images for all players (not as spritesheets)
+    this.load.image('bento_raw', player1RawImg);
+    this.load.image('davir_raw', player2RawImg);
+    this.load.image('jose_raw', player3RawImg);
+    this.load.image('davis_raw', player4RawImg);
+    this.load.image('carol_raw', player5RawImg);
+    this.load.image('roni_raw', player6RawImg);
+    this.load.image('jacqueline_raw', player7RawImg);
+    this.load.image('ivan_raw', player8RawImg);
+    this.load.image('d_isa_raw', player9RawImg);
+    console.log('[KidsFightScene][preload] Loaded raw character keys:', [
+      'bento_raw','davir_raw','jose_raw','davis_raw','carol_raw','roni_raw','jacqueline_raw','ivan_raw','d_isa_raw'
+    ]);
   }
 
   create() {
+    // Utility: Adds a custom spritesheet for a player with variable frame widths
+    function addVariableWidthSpritesheet(scene, key, rawKey, frameWidths, frameHeight) {
+      if (!scene.textures.exists(key)) {
+        const playerTexture = scene.textures.get(rawKey).getSourceImage();
+        scene.textures.addSpriteSheet(key, playerTexture, {
+          frameWidth: frameWidths[0], // Not used, but required
+          frameHeight: frameHeight,
+          endFrame: frameWidths.length - 1
+        });
+        const tex = scene.textures.get(key);
+        tex.frames = { __BASE: tex.frames['__BASE'] };
+        let x = 0;
+        for (let i = 0; i < frameWidths.length; i++) {
+          tex.add(i, 0, x, 0, frameWidths[i], frameHeight);
+          x += frameWidths[i];
+        }
+      }
+    }
+
+    // Add variable-width spritesheets for each player
+    addVariableWidthSpritesheet(this, 'bento', 'bento_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'davir', 'davir_raw', [415, 410, 420, 440, 440, 470, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'jose', 'jose_raw', [415, 410, 420, 440, 440, 390, 530, 480], 512);
+    addVariableWidthSpritesheet(this, 'davis', 'davis_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'carol', 'carol_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'roni', 'roni_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'jacqueline', 'jacqueline_raw', [415, 410, 420, 440, 440, 410, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'ivan', 'ivan_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'd_isa', 'd_isa_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+
     // Ensure debug scene always sets up two valid player objects
     this.players = [
-      this.physics.add.sprite(100, 100, 'player1') as any,
-      this.physics.add.sprite(200, 100, 'player2') as any,
+      { key: 'bento' },
+      { key: 'davir' },
     ];
-    // Set minimal required properties for attack logic
     this.players[0].health = 100;
     this.players[1].health = 100;
     this.players[0].special = 0;
@@ -46,14 +78,32 @@ export default class BootDebugScene extends Phaser.Scene {
     this.players[0].direction = 'right';
     this.players[1].direction = 'left';
 
-    // After loading, go directly to KidsFightScene with chosen players/scenario
-    // this.scene.start('KidsFightScene', {
-    //   selected: { p1: 'player1', p2: 'player2' },
-    //   p1: 'player1',
-    //   p2: 'player2',
-    //   selectedScenario: 'scenario1',
-    //   gameMode: 'single',
-    //   isHost: true
-    // });
+    // Add background for visual context
+    this.add.image(400, 300, 'scenario1').setOrigin(0.5, 0.5).setDepth(0);
+
+    // Add player sprites for debug visualization
+    const platformHeight = 520;
+    const scale = 0.4;
+    const player1 = this.add.sprite(240, platformHeight, 'bento', 0)
+      .setOrigin(0.5, 1.0)
+      .setScale(scale)
+      .setDepth(1);
+    const player2 = this.add.sprite(560, platformHeight, 'davir', 0)
+      .setOrigin(0.5, 1.0)
+      .setScale(scale)
+      .setFlipX(true)
+      .setDepth(1);
+
+    this.add.text(240, platformHeight - 520, 'Bento', { font: '24px monospace', color: '#fff' }).setOrigin(0.5, 0);
+    this.add.text(560, platformHeight - 520, 'Davi R', { font: '24px monospace', color: '#fff' }).setOrigin(0.5, 0);
+
+    this.scene.start('KidsFightScene', {
+      selected: { p1: 'bento', p2: 'davir' },
+      p1: 'd_isa',
+      p2: 'davir',
+      selectedScenario: 'scenario1',
+      gameMode: 'online',
+      isHost: true
+    });
   }
 }

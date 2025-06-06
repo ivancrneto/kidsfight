@@ -26,6 +26,58 @@ afterAll(() => {
 
 jest.setTimeout(15000);
 describe('WebSocket Server', () => {
+  it('should synchronize scenario selection and send correct scenario in game_start', (done) => {
+    const wsHost = new WebSocket(SERVER_URL);
+    let wsClient;
+    let roomCode = null;
+    let hostGameStartScenario = null;
+    let clientGameStartScenario = null;
+    let doneCalled = false;
+
+    function maybeDone() {
+      if (hostGameStartScenario && clientGameStartScenario && !doneCalled) {
+        doneCalled = true;
+        expect(hostGameStartScenario).toBe('scenario2');
+        expect(clientGameStartScenario).toBe('scenario2');
+        wsHost.close();
+        if (wsClient) wsClient.close();
+        done();
+      }
+    }
+
+    wsHost.on('open', () => {
+      wsHost.send(JSON.stringify({ type: 'create_room' }));
+    });
+    wsHost.on('message', (msg) => {
+      const data = JSON.parse(msg);
+      if (data.type === 'room_created') {
+        roomCode = data.roomCode;
+        wsClient = new WebSocket(SERVER_URL);
+        wsClient.on('open', () => {
+          wsClient.send(JSON.stringify({ type: 'join_room', roomCode }));
+        });
+        wsClient.on('message', (msg2) => {
+          const data2 = JSON.parse(msg2);
+          if (data2.type === 'game_joined') {
+            // Host selects scenario2
+            wsHost.send(JSON.stringify({ type: 'scenario_selected', scenario: 'scenario2', roomCode }));
+            // Both players ready
+            setTimeout(() => {
+              wsHost.send(JSON.stringify({ type: 'player_ready', roomCode }));
+              wsClient.send(JSON.stringify({ type: 'player_ready', roomCode }));
+            }, 100);
+          } else if (data2.type === 'game_start') {
+            clientGameStartScenario = data2.scenario;
+            maybeDone();
+          }
+        });
+      } else if (data.type === 'game_start') {
+        hostGameStartScenario = data.scenario;
+        maybeDone();
+      }
+    });
+  });
+
   it('should include playerIndex and isHost in game_joined and game_start messages', (done) => {
     jest.setTimeout(15000);
     const wsHost = new WebSocket(SERVER_URL);

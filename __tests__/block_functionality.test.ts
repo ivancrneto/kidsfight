@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import KidsFightScene from '../kidsfight_scene';
 
 // Mock WebSocketManager before importing it
@@ -5,6 +6,29 @@ jest.mock('../websocket_manager');
 
 // Import the WebSocketManager class after mocking
 import { WebSocketManager } from '../websocket_manager';
+
+// Create a mock Player type that satisfies both Phaser.Sprite and our custom properties
+type MockPlayer = Phaser.Physics.Arcade.Sprite & {
+  health: number;
+  special: number;
+  isBlocking: boolean;
+  isAttacking: boolean;
+  direction: 'left' | 'right';
+  anims: {
+    play: (config: string | Phaser.Types.Animations.PlayAnimationConfig) => void;
+  };
+  setData: (key: string, value: any) => void;
+  getData: (key: string) => any;
+  setScale: (x: number, y?: number) => void;
+  setFrame: (frame: string | number) => void;
+  texture: { key: string; frameTotal?: number };
+  x: number;
+  y: number;
+  body: {
+    blocked: { down: boolean };
+    velocity: { x: number; y: number };
+  };
+};
 
 const wsFactory = () => ({
   send: jest.fn(),
@@ -15,9 +39,9 @@ const wsFactory = () => ({
 });
 
 describe('Block Functionality', () => {
-  let scene;
-  let mockCanvas;
-  let wsManagerMock;
+  let scene: KidsFightScene;
+  let mockCanvas: HTMLCanvasElement;
+  let wsManagerMock: WebSocketManager;
   
   beforeEach(() => {
     // Reset the WebSocketManager mock instance
@@ -75,31 +99,55 @@ describe('Block Functionality', () => {
     };
     
     // Mock player with enough frames for blocking animation
-    const mockTexture = { frameTotal: 10 }; // at least 6 frames for block
-    scene.players = [
-      {
-        health: 100,
-        setData: jest.fn(),
-        getData: jest.fn((key) => key === 'isBlocking'),
-        setScale: jest.fn(),
-        setFrame: jest.fn(),
-        anims: { play: jest.fn() },
-        texture: mockTexture,
-        x: 200,
-        y: 300
+    const mockTexture = { key: 'player1', frameTotal: 10 }; // at least 6 frames for block
+    
+    // Create mock players with proper typing
+    const player1: MockPlayer = {
+      health: 100,
+      special: 0,
+      isBlocking: false,
+      isAttacking: false,
+      direction: 'right',
+      setData: jest.fn(),
+      getData: jest.fn((key: string) => key === 'isBlocking'),
+      setScale: jest.fn(),
+      setFrame: jest.fn(),
+      anims: { 
+        play: jest.fn() 
       },
-      {
-        health: 100,
-        setData: jest.fn(),
-        getData: jest.fn(),
-        setScale: jest.fn(),
-        setFrame: jest.fn(),
-        anims: { play: jest.fn() },
-        texture: { key: 'player2' },
-        x: 600,
-        y: 300
+      texture: mockTexture,
+      x: 200,
+      y: 300,
+      body: {
+        blocked: { down: true },
+        velocity: { x: 0, y: 0 }
       }
-    ];
+    } as unknown as MockPlayer;
+
+    const player2: MockPlayer = {
+      health: 100,
+      special: 0,
+      isBlocking: false,
+      isAttacking: false,
+      direction: 'left',
+      setData: jest.fn(),
+      getData: jest.fn(),
+      setScale: jest.fn(),
+      setFrame: jest.fn(),
+      anims: { 
+        play: jest.fn() 
+      },
+      texture: { key: 'player2', frameTotal: 10 },
+      x: 600,
+      y: 300,
+      body: {
+        blocked: { down: true },
+        velocity: { x: 0, y: 0 }
+      }
+    } as unknown as MockPlayer;
+
+    // Assign to scene.players with type assertion
+    scene.players = [player1, player2];
     
     // Initialize playerHealth array
     scene.playerHealth = [100, 100];

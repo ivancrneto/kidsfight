@@ -24,6 +24,7 @@ interface RoomData {
 }
 
 export default class OnlineModeScene extends Phaser.Scene {
+  private gameStarted: boolean = false;
   private bg!: Phaser.GameObjects.Rectangle;
   private createButton!: Phaser.GameObjects.Text;
   private joinButton!: Phaser.GameObjects.Text;
@@ -319,140 +320,24 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   private async handleWebSocketMessage(event: MessageEvent): Promise<void> {
+    console.log('[OnlineModeScene] handleWebSocketMessage called:', event);
     console.log('[OnlineModeScene] Received message:', event.data);
     try {
-      // The WebSocketManager already parses the data, so we can use it directly
       const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-      
+      // Only show waiting screen if game hasn't started
+      if (data.type === 'room_code') {
+        this.roomCode = data.roomCode;
+        console.log('[OnlineModeScene] Received room_code from server:', data.roomCode);
+        if (!this.gameStarted) this.showRoomCode(data.roomCode);
+        return;
+      }
       if (data.type === 'room_created') {
-        // Don't reconnect if already connected
         if (!this.wsManager.isConnected()) {
           const ws = await this.wsManager.connect(getWebSocketUrl(), data.roomCode);
           if (!ws) {
             console.error('Failed to connect to WebSocket server');
             return;
           }
-        }
-        this.wsManager.setRoomCode(data.roomCode);
-        this.wsManager.setHost(true);
-        this.showRoomCode(data.roomCode);
-      } else if (data.type === 'room_joined') {
-        // Don't reconnect if already connected
-        if (!this.wsManager.isConnected()) {
-          const ws = await this.wsManager.connect(getWebSocketUrl(), data.roomCode);
-          if (!ws) {
-            console.error('Failed to connect to WebSocket server');
-            return;
-          }
-        }
-        this.wsManager.setRoomCode(data.roomCode);
-        this.wsManager.setHost(false);
-        this.startGame({ roomCode: data.roomCode, isHost: false });
-      } else if (data.type === 'player_joined') {
-        console.log('Player joined, starting game...');
-        this.wsManager.setRoomCode(data.roomCode); // Ensure roomCode is set
-        this.startGame({ roomCode: data.roomCode, isHost: true });
-      } else if (data.type === 'game_joined') {
-        console.log('Successfully joined game, starting...');
-        this.wsManager.setRoomCode(data.roomCode); // Ensure roomCode is set
-        this.startGame({ roomCode: data.roomCode, isHost: false });
-      } else if (data.type === 'error') {
-        this.showError(data.message);
-      }
-    } catch (error) {
-      console.error('Error parsing WebSocket message:', error);
-      this.showError('Error processing server message');
-    }
-  }
-
-  private showRoomCode(code: string): void {
-    const w = this.cameras.main.width;
-    const h = this.cameras.main.height;
-    // Define all lines
-    // Use the titleText created in create()
-    if (!this.titleText) {
-      // Fallback: if missing, create it (shouldn't happen)
-      this.titleText = this.add.text(w/2, 0, 'Modo Online', {
-        fontSize: '36px',
-        color: '#fff',
-        fontFamily: 'monospace',
-        align: 'center'
-      }).setOrigin(0.5);
-    }
-    this.titleText.setVisible(true);
-    const lines = [
-      this.titleText,
-      this.roomCodeText.setText('Código da Sala:').setOrigin(0.5).setVisible(true),
-      this.roomCodeDisplay.setText(code).setOrigin(0.5).setVisible(true),
-      this.waitingText.setText('Aguardando outro jogador...').setOrigin(0.5).setVisible(true)
-    ];
-    // Calculate vertical stacking
-    const gap = 40;
-    const totalHeight = (lines.length - 1) * gap;
-    const startY = h/2 - totalHeight/2;
-    lines.forEach((txt, i) => {
-      txt.setX(w/2);
-      txt.setY(startY + i * gap);
-      txt.setVisible(true);
-    });
-    // Hide main menu buttons
-    this.createButton.setVisible(false);
-    this.joinButton.setVisible(false);
-    this.backButton.setVisible(false);
-  }
-
-  private showError(message: string): void {
-    if (this.errorText && !(this.errorText as any).destroyed) {
-      this.errorText.setText(message).setVisible(true);
-    } else {
-      console.warn('[OnlineModeScene] Tried to show error but errorText is missing or destroyed');
-    }
-
-    // Defensive: If you have any canvas drawing, guard it:
-    if ((this as any).errorCanvas) {
-      const ctx = (this as any).errorCanvas.getContext && (this as any).errorCanvas.getContext('2d');
-      if (ctx) {
-        // Example: ctx.drawImage(...);
-        // (No-op unless you actually need it)
-      } else {
-        console.warn('[OnlineModeScene] showError: Canvas context is null!');
-      }
-    }
-
-    if (this.showMainButtons) this.showMainButtons();
-    if (this.waitingText) this.waitingText.setVisible(false);
-    if (this.roomCodeText) this.roomCodeText.setVisible(false);
-    if (this.roomCodeDisplay) this.roomCodeDisplay.setVisible(false);
-
-    setTimeout(() => {
-      if (this.errorText && !(this.errorText as any).destroyed) this.errorText.setVisible(false);
-    }, 3000);
-  }
-
-  private startGame(roomData: RoomData): void {
-    console.log('Starting game with room data:', roomData); // DEBUG LOG
-    try {
-      // Set the room code in the WebSocket manager
-      this.wsManager.setRoomCode(roomData.roomCode);
-      // Set host status in the WebSocket manager
-      this.wsManager.setHost(roomData.isHost);
-      
-      // Start the PlayerSelectScene with the room data
-      this.scene.start('PlayerSelectScene', {
-        mode: 'online',
-        roomCode: roomData.roomCode,
-        isHost: roomData.isHost
-      });
-    } catch (error) {
-      console.error('Error starting PlayerSelectScene:', error);
-      this.showError('Failed to start game');
-    }
-  }
-
-  private goBack(): void {
-    this.wsManager.disconnect();
-    this.scene.start('GameModeScene');
-  }
 
   private updateLayout(gameSize: Phaser.Structs.Size): void {
     const w = gameSize.width;

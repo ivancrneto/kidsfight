@@ -1,7 +1,8 @@
 const WebSocket = require('ws');
-const PORT = process.argv[2] ? parseInt(process.argv[2], 10) : 8081;
-const server = new WebSocket.Server({ port: PORT });
-console.log(`WebSocket server running on port ${PORT}`);
+const PORT = process.env.PORT || (process.argv[2] ? parseInt(process.argv[2], 10) : 8081);
+const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+const server = new WebSocket.Server({ host: HOST, port: PORT });
+console.log(`WebSocket server running on ${HOST}:${PORT}`);
 
 // Store active game rooms
 const gameRooms = new Map();
@@ -9,7 +10,12 @@ const gameRooms = new Map();
 // Helper to get or init player state in a room
 function getPlayerState(room, playerKey) {
   if (!room.gameState[playerKey]) {
-    room.gameState[playerKey] = { hits: 0, specialEnabled: false };
+    room.gameState[playerKey] = { 
+      hits: 0, 
+      specialEnabled: false,
+      scene: 'player_select', // Track which scene the player is in
+      ready: false
+    };
   }
   return room.gameState[playerKey];
 }
@@ -18,10 +24,14 @@ function getPlayerState(room, playerKey) {
 function shouldStartGame(room) {
   const p1 = room.gameState.p1;
   const p2 = room.gameState.p2;
+  
+  // Only start if both players are in the scenario select scene and ready
   return (
     p1 && p2 &&
     p1.ready && p2.ready &&
-    p1.character && p2.character
+    p1.character && p2.character &&
+    p1.scene === 'scenario_select' &&
+    p2.scene === 'scenario_select'
   );
 }
 
@@ -52,6 +62,16 @@ function startGame(room, roomCode) {
 
 server.on('connection', (ws) => {
   console.log('New client connected');
+
+  // Send a test message to the client immediately on connection
+ws.send(JSON.stringify({ type: 'test', msg: 'hello from server' }), (err) => {
+  if (err) {
+    console.error('[Server] Error sending test:', err);
+  } else {
+    console.log('[Server] test message sent successfully');
+  }
+});
+
   let roomCode = null;
   let isHost = false;
 
@@ -82,7 +102,15 @@ server.on('connection', (ws) => {
           });
           
           isHost = true;
-          ws.send(JSON.stringify({ type: 'room_created', roomCode }));
+          ws.send(JSON.stringify({ type: 'room_created', roomCode }), (err) => {
+            if (err) console.error('[Server] Error sending room_created:', err);
+            else console.log('[Server] room_created sent successfully');
+          });
+          ws.send(JSON.stringify({ type: 'room_code', roomCode }), (err) => {
+            if (err) console.error('[Server] Error sending room_code:', err);
+            else console.log('[Server] room_code sent successfully');
+          });
+          console.log('[Server] Sent room_code to host (on create):', roomCode);
           console.log(`Game created with code: ${roomCode}`);
           break;
 
@@ -108,13 +136,16 @@ server.on('connection', (ws) => {
             type: 'player_joined',
             roomCode: roomCode
           }));
-          
           ws.send(JSON.stringify({ 
             type: 'game_joined',
             roomCode: roomCode,
             playerIndex: 1,
             isHost: false
           }));
+          ws.send(JSON.stringify({ type: 'room_code', roomCode })); // Ensure guest always receives room_code
+          console.log('[Server] Sent room_code to guest:', roomCode);
+          room.host.send(JSON.stringify({ type: 'room_code', roomCode })); // Optionally re-send to host on join
+          console.log('[Server] Sent room_code to host (on join):', roomCode);
 
           console.log(`Player joined room: ${roomCode}`);
           break;
@@ -179,6 +210,8 @@ server.on('connection', (ws) => {
         case 'scenario_selected':
           const scRoom = gameRooms.get(roomCode);
           if (!scRoom) return;
+          // Store the selected scenario in the room's game state
+          scRoom.gameState.scenario = data.scenario;
           // Forward scenario selection to both players
           if (scRoom.host) {
             scRoom.host.send(JSON.stringify({
@@ -237,6 +270,134 @@ server.on('connection', (ws) => {
           console.log('[Server] game_start message handling complete');
         }
         break;
+
+        case 'scene_change':
+          console.log(`[SERVER] Player changed scene:`, data);
+          if (!roomCode) {
+            console.log(`[SERVER] Room not found for scene change:`, data);
+            return;
+          }
+
+          const sceneRoom = gameRooms.get(roomCode);
+          if (!sceneRoom) {
+            console.log(`[SERVER] Room not found for scene change:`, data);
+            return;
+          }
+
+          
+          
+          // Update player's scene
+          playerState.scene = data.scene;
+          console.log(`[SERVER] Player ${playerKey} changed to scene: ${data.scene}`);
+          
+          // Reset ready state when leaving scenario select
+          if (data.scene !== 'scenario_select') {
+            playerState.ready = false;
+            console.log(`[SERVER] Reset ready state for player ${playerKey} (left scenario select)`);
+          }
+          
+          // Notify both players of the scene change
+          broadcastToRoom(ws, sceneRoom, {
+            type: 'player_scene_changed',
+            player: playerKey,
+            scene: data.scene,
+            roomCode: roomCode
+          });
+          break;
+
+        case 'request_game_state':
+          console.log(`[SERVER] Game state requested by ${data.isHost ? 'host' : 'guest'}`);
+          if (!roomCode) {
+            console.log(`[SERVER] Room not found for game state request`);
+            return;
+          }
+          
+          const stateRoom = gameRooms.get(roomCode);
+          if (!stateRoom) {
+            console.log(`[SERVER] Room not found: ${roomCode}`);
+            return;
+          }
+          
+          // Send current game state to the requesting client
+          const targetWs = data.isHost ? stateRoom.host : stateRoom.client;
+          if (targetWs) {
+            const gameState = {
+              type: 'game_state',
+              states: {
+                hostReady: stateRoom.gameState.p1?.ready || false,
+                guestReady: stateRoom.gameState.p2?.ready || false,
+                scenario: stateRoom.gameState.scenario
+              }
+            };
+            targetWs.send(JSON.stringify(gameState));
+            console.log(`[SERVER] Sent game state to ${data.isHost ? 'host' : 'guest'}:`, gameState);
+          }
+          break;
+          
+        case 'player_ready':
+          console.log(`[SERVER] Player ready:`, data);
+          if (!roomCode) {
+            console.log(`[SERVER] Room not found: ${data.roomCode}`);
+            return;
+          }
+
+          const readyRoom = gameRooms.get(roomCode);
+          if (!readyRoom) {
+            console.log(`[SERVER] Room not found: ${data.roomCode}`);
+            return;
+          }
+
+          const readyPlayerKey = data.player === 'host' ? 'p1' : 'p2';
+          const readyPlayerState = getPlayerState(readyRoom, readyPlayerKey);
+          
+          // Only allow ready state if player is in scenario select
+          if (readyPlayerState.scene !== 'scenario_select') {
+            console.log(`[SERVER] Player ${readyPlayerKey} tried to ready up while in ${readyPlayerState.scene}`);
+            return;
+          }
+
+          // Update ready state
+          readyPlayerState.ready = true;
+          console.log(`[SERVER] Player ${readyPlayerKey} is ready`);
+
+          // Broadcast the ready state to both players
+          broadcastToRoom(ws, readyRoom, {
+            type: 'player_ready',
+            player: data.player,
+            roomCode: roomCode
+          });
+
+          // Check if we should start the game
+          const p1 = readyRoom.gameState.p1;
+          const p2 = readyRoom.gameState.p2;
+          
+          if (p1 && p2 && p1.ready && p2.ready && 
+              p1.scene === 'scenario_select' && 
+              p2.scene === 'scenario_select' &&
+              p1.character && p2.character) {
+            
+            console.log(`[SERVER] Both players ready, starting game...`);
+            
+            // Send game start to both players
+            broadcastToRoom(ws, readyRoom, {
+              type: 'game_start',
+              p1Char: p1.character,
+              p2Char: p2.character,
+              scenario: readyRoom.gameState.scenario || 'scenario1',
+              roomCode: roomCode,
+              playerIndex: 0 // Host is player 1
+            }, true);
+          } else {
+            console.log('[SERVER] Waiting for:', {
+              p1Ready: p1?.ready,
+              p2Ready: p2?.ready,
+              p1Scene: p1?.scene,
+              p2Scene: p2?.scene,
+              p1Char: p1?.character,
+              p2Char: p2?.character
+            });
+          }
+          break;
 
         case 'game_action':
           const currentRoom = gameRooms.get(roomCode);
@@ -322,4 +483,4 @@ server.on('connection', (ws) => {
   });
 });
 
-console.log('WebSocket server running on ws://localhost:8081');
+console.log(`WebSocket server running on ws://${HOST}:${PORT}`);

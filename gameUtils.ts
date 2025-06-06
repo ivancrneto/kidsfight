@@ -2,6 +2,10 @@ import Phaser from 'phaser';
 
 interface GameObject extends Phaser.GameObjects.GameObject {
   setPosition: (x: number, y: number) => void;
+  health?: number;
+  special?: number;
+  x: number;
+  y: number;
   setSize?: (width: number, height: number) => void;
   setScale?: (scale: number) => void;
   setAlpha?: (alpha: number) => void;
@@ -34,6 +38,8 @@ interface GameScene extends Phaser.Scene {
   winnerText?: Phaser.GameObjects.Text;
   readyText?: Phaser.GameObjects.Text;
   countdownText?: Phaser.GameObjects.Text;
+  playerHealth?: number[];
+  playerSpecial?: number[];
 }
 
 // Function to apply CSS to the game container
@@ -322,6 +328,14 @@ export function tryAttack({
   const damage = special ? 30 : 10;
   const knockback = special ? 300 : 100;
 
+  // Only apply damage if attacker and defender are close (e.g., within 80px horizontally)
+  if (typeof attacker.x === 'number' && typeof defender.x === 'number') {
+    if (Math.abs(attacker.x - defender.x) > 80) {
+      // Too far: no damage
+      return false;
+    }
+  }
+
   // Apply damage and knockback
   defender.health = Math.max(0, defender.health - damage);
   
@@ -331,7 +345,7 @@ export function tryAttack({
     console.log('[TRYATTACK] Updated playerHealth array:', scene.playerHealth);
   }
   
-  if (special) attacker.special = 0;
+  if (special && typeof attacker.special !== 'undefined') attacker.special = 0;
 
   // Optionally, apply knockback or other effects here
 
