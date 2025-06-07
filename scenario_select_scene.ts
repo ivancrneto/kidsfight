@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import scenario1Img from './scenario1.png';
 import scenario2Img from './scenario2.png';
+import gameLogoImg from './android-chrome-192x192.png';
 
 interface Scenario {
   key: string;
@@ -26,7 +27,7 @@ export const SCENARIOS: Scenario[] = [
 ];
 
 class ScenarioSelectScene extends Phaser.Scene {
-  private selectedScenario: number;
+  private selectedScenario: number = 0; // Always an index into SCENARIOS
   private preview!: Phaser.GameObjects.Image;
   private nextButton!: Phaser.GameObjects.Text;
   private prevButton!: Phaser.GameObjects.Text;
@@ -42,13 +43,16 @@ class ScenarioSelectScene extends Phaser.Scene {
   private guestReady: boolean = false;
   private gameStarted: boolean = false;
   private _wsMessageHandler?: (event: MessageEvent) => void;
+  private _lastGameStartTime: number = 0;
+  private _gameStartCooldown: number = 1000; // 1 second cooldown between start attempts
+  private _processedMessageIds: Set<string> = new Set();
 
   /**
    * Optional wsManager injection for testability
    */
   constructor(wsManagerInstance: any = null) {
     super({ key: 'ScenarioSelectScene' });
-    this.selectedScenario = 0;
+    this.selectedScenario = 0; // Always reset to 0 on constructor
     this.mode = 'local';
     this.selected = { p1: 'player1', p2: 'player2' };
     this.roomCode = null;
@@ -101,6 +105,7 @@ class ScenarioSelectScene extends Phaser.Scene {
   }
 
   preload(): void {
+    this.load.image('gameLogo', gameLogoImg);
     SCENARIOS.forEach(s => {
       this.load.image(s.key, s.img);
     });
@@ -112,8 +117,18 @@ class ScenarioSelectScene extends Phaser.Scene {
     this.guestReady = false;
     this.gameStarted = false;
 
+    // Add logo as a background, subtle watermark style
+    const logoBg = this.add.image(width/2, height/2, 'gameLogo')
+      .setOrigin(0.5)
+      .setDisplaySize(width, height)
+      .setAlpha(0.13)
+      .setDepth(0);
+
+    // Add background color rectangle above logo for contrast
+    const bg = this.add.rectangle(width/2, height/2, width, height, 0x222222, 0.55).setDepth(1);
+
     // Add dark overlay
-    this.add.rectangle(width/2, height/2, width, height, 0x000000, 0.7);
+    this.add.rectangle(width/2, height/2, width, height, 0x000000, 0.7).setDepth(2);
     
     // Add title
     this.add.text(width/2, 80, 'ESCOLHA O CENÁRIO', {
@@ -121,12 +136,18 @@ class ScenarioSelectScene extends Phaser.Scene {
       color: '#fff',
       fontStyle: 'bold',
       fontFamily: 'monospace'
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(2);
 
+    // Defensive: ensure selectedScenario is always a valid index
+    if (typeof this.selectedScenario !== 'number' || this.selectedScenario < 0 || this.selectedScenario >= SCENARIOS.length) {
+      console.warn('[ScenarioSelectScene] Invalid selectedScenario index, defaulting to 0:', this.selectedScenario);
+      this.selectedScenario = 0;
+    }
     // Show scenario preview
     this.preview = this.add.image(width/2, height/2, SCENARIOS[this.selectedScenario].key)
       .setOrigin(0.5)
-      .setAlpha(0.95);
+      .setAlpha(0.95)
+      .setDepth(2);
     
     // Match scaling logic to KidsFightScene (contain, never crop)
     this.rescalePreview();
@@ -139,13 +160,13 @@ class ScenarioSelectScene extends Phaser.Scene {
 
     // Show waiting message for guest
     if (this.mode === 'online' && !this.isHost) {
-      this.waitingText = this.add.text(width/2, height*0.85, 'Aguardando o anfitrião escolher o cenário...', {
+      this.waitingText = this.add.text(width/2, height*0.85, 'Enfitrião escolhendo cenário...', {
         fontSize: '22px',
         color: '#fff',
         backgroundColor: '#222',
         padding: { x: 16, y: 8 },
         fontFamily: 'monospace'
-      }).setOrigin(0.5);
+      }).setOrigin(0.5).setDepth(2);
       
       // Disable scenario selection for guest
       if (this.prevButton) this.prevButton.disableInteractive();
@@ -168,22 +189,23 @@ class ScenarioSelectScene extends Phaser.Scene {
             // Update the preview to match the host's selection
             console.debug('[ScenarioSelectScene][WebSocket] Guest received scenario selection from host:', data.scenario);
             
-            // Find the scenario index
+            // Find the index of the scenario by key
             const scenarioIndex = SCENARIOS.findIndex(s => s.key === data.scenario);
             if (scenarioIndex !== -1) {
               this.selectedScenario = scenarioIndex;
-              this.preview.setTexture(SCENARIOS[this.selectedScenario].key);
-              this.rescalePreview();
               console.debug('[ScenarioSelectScene][WebSocket] Guest updated scenario preview to:', data.scenario);
+              this.preview.setTexture(data.scenario);
+              this.rescalePreview();
             }
           } else if (data.type === 'player_ready') {
             console.debug('[ScenarioSelectScene][WebSocket] player_ready received:', data);
             console.debug('[ScenarioSelectScene][WebSocket] Readiness BEFORE assignment:', {
-              isHost: this.isHost,
-              hostReady: this.hostReady,
+              isHost: this.isHost, 
+              hostReady: this.hostReady, 
               guestReady: this.guestReady,
               gameStarted: this.gameStarted
             });
+            
             if (data.player === 'host') {
               this.hostReady = true;
               console.debug('[ScenarioSelectScene][WebSocket] Marked host as ready');
@@ -191,95 +213,51 @@ class ScenarioSelectScene extends Phaser.Scene {
               this.guestReady = true;
               console.debug('[ScenarioSelectScene][WebSocket] Marked guest as ready');
             }
-            this.updateReadyUI();
+            
             console.debug('[ScenarioSelectScene][WebSocket] Readiness AFTER assignment:', {
-              isHost: this.isHost,
-              hostReady: this.hostReady,
+              isHost: this.isHost, 
+              hostReady: this.hostReady, 
               guestReady: this.guestReady,
               gameStarted: this.gameStarted
             });
             
-            // Debug: print readiness state before checking if we should start game
+            this.updateReadyUI();
+            
+            // Check if both players are ready and we should start the game
+            const shouldStartGame = this.hostReady && this.guestReady && !this.gameStarted;
             console.debug('[ScenarioSelectScene][WebSocket] Checking if should start game:', {
-              isHost: this.isHost,
-              hostReady: this.hostReady,
+              isHost: this.isHost, 
+              hostReady: this.hostReady, 
               guestReady: this.guestReady,
               gameStarted: this.gameStarted,
-              condition: this.isHost && this.hostReady && this.guestReady && !this.gameStarted
+              condition: shouldStartGame
             });
             
-            if (this.isHost && this.hostReady && this.guestReady && !this.gameStarted) {
-              console.debug('[ScenarioSelectScene][WebSocket] Readiness before starting game:', {
-                isHost: this.isHost,
-                hostReady: this.hostReady,
-                guestReady: this.guestReady,
-                gameStarted: this.gameStarted
-              });
-              this.gameStarted = true;
-              console.debug('[ScenarioSelectScene][WebSocket] Both ready! Host sending game_start.', {
-                hostReady: this.hostReady,
-                guestReady: this.guestReady,
-                gameStarted: this.gameStarted
-              });
-              const gameStartMsg = {
-                type: 'game_start',
-                scenario: SCENARIOS[this.selectedScenario].key,
-                roomCode: this.roomCode,
-                p1Char: this.selected.p1.replace('_select', ''),
-                p2Char: this.selected.p2.replace('_select', ''),
-                isHost: true
-              };
-              this.wsManager.send(gameStartMsg);
-              const p1Clean = this.selected.p1.replace('_select', '');
-              const p2Clean = this.selected.p2.replace('_select', '');
-              console.log('[ScenarioSelectScene] Starting KidsFightScene with characters:', { p1: p1Clean, p2: p2Clean });
-              this.scene.start('KidsFightScene', {
-                gameMode: 'online',
-                mode: this.mode,
-                p1: p1Clean,
-                p2: p2Clean,
-                selected: { p1: p1Clean, p2: p2Clean },
-                scenario: SCENARIOS[this.selectedScenario].key,
-                selectedScenario: SCENARIOS[this.selectedScenario].key,
-                roomCode: this.roomCode,
-                isHost: true,
-                wsManager: this.wsManager
-              });
+            if (shouldStartGame && this.isHost) {
+              console.debug('[ScenarioSelectScene][WebSocket] Both players ready, host starting game');
+              this.startGame();
             }
-          } else if (data.type === 'game_start' || data.type === 'gameStart') {
-            console.debug('[ScenarioSelectScene][WebSocket] game_start received, state BEFORE processing:', {
-              data,
-              isHost: this.isHost,
-              hostReady: this.hostReady,
-              guestReady: this.guestReady,
-              gameStarted: this.gameStarted,
-              roomCode: this.roomCode
-            });
+          } else if (data.type === 'game_start') {
+            // Ignore duplicate game_start messages if we've already started
+            if (this.gameStarted) {
+              console.debug('[ScenarioSelectScene][WebSocket] Ignoring duplicate game_start message, game already started');
+              return;
+            }
+            
+            console.debug('[ScenarioSelectScene][WebSocket] game_start received:', data);
             
             // Always set gameStarted to true when we receive game_start
             this.gameStarted = true;
-            console.debug('[ScenarioSelectScene][WebSocket] gameStarted set to true, starting game scene');
             
-            // Always use the character keys from the server message
-            // Note: We always process game_start messages regardless of gameStarted flag
-            // This ensures the host doesn't get stuck on the scenario selection screen
-            console.debug('[ScenarioSelectScene][WebSocket] Transitioning to KidsFightScene with data:', data);
-            this.scene.start('KidsFightScene', {
-              gameMode: 'online',
-              mode: this.mode,
-              p1: data.p1Char,
-              p2: data.p2Char,
-              selected: { p1: data.p1Char, p2: data.p2Char },
-              scenario: data.scenario,
-              selectedScenario: data.scenario,
-              roomCode: data.roomCode,
-              isHost: data.isHost,
-              playerIndex: data.playerIndex,
-              wsManager: this.wsManager
-            });
+            // Ensure we have the correct scenario from the server
+            const scenarioKey = data.scenario || 'scenario1';
+            console.debug('[ScenarioSelectScene][WebSocket] Starting game with server-provided scenario:', scenarioKey);
+            
+            // Start the KidsFightScene with the data from the server message
+            this._transitionToGame(data, data.p1Char, data.p2Char);
           }
         } catch (e) {
-          console.error('[ScenarioSelectScene][WebSocket] Error parsing incoming message:', e, event);
+          console.error('[ScenarioSelectScene][WebSocket] Error processing message:', e);
         }
       };
       this.wsManager.setMessageCallback(this._wsMessageHandler);
@@ -301,12 +279,14 @@ class ScenarioSelectScene extends Phaser.Scene {
     // Previous button
     this.prevButton = this.add.text(width * 0.2, height/2, '<', buttonStyle)
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setDepth(2);
 
     // Next button
     this.nextButton = this.add.text(width * 0.8, height/2, '>', buttonStyle)
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setDepth(2);
 
     // Button hover effects
     [this.prevButton, this.nextButton].forEach(button => {
@@ -327,31 +307,34 @@ class ScenarioSelectScene extends Phaser.Scene {
     this.backButton = this.add.text(100, height - 80, 'VOLTAR', buttonStyle)
       .setOrigin(0.5)
       .setInteractive()
+      .setDepth(2)
       .on('pointerdown', () => {
         this.scene.start('PlayerSelectScene');
       });
     
     // Ready button (or Start in local mode)
-    const buttonText = this.mode === 'local' ? 'COMEÇAR' : 'PRONTO';
+    const buttonText = this.mode === 'local' ? 'COMEÇAR' : 'COMEÇAR';
     this.readyButton = this.add.text(width - 100, height - 80, buttonText, buttonStyle)
       .setOrigin(0.5)
       .setInteractive()
+      .setDepth(2)
+      .setPadding(20)
+      .setBackgroundColor('#00AA00')
       .on('pointerdown', () => {
         if (this.mode === 'local') {
-          // For local mode, just start the game
           this.startGame();
         } else if (this.mode === 'online' && this.wsManager) {
           // Online mode - send ready message
-          const msg = {
+          const msg: any = {
             type: 'player_ready',
-            player: this.isHost ? 'host' : 'guest',
-            scenario: SCENARIOS[this.selectedScenario].key
+            player: this.isHost ? 'host' : 'guest'
           };
-          
+          if (this.isHost) {
+            msg.scenario = SCENARIOS[this.selectedScenario].key;
+          }
           console.debug('[ScenarioSelectScene][ReadyButton] Sending player_ready message', msg);
           this.wsManager.send(msg);
 
-          // Ensure the host simulates receiving its own player_ready message
           if (this.isHost) {
             console.debug('[ScenarioSelectScene][ReadyButton] Host simulating receiving own player_ready message');
             
@@ -383,15 +366,17 @@ class ScenarioSelectScene extends Phaser.Scene {
                 console.error('[ScenarioSelectScene][ReadyButton] Error simulating message:', e);
               }
             }, 50);
-        }
+          }
 
-        // Update button text to show waiting
-        this.readyButton.setText('AGUARDANDO...');
-        this.readyButton.setTint(0x888888);
-        this.readyButton.disableInteractive();
+          // Update button text to show waiting
+          this.readyButton.setText('AGUARDANDO...');
+          this.readyButton.setTint(0x888888);
+          this.readyButton.setBackgroundColor('#888888');
+          this.readyButton.disableInteractive();
+        }
       }
-    });
-    
+    );
+  
   // Local mode button handlers
   if (this.mode === 'local') {
       this.readyButton.on('pointerdown', () => this.startGame());
@@ -439,24 +424,42 @@ class ScenarioSelectScene extends Phaser.Scene {
   private startGame(): void {
     console.debug('[ScenarioSelectScene][startGame] Starting game with mode:', this.mode);
     
+    const now = Date.now();
+    
+    // Check if we're in cooldown period
+    if (now - this._lastGameStartTime < this._gameStartCooldown) {
+      console.debug('[ScenarioSelectScene] Game start throttled - too soon after last attempt');
+      return;
+    }
+    
+    this._lastGameStartTime = now;
+    
     try {
+      // Defensive: ensure selectedScenario is always a valid index
+      let scenarioKey = 'scenario1';
+      if (typeof this.selectedScenario === 'number' && SCENARIOS[this.selectedScenario]) {
+        scenarioKey = SCENARIOS[this.selectedScenario].key;
+      } else {
+        console.warn('[ScenarioSelectScene][startGame] Invalid selectedScenario index, defaulting to scenario1:', this.selectedScenario);
+      }
+      
       if (this.mode === 'local') {
         console.debug('[ScenarioSelectScene][startGame] Starting local game with:', {
           p1: this.selected.p1,
           p2: this.selected.p2,
-          scenario: SCENARIOS[this.selectedScenario].key
+          scenario: scenarioKey
         });
         
         this.scene.start('KidsFightScene', {
-          gameMode: 'single', // Changed from 'local' to 'single' to match the expected value in KidsFightScene
+          gameMode: 'single', 
           p1: this.selected.p1,
           p2: this.selected.p2,
           selected: { p1: this.selected.p1, p2: this.selected.p2 },
-          scenario: SCENARIOS[this.selectedScenario].key,
-          selectedScenario: SCENARIOS[this.selectedScenario].key // Adding this as a fallback
+          scenario: scenarioKey,
+          selectedScenario: scenarioKey 
         });
       } else if (this.mode === 'online') {
-        // For online mode, set gameStarted flag and send game_start message if host
+        // For online mode, set gameStarted flag to prevent duplicate starts
         this.gameStarted = true;
         
         console.debug('[ScenarioSelectScene][startGame] Starting online game with:', {
@@ -465,13 +468,15 @@ class ScenarioSelectScene extends Phaser.Scene {
           guestReady: this.guestReady,
           p1: this.selected.p1,
           p2: this.selected.p2,
-          scenario: SCENARIOS[this.selectedScenario].key
+          scenario: scenarioKey,
+          selectedScenario: this.selectedScenario
         });
         
         if (this.isHost) {
+          // Create game_start message with the correct scenario key
           const msg = {
             type: 'game_start',
-            scenario: SCENARIOS[this.selectedScenario].key,
+            scenario: scenarioKey,
             p1Char: this.selected.p1,
             p2Char: this.selected.p2,
             roomCode: this.roomCode,
@@ -480,27 +485,99 @@ class ScenarioSelectScene extends Phaser.Scene {
           
           console.debug('[ScenarioSelectScene][startGame] Host sending game_start message:', msg);
           this.wsManager.send(msg);
+          
+          // Also transition to game scene directly for host
+          // This ensures the host doesn't get stuck waiting for their own message
+          setTimeout(() => {
+            this._transitionToGame(msg, this.selected.p1, this.selected.p2);
+          }, 100);
+        } else {
+          // Guest should never directly start the game - they should wait for the game_start message
+          console.debug('[ScenarioSelectScene][startGame] Guest waiting for game_start message from host');
         }
-        
-        this.scene.start('KidsFightScene', {
-          gameMode: 'online',
-          mode: this.mode,
-          p1: this.selected.p1,
-          p2: this.selected.p2,
-          selected: { p1: this.selected.p1, p2: this.selected.p2 },
-          scenario: SCENARIOS[this.selectedScenario].key,
-          selectedScenario: SCENARIOS[this.selectedScenario].key,
-          roomCode: this.roomCode,
-          isHost: this.isHost,
-          wsManager: this.wsManager
-        });
       }
     } catch (e) {
       console.error('[ScenarioSelectScene][startGame] Error starting game:', e);
+      // Reset state to allow retry
+      this.gameStarted = false;
+      this._lastGameStartTime = 0;
+    }
+  }
+  
+  // Helper method to transition to the game scene
+  private _transitionToGame(data: any, p1Char: string, p2Char: string): void {
+    try {
+      console.debug('[ScenarioSelectScene][_transitionToGame] Transitioning to KidsFightScene with:', data);
+      
+      this.scene.start('KidsFightScene', {
+        gameMode: 'online',
+        mode: this.mode,
+        p1: p1Char,
+        p2: p2Char,
+        selected: { p1: p1Char, p2: p2Char },
+        scenario: data.scenario || 'scenario1',
+        selectedScenario: data.scenario || 'scenario1',
+        roomCode: data.roomCode || this.roomCode,
+        isHost: data.isHost !== undefined ? data.isHost : this.isHost,
+        playerIndex: data.playerIndex !== undefined ? data.playerIndex : (this.isHost ? 0 : 1),
+        wsManager: this.wsManager
+      });
+    } catch (e) {
+      console.error('[ScenarioSelectScene][_transitionToGame] Error transitioning to game:', e);
+      // Reset state to allow retry
+      this.gameStarted = false;
+      this._lastGameStartTime = 0;
+    }
+  }
+  
+  // Add a character key validation method
+  private validateCharacterKey(key: string): string {
+    const validKeys = ['player1', 'player2', 'bento', 'davir', 'jose', 'davis', 'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'];
+    
+    // Clean up the key by removing '_select' suffix if present
+    const cleanKey = key.replace('_select', '');
+    
+    // If key is not valid, return player1 or player2
+    if (!validKeys.includes(cleanKey)) {
+      console.warn(`[ScenarioSelectScene] Invalid character key: ${key}, using 'player1' instead`);
+      return 'player1';
     }
     
-    // Set the WebSocket message handler
-    this.wsManager.setMessageCallback(this._wsMessageHandler);
+    return cleanKey;
+  }
+
+  // Add shutdown method to clean up resources
+  shutdown() {
+    console.log('[ScenarioSelectScene] shutdown called');
+    
+    // Clean up WebSocket handler when leaving the scene
+    if (this.wsManager) {
+      if (typeof this.wsManager.setMessageCallback === 'function') {
+        this.wsManager.setMessageCallback(null);
+      }
+      
+      // Notify server that we're leaving the scenario select scene
+      if (this.mode === 'online' && this.roomCode) {
+        this.wsManager.send({
+          type: 'scene_change',
+          scene: 'leaving_scenario_select',
+          roomCode: this.roomCode,
+          isHost: this.isHost
+        });
+      }
+    }
+    
+    // Reset state in case scene is reused
+    this.gameStarted = false;
+    this.hostReady = false;
+    this.guestReady = false;
+    this._lastGameStartTime = 0;
+    this._processedMessageIds.clear(); // Clear processed message IDs
+    
+    // Remove any event listeners
+    this.scale.off('resize', this.updateLayout, this);
+    
+    console.debug('[ScenarioSelectScene] Scene shutdown completed');
   }
 
   private updateLayout(gameSize: Phaser.Structs.Size): void {
@@ -530,23 +607,27 @@ class ScenarioSelectScene extends Phaser.Scene {
   }
 
   private updateReadyUI(): void {
-    let hostTxt = this.isHost ? 'YOU' : 'HOST';
-    let guestTxt = this.isHost ? 'GUEST' : 'YOU';
+    if (!this.readyButton) return;
     
-    let txt = this.add.text(this.cameras.main.width / 2, 50, `${hostTxt}: ${this.hostReady ? 'READY' : 'NOT READY'}`, { fontSize: '18px', color: '#fff' });
-    txt.setOrigin(0.5);
-    txt = this.add.text(this.cameras.main.width / 2, 80, `${guestTxt}: ${this.guestReady ? 'READY' : 'NOT READY'}`, { fontSize: '18px', color: '#fff' });
-    txt.setOrigin(0.5);
-    
-    if (this.waitingText) {
-      this.waitingText.setVisible(this.hostReady || this.guestReady);
-      this.waitingText.setText(`Waiting for ${!this.hostReady ? 'host' : !this.guestReady ? 'guest' : 'game to start'}...`);
-    }
-    
-    // If both players are ready, update the UI
-    if (this.hostReady && this.guestReady && this.readyButton) {
-      this.readyButton.setText('STARTING...');
-      this.readyButton.setTint(0x00ff00);
+    if (this.mode === 'online') {
+      if ((this.isHost && this.hostReady) || (!this.isHost && this.guestReady)) {
+        // This player is ready
+        this.readyButton.setText('CANCELAR');
+        this.readyButton.setBackgroundColor('#AA0000');
+        this.readyButton.disableInteractive();
+      } else {
+        // This player is not ready
+        this.readyButton.setText('COMEÇAR');
+        this.readyButton.setBackgroundColor('#00AA00');
+        this.readyButton.setInteractive();
+      }
+      
+      // If both players are ready, show waiting text
+      if (this.hostReady && this.guestReady) {
+        this.readyButton.setText('AGUARDANDO...');
+        this.readyButton.setBackgroundColor('#888888');
+        this.readyButton.disableInteractive();
+      }
     }
   }
 }
