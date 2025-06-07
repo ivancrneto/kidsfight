@@ -98,7 +98,6 @@ export default class PlayerSelectScene extends Phaser.Scene {
   public p2Indicator!: Phaser.GameObjects.Arc;
   public p1Text!: Phaser.GameObjects.Text;
   public p2Text!: Phaser.GameObjects.Text;
-  public startButtonRect!: Phaser.GameObjects.Rectangle;
   public p1Char: string | null = null;
   public p1Sprite: Phaser.GameObjects.Sprite | null = null;
 
@@ -189,7 +188,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
     this.load.image('scenario', scenarioImg);
     
     // Load game logo
-    this.load.image('game_logo', gameLogoImg);
+    this.load.image('gameLogo', gameLogoImg);
   }
 
   create(): void {
@@ -197,9 +196,16 @@ export default class PlayerSelectScene extends Phaser.Scene {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
 
-    // Add background
-    const bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
-    
+    // Add a large logo as a background, behind players
+    const logoBg = this.add.image(w/2, h/2, 'gameLogo')
+      .setOrigin(0.5)
+      .setDisplaySize(w, h)
+      .setAlpha(0.13)
+      .setDepth(0); // Behind everything
+
+    // Add background color rectangle above logo for contrast (optional, can remove if too opaque)
+    const bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 0.55).setDepth(1);
+
     // Add title (always two lines)
     this.title = this.add.text(
       w/2,
@@ -212,7 +218,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
         align: 'center',
         wordWrap: { width: w * 0.8, useAdvancedWrap: true }
       }
-    ).setOrigin(0.5);
+    ).setOrigin(0.5).setDepth(2);
 
     // Setup character grid
     this.setupCharacters();
@@ -222,6 +228,9 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
     // Create UI buttons
     this.createUIButtons();
+    
+    // Update ready button state
+    this.updateReadyButton();
 
     // Setup WebSocket handlers for online mode
     if (this.mode === 'online') {
@@ -347,20 +356,19 @@ export default class PlayerSelectScene extends Phaser.Scene {
         fontFamily: 'monospace',
         align: 'center',
       }
-    ).setOrigin(0.5, 0);
+    ).setOrigin(0.5).setDepth(2);
     char.nameLabel = label;
   }
 
   // Move button group further down below the row of names
   const buttonOffset = 80; // much more space for buttons below names
   const buttonsY = nameLabelsY + nameFontSize + buttonOffset;
-  if (this.backButton && this.readyButton && this.startButtonRect) {
+  if (this.backButton && this.readyButton) {
     const spacing = 32;
     const totalWidth = this.readyButton.displayWidth + spacing + this.backButton.displayWidth;
     const centerX = w / 2;
     this.backButton.setPosition(centerX - totalWidth/2 + this.backButton.displayWidth/2, buttonsY);
     this.readyButton.setPosition(centerX + totalWidth/2 - this.readyButton.displayWidth/2, buttonsY);
-    this.startButtonRect.setPosition(this.readyButton.x, this.readyButton.y);
   }
 }
 
@@ -474,10 +482,17 @@ export default class PlayerSelectScene extends Phaser.Scene {
     if (!this.readyButton) return;
 
     const isReady = this.isHost ? this.player1Ready : this.player2Ready;
-    this.readyButton.setText(isReady ? 'Not Ready' : 'Ready');
-    this.readyButton.setStyle({
-      backgroundColor: isReady ? '#ff4444' : '#4CAF50'
-    });
+    
+    // Update button text and background color to match scenario select scene
+    if (isReady) {
+      this.readyButton.setText('CANCELAR');
+      this.readyButton.setBackgroundColor('#AA0000');
+      this.readyButton.disableInteractive();
+    } else {
+      this.readyButton.setText('COMEÇAR');
+      this.readyButton.setBackgroundColor('#00AA00');
+      this.readyButton.setInteractive({ useHandCursor: true });
+    }
   }
 
   private handleBack(): void {
@@ -589,8 +604,9 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
     if (this.readyButton) {
       const isReady = this.isHost ? this.player1Ready : this.player2Ready;
-      this.readyButton.setText(isReady ? 'Not Ready' : 'Ready');
+      this.readyButton.setText(isReady ? 'Cancelar' : 'COMEÇAR');
       this.readyButton.setStyle({
+        color: '#fff',
         backgroundColor: isReady ? '#ff4444' : '#4CAF50'
       });
     }
@@ -630,36 +646,30 @@ export default class PlayerSelectScene extends Phaser.Scene {
     this.readyButton = this.add.text(0, 0, 'COMEÇAR', {
       fontSize: '24px',
       color: '#fff',
-      backgroundColor: '#4a4a4a',
-      padding: { x: 20, y: 10 }
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      fontFamily: 'monospace',
+      padding: { x: 20, y: 10 },
+      backgroundColor: '#00AA00'
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(2);
+    
     this.backButton = this.add.text(0, 0, 'Voltar', {
       fontSize: '24px',
       color: '#fff',
+      fontFamily: 'monospace',
       backgroundColor: '#4a4a4a',
       padding: { x: 20, y: 10 }
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(2);
+    
     // Calculate total width
     const totalWidth = this.readyButton.displayWidth + spacing + this.backButton.displayWidth;
     const centerX = w / 2;
     const y = h * 0.85;
+    
     // Position backButton to the left, readyButton to the right
     this.backButton.setPosition(centerX - totalWidth/2 + this.backButton.displayWidth/2, y);
     this.readyButton.setPosition(centerX + totalWidth/2 - this.readyButton.displayWidth/2, y);
-    // Optionally, add a green rectangle behind the readyButton
-    if (this.startButtonRect) this.startButtonRect.destroy();
-    this.startButtonRect = this.add.rectangle(
-      this.readyButton.x,
-      this.readyButton.y,
-      this.readyButton.displayWidth + 16,
-      this.readyButton.displayHeight + 8,
-      0x00ff00
-    ).setDepth(this.readyButton.depth - 1);
-    this.readyButton.setDepth(1);
-    // --- End centered button group ---
 
     // Button hover effects
-    [this.readyButton, this.backButton].forEach(button => {
+    [this.backButton].forEach(button => {
       button.on('pointerover', () => {
         button.setStyle({ backgroundColor: '#666' });
       });
@@ -667,7 +677,8 @@ export default class PlayerSelectScene extends Phaser.Scene {
         button.setStyle({ backgroundColor: '#4a4a4a' });
       });
     });
-    // DEBUG: Add pointerdown for readyButton (start game)
+    
+    // Ready button click event
     this.readyButton.on('pointerdown', () => {
       console.log('[PlayerSelectScene] Ready button clicked');
       this.launchGame();
