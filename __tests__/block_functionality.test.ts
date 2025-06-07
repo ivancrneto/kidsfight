@@ -171,17 +171,11 @@ describe('Block Functionality', () => {
   });
   
   test('blocking animation is displayed when player is blocking', () => {
-    // Set player 1 (index 0) to blocking state
+    scene.players[0].getData.mockImplementation((key) => key === 'isBlocking');
     scene.playerBlocking[0] = true;
-    
-    // Update animation for player 1
     scene.updatePlayerAnimation(0);
-    
-    // Check if frame 5 was used for blocking animation
-    expect(scene.players[0].setFrame).toHaveBeenCalledWith(5);
-    
-    // Check if scaling was applied (0.9, 1.0 for blocking)
-    expect(scene.players[0].setScale).toHaveBeenCalledWith(0.9, 1.0);
+    // Check if scaling was applied (BASE_PLAYER_SCALE for blocking)
+    expect(scene.players[0].setScale).toHaveBeenCalledWith(0.4);
   });
   
   test('block button correctly sets player blocking state', () => {

@@ -86,10 +86,15 @@ describe('Character and Scenario Selection', () => {
     // Use the real KidsFightScene instance
     scene = new KidsFightScene() as KidsFightSceneTest;
     setupMockScene(scene);
+    scene.textures = {
+      exists: () => true,
+      remove: () => {},
+      get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+      addImage: () => {},
+      list: {},
+      getTextureKeys: () => []
+    };
     // Mock textures.list for KidsFightScene
-    if (!scene.textures) scene.textures = { list: {} };
-    else scene.textures.list = {};
-
     if (mockWebSocket) {
       mockWebSocket.readyState = 1;
       if (mockWebSocket.send) mockWebSocket.send.mockClear();
@@ -235,12 +240,14 @@ describe('Character and Scenario Selection', () => {
       expect(scene.physics.add.sprite).toHaveBeenCalledWith(
         expect.any(Number),
         expect.any(Number),
-        expect.any(String)
+        expect.any(String),
+        expect.any(Number)
       );
       expect(scene.physics.add.sprite).toHaveBeenCalledWith(
         expect.any(Number),
         expect.any(Number),
-        expect.any(String)
+        expect.any(String),
+        expect.any(Number)
       );
     });
 

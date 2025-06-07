@@ -13,6 +13,7 @@ import player9RawImg from './sprites-d_isa.png';
 import { WebSocketManager } from './websocket_manager'; // This is a singleton instance, not a class
 import { tryAttack, KidsFightScene as KidsFightSceneTest } from './gameUtils.cjs';
 import { time } from 'console';
+import { SCENARIOS } from './scenario_select_scene';
 const getCharacterName = KidsFightSceneTest.prototype.getCharacterName;
 
 interface PlayerProps {
@@ -47,11 +48,14 @@ interface SceneData {
   selected: { p1: string; p2: string };
   p1: string;
   p2: string;
+  p1Char?: string;
+  p2Char?: string;
   selectedScenario: string;
   scenario?: string; // Add this property to support legacy code
   roomCode?: string;
   isHost?: boolean;
   gameMode: 'single' | 'online';
+  wsManager?: any;
 }
 
 // --- Replay/Restart Data Types ---
@@ -74,6 +78,37 @@ export function stretchBackgroundToFill(bg: any, width: number, height: number):
   sprite.displayWidth = width;
   sprite.displayHeight = height;
 }
+
+// Adds a variable width spritesheet to the Phaser texture manager
+// Useful for character animations where each frame may have a different width
+export function addVariableWidthSpritesheet(
+  scene: Phaser.Scene,
+  key: string,
+  rawKey: string,
+  frameWidths: number[],
+  frameHeight: number
+  scene: Phaser.Scene,
+  key: string,
+  imageKey: string, // now expects the loaded image key
+  frameWidths: number[],
+  frameHeight: number
+): void {
+  let x = 0;
+  // Remove any existing texture with this key
+  if (scene.textures.exists(key)) {
+    scene.textures.remove(key);
+  }
+  // Get the actual image from the cache
+  const image = scene.textures.get(imageKey).getSourceImage();
+  // Add the raw image as a new texture
+  scene.textures.addImage(key, image);
+  // Add custom frames
+  frameWidths.forEach((width, idx) => {
+    scene.textures.get(key).add(idx, 0, x, 0, width, frameHeight);
+    x += width;
+  });
+}
+
 
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 480;
@@ -269,18 +304,32 @@ class KidsFightScene extends Phaser.Scene {
     console.log('[DEBUG][KidsFightScene.init] incoming p1:', this.p1, 'p2:', this.p2);
     // Fallback: if p1 or p2 is not a valid sprite key, set default
     const validKeys = ['player1','player2','bento','davir','jose','davis','carol','roni','jacqueline','ivan','d_isa'];
-    if (!validKeys.includes(this.p1)) {
-      console.warn('[KidsFightScene] Invalid p1 key:', this.p1, 'Defaulting to player1');
-      this.p1 = 'player1';
+    // Validate and fallback for p1
+    if (!validKeys.includes(this.p1) || !this.textures.exists(this.p1)) {
+      console.warn('[KidsFightScene] Invalid or missing p1 key/texture:', this.p1, 'Defaulting to player1');
+      this.p1 = this.textures.exists('player1') ? 'player1' : validKeys.find(k => this.textures.exists(k)) || 'player1';
     }
-    if (!validKeys.includes(this.p2)) {
-      console.warn('[KidsFightScene] Invalid p2 key:', this.p2, 'Defaulting to player2');
-      this.p2 = 'player2';
+    // Validate and fallback for p2
+    if (!validKeys.includes(this.p2) || !this.textures.exists(this.p2)) {
+      console.warn('[KidsFightScene] Invalid or missing p2 key/texture:', this.p2, 'Defaulting to player2');
+      this.p2 = this.textures.exists('player2') ? 'player2' : validKeys.find(k => this.textures.exists(k) && k !== this.p1) || 'player2';
     }
-    
+
     // Enhanced scenario handling with better logging
     const incomingScenario = data.scenario || data.selectedScenario || 'scenario1';
-    this.selectedScenario = incomingScenario;
+    // Defensive: handle both number (index) and string (key) for scenario
+    let scenarioKey = 'scenario1';
+    if (typeof incomingScenario === 'number') {
+      // Try to get key from SCENARIOS array if available
+      if (typeof SCENARIOS !== 'undefined' && Array.isArray(SCENARIOS) && SCENARIOS[incomingScenario]) {
+        scenarioKey = SCENARIOS[incomingScenario].key;
+      } else {
+        scenarioKey = 'scenario1';
+      }
+    } else if (typeof incomingScenario === 'string') {
+      scenarioKey = incomingScenario;
+    }
+    this.selectedScenario = scenarioKey;
     console.log('[KidsFightScene] Setting selected scenario to:', this.selectedScenario, 'from data:', {
       scenario: data.scenario, 
       selectedScenario: data.selectedScenario
@@ -308,24 +357,56 @@ class KidsFightScene extends Phaser.Scene {
     });
     
     // Load character spritesheets with correct keys for each character
-    this.load.spritesheet('bento', player1RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('davir', player2RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('jose', player3RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('davis', player4RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('carol', player5RawImg, { frameWidth: 410, frameHeight: 512 });
-    this.load.spritesheet('roni', player6RawImg, { frameWidth: 450, frameHeight: 512 });
-    this.load.spritesheet('jacqueline', player7RawImg, { frameWidth: 450, frameHeight: 512 });
-    this.load.spritesheet('ivan', player8RawImg, { frameWidth: 450, frameHeight: 512 });
-    this.load.spritesheet('d_isa', player9RawImg, { frameWidth: 450, frameHeight: 512 });
-    // Debug log for loaded keys
-    console.log('[KidsFightScene][preload] Loaded character keys:', [
-      'player1','player2','bento','davir','jose','davis','carol','roni','jacqueline','ivan','d_isa'
+    // All character sprites are loaded as images. Variable-width slicing is handled in create().
+    // Load raw images for all players (not as spritesheets)
+    this.load.image('bento_raw', player1RawImg);
+    this.load.image('davir_raw', player2RawImg);
+    this.load.image('jose_raw', player3RawImg);
+    this.load.image('davis_raw', player4RawImg);
+    this.load.image('carol_raw', player5RawImg);
+    this.load.image('roni_raw', player6RawImg);
+    this.load.image('jacqueline_raw', player7RawImg);
+    this.load.image('ivan_raw', player8RawImg);
+    this.load.image('d_isa_raw', player9RawImg);
+    console.log('[KidsFightScene][preload] Loaded raw character keys:', [
+      'bento_raw','davir_raw','jose_raw','davis_raw','carol_raw','roni_raw','jacqueline_raw','ivan_raw','d_isa_raw'
     ]);
   }
 
   create(): void {
     // DEBUG: Log player array and local player index at scene start
     console.log('[DEBUG][KidsFightScene] Player array at start:', this.players, 'Local index:', this.localPlayerIndex);
+
+    function addVariableWidthSpritesheet(scene, key, rawKey, frameWidths, frameHeight) {
+      if (scene.textures.exists(key)) scene.textures.remove(key);
+      const playerTexture = scene.textures.get(rawKey).getSourceImage();
+      scene.textures.addImage(key, playerTexture);
+      let x = 0;
+      for (let i = 0; i < frameWidths.length; i++) {
+        scene.textures.get(key).add(i, 0, x, 0, frameWidths[i], frameHeight);
+        x += frameWidths[i];
+      }
+      // Debug log to show registered frame names/indices
+      const frameNames = scene.textures.get(key).getFrameNames();
+      console.log(`[addVariableWidthSpritesheet] Registered frames for ${key}:`, frameNames);
+    }
+
+    // Add variable-width spritesheets for each player
+    addVariableWidthSpritesheet(this, 'bento_fight', 'bento_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'davir_fight', 'davir_raw', [415, 410, 420, 440, 440, 470, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'jose_fight', 'jose_raw', [415, 410, 420, 440, 440, 390, 530, 480], 512);
+    addVariableWidthSpritesheet(this, 'davis_fight', 'davis_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'carol_fight', 'carol_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'roni_fight', 'roni_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'jacqueline_fight', 'jacqueline_raw', [415, 410, 420, 440, 440, 410, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'ivan_fight', 'ivan_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'd_isa_fight', 'd_isa_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+
+    // Ensure debug scene always sets up two valid player objects
+    this.players = [
+      {},
+      {},
+    ];
 
     // Initialize round start time immediately
     this.roundStartTime = Date.now();
@@ -394,7 +475,7 @@ class KidsFightScene extends Phaser.Scene {
       .setDisplaySize(gameWidth, gameHeight) as Phaser.GameObjects.Image;
     
     // Show debug text on screen for scenario selection
-    const debugText = this.add.text(10, 10, `Scenario: ${this.selectedScenario}`, {
+    const debugText = this.add.text(300, 100, `Scenario: ${this.selectedScenario}`, {
       fontSize: '18px',
       color: '#ff0000',
       backgroundColor: '#fff',
@@ -470,28 +551,48 @@ class KidsFightScene extends Phaser.Scene {
     // --- PLAYER SPRITES ---
     // Use consistent scale and origin for all modes
     const playerScale = 0.4;
-    const widerPlayers = ['player6', 'player7', 'player8', 'player9'];
+    const widerPlayers = ['roni', 'jacqueline', 'ivan', 'd_isa'];
 
+    // Debug: Log available textures and keys being used
+    console.log('Available textures:', this.textures.getTextureKeys());
+    console.log('Attempting to create player1 with key:', this.p1);
+    console.log('Attempting to create player2 with key:', this.p2);
     // Player 1
     const isP1Wider = widerPlayers.includes(this.p1);
-    this.players[0] = this.physics.add.sprite(gameWidth * 0.25, upperPlatformY2, this.p1) as Phaser.Physics.Arcade.Sprite & PlayerProps;
-    this.players[0].setOrigin(
-      0.5 + (isP1Wider ? ((450 - 410) / 2) / 450 : 0),
-      1.0
-    );
-    this.players[0].setScale(isP1Wider ? playerScale * (410 / 450) : playerScale);
-    this.players[0].y = upperPlatformY2;
+    const p1FightKey = this.p1 + '_fight';
+    if (this.textures.exists(p1FightKey)) {
+      this.players[0] = this.physics.add.sprite(gameWidth * 0.25, upperPlatformY2, p1FightKey, 0) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+      this.players[0].setOrigin(
+        0.5 + (isP1Wider ? ((440 - 410) / 2) / 440 : 0),
+        1.0
+      );
+      this.players[0].setScale(isP1Wider ? playerScale * (410 / 440) : playerScale);
+      this.players[0].y = upperPlatformY2;
+      console.log('[KidsFightScene] Created player1 sprite with key:', this.p1, 'at', this.players[0].x, this.players[0].y);
+    } else {
+      // Fallback: draw a visible rectangle as placeholder
+      this.players[0] = this.add.rectangle(gameWidth * 0.25, upperPlatformY2, 60, 120, 0xff0000) as unknown as Phaser.Physics.Arcade.Sprite & PlayerProps;
+      console.warn('[KidsFightScene] Could not create player1 sprite, drew placeholder rectangle.');
+    }
 
     // Player 2
     const isP2Wider = widerPlayers.includes(this.p2);
-    this.players[1] = this.physics.add.sprite(gameWidth * 0.75, upperPlatformY2, this.p2) as Phaser.Physics.Arcade.Sprite & PlayerProps;
-    this.players[1].setOrigin(
-      0.5 + (isP2Wider ? ((450 - 410) / 2) / 450 : 0),
-      1.0
-    );
-    this.players[1].setScale(isP2Wider ? playerScale * (410 / 450) : playerScale);
-    this.players[1].y = upperPlatformY2;
-    this.players[1]?.setFlipX(true);
+    const p2FightKey = this.p2 + '_fight';
+    if (this.textures.exists(p2FightKey)) {
+      this.players[1] = this.physics.add.sprite(gameWidth * 0.75, upperPlatformY2, p2FightKey, 0) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+      this.players[1].setOrigin(
+        0.5 + (isP2Wider ? ((440 - 410) / 2) / 440 : 0),
+        1.0
+      );
+      this.players[1].setScale(isP2Wider ? playerScale * (410 / 440) : playerScale);
+      this.players[1].y = upperPlatformY2;
+      this.players[1]?.setFlipX(true);
+      console.log('[KidsFightScene] Created player2 sprite with key:', this.p2, 'at', this.players[1].x, this.players[1].y);
+    } else {
+      // Fallback: draw a visible rectangle as placeholder
+      this.players[1] = this.add.rectangle(gameWidth * 0.75, upperPlatformY2, 60, 120, 0x0000ff) as unknown as Phaser.Physics.Arcade.Sprite & PlayerProps;
+      console.warn('[KidsFightScene] Could not create player2 sprite, drew placeholder rectangle.');
+    }
 
     // Enable collision between players and the new upper platform
     this.physics.add.collider(this.players[0], upperPlatform);
@@ -1632,8 +1733,8 @@ private updatePlayerAnimation(playerIndex: number): void {
     //console.log('ANIM: HIT', playerIndex);
   } else if (this.playerBlocking[playerIndex] || (player.getData && player.getData('isBlocking'))) {
     this.setSafeFrame(player, 5); // Block frame
-    // Use special block scale as expected by tests
-    if (player.setScale) player.setScale(0.9, 1.0);
+    // Use base scale for block (fixes bug where player gets big/moves down)
+    if (player.setScale) player.setScale(BASE_PLAYER_SCALE);
     console.log('ANIM: BLOCKING', playerIndex);
   } else if (player.getData && player.getData('isSpecialAttacking')) {
     this.setSafeFrame(player, 6); // Special attack frame

@@ -268,6 +268,55 @@ class MockTimerEvent implements Phaser.Time.TimerEvent {
     beforeEach(() => {
       jest.clearAllMocks();
       mockScene = new MockScene();
+      if (!mockScene.textures) {
+        mockScene.textures = {
+          exists: () => true,
+          remove: () => {},
+          get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+          addImage: () => {},
+          list: {},
+          getTextureKeys: () => []
+        };
+      }
+
+      // Always define kidsFightScene before patching its textures property
+      kidsFightScene = {
+        scene: mockScene,
+        time: mockScene.time,
+        sys: mockScene.sys,
+        events: mockScene.events,
+        gameState: {
+          isGameOver: false,
+          isPaused: false,
+          winningPlayer: null,
+        },
+        startRoundTimer: jest.fn(),
+        endRound: jest.fn(),
+        resetRound: jest.fn(),
+        handleGameOver: jest.fn()
+      };
+      if (!kidsFightScene.textures) {
+        kidsFightScene.textures = {
+          exists: () => true,
+          remove: () => {},
+          get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+          addImage: () => {},
+          list: {},
+          getTextureKeys: () => []
+        };
+      }
+
+      // Ensure every test scene instance has a complete textures mock
+      if (!kidsFightScene.textures) {
+        kidsFightScene.textures = {
+          exists: () => true,
+          remove: () => {},
+          get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+          addImage: () => {},
+          list: {},
+          getTextureKeys: () => []
+        };
+      }
 
       // Create a partial KidsFightScene instance with necessary mocks
       kidsFightScene = {
@@ -1418,3 +1467,229 @@ class TestKidsFightScene extends KidsFightScene {
 
 // Export the test scene type
 export { TestKidsFightScene };
+
+describe('KidsFightScene Game State Tests', () => {
+  let mockScene: MockScene;
+  let kidsFightScene: any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockScene = new MockScene();
+    if (!mockScene.textures) {
+      mockScene.textures = {
+        exists: () => true,
+        remove: () => {},
+        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+        addImage: () => {},
+        list: {},
+        getTextureKeys: () => []
+      };
+    }
+
+    // Always define kidsFightScene before patching its textures property
+    kidsFightScene = {
+      scene: mockScene,
+      time: mockScene.time,
+      sys: mockScene.sys,
+      events: mockScene.events,
+      gameState: {
+        isGameOver: false,
+        isPaused: false,
+        winningPlayer: null,
+      },
+      startRoundTimer: jest.fn(),
+      endRound: jest.fn(),
+      resetRound: jest.fn(),
+      handleGameOver: jest.fn()
+    };
+    if (!kidsFightScene.textures) {
+      kidsFightScene.textures = {
+        exists: () => true,
+        remove: () => {},
+        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+        addImage: () => {},
+        list: {},
+        getTextureKeys: () => []
+      };
+    }
+
+    // Ensure every test scene instance has a complete textures mock
+    if (!kidsFightScene.textures) {
+      kidsFightScene.textures = {
+        exists: () => true,
+        remove: () => {},
+        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+        addImage: () => {},
+        list: {},
+        getTextureKeys: () => []
+      };
+    }
+
+    // Create a partial KidsFightScene instance with necessary mocks
+    kidsFightScene = {
+      scene: mockScene,
+      time: mockScene.time,
+      sys: mockScene.sys,
+      events: mockScene.events,
+      gameState: {
+        isGameOver: false,
+        isPaused: false,
+        winningPlayer: null,
+      },
+      startRoundTimer: jest.fn(),
+      endRound: jest.fn(),
+      resetRound: jest.fn(),
+      handleGameOver: jest.fn()
+    };
+  });
+
+  test('should handle game state transitions correctly', () => {
+    // Simulate game start
+    kidsFightScene.gameState.isGameOver = false;
+
+    // Verify initial state
+    expect(kidsFightScene.gameState.isGameOver).toBe(false);
+    expect(kidsFightScene.gameState.winningPlayer).toBeNull();
+
+    // Simulate game over
+    kidsFightScene.gameState.isGameOver = true;
+    kidsFightScene.gameState.winningPlayer = 1;
+
+    // Verify game over state
+    expect(kidsFightScene.gameState.isGameOver).toBe(true);
+    expect(kidsFightScene.gameState.winningPlayer).toBe(1);
+  });
+
+  test('should handle pause state correctly', () => {
+    // Initial state
+    kidsFightScene.gameState.isPaused = false;
+    expect(kidsFightScene.gameState.isPaused).toBe(false);
+
+    // Pause the game
+    kidsFightScene.gameState.isPaused = true;
+    expect(kidsFightScene.gameState.isPaused).toBe(true);
+
+    // Unpause the game
+    kidsFightScene.gameState.isPaused = false;
+    expect(kidsFightScene.gameState.isPaused).toBe(false);
+  });
+});
+
+describe('KidsFightScene Game State Tests', () => {
+  let mockScene: MockScene;
+  let kidsFightScene: any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockScene = new MockScene();
+    if (!mockScene.textures) {
+      mockScene.textures = {
+        exists: () => true,
+        remove: () => {},
+        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+        addImage: () => {},
+        list: {},
+        getTextureKeys: () => []
+      };
+    }
+
+    // Always define kidsFightScene before patching its textures property
+    kidsFightScene = {
+      scene: mockScene,
+      time: mockScene.time,
+      sys: mockScene.sys,
+      events: mockScene.events,
+      gameState: {
+        isGameOver: false,
+        isPaused: false,
+        winningPlayer: null,
+      },
+      startRoundTimer: jest.fn(),
+      endRound: jest.fn(),
+      resetRound: jest.fn(),
+      handleGameOver: jest.fn()
+    };
+    if (!kidsFightScene.textures) {
+      kidsFightScene.textures = {
+        exists: () => true,
+        remove: () => {},
+        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+        addImage: () => {},
+        list: {},
+        getTextureKeys: () => []
+      };
+    }
+
+    // Ensure every test scene instance has a complete textures mock
+    if (!kidsFightScene.textures) {
+      kidsFightScene.textures = {
+        exists: () => true,
+        remove: () => {},
+        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+        addImage: () => {},
+        list: {},
+        getTextureKeys: () => []
+      };
+    }
+
+    // Create a partial KidsFightScene instance with necessary mocks
+    kidsFightScene = {
+      scene: mockScene,
+      time: mockScene.time,
+      sys: mockScene.sys,
+      events: mockScene.events,
+      gameState: {
+        isGameOver: false,
+        isPaused: false,
+        winningPlayer: null,
+      },
+      startRoundTimer: jest.fn(),
+      endRound: jest.fn(),
+      resetRound: jest.fn(),
+      handleGameOver: jest.fn()
+    };
+  });
+
+  test('should handle game state transitions correctly', () => {
+    // Simulate game start
+    kidsFightScene.gameState.isGameOver = false;
+
+    // Verify initial state
+    expect(kidsFightScene.gameState.isGameOver).toBe(false);
+    expect(kidsFightScene.gameState.winningPlayer).toBeNull();
+
+    // Simulate game over
+    kidsFightScene.gameState.isGameOver = true;
+    kidsFightScene.gameState.winningPlayer = 1;
+
+    // Verify game over state
+    expect(kidsFightScene.gameState.isGameOver).toBe(true);
+    expect(kidsFightScene.gameState.winningPlayer).toBe(1);
+  });
+
+  test('should handle pause state correctly', () => {
+    // Initial state
+    kidsFightScene.gameState.isPaused = false;
+    expect(kidsFightScene.gameState.isPaused).toBe(false);
+
+    // Pause the game
+    kidsFightScene.gameState.isPaused = true;
+    expect(kidsFightScene.gameState.isPaused).toBe(true);
+
+    // Unpause the game
+    kidsFightScene.gameState.isPaused = false;
+    expect(kidsFightScene.gameState.isPaused).toBe(false);
+  });
+});
+
+// Patch all relevant scene instances (including TestKidsFightScene) to always have a textures mock
+if (TestKidsFightScene && !TestKidsFightScene.prototype.textures) {
+  TestKidsFightScene.prototype.textures = {
+    exists: () => true,
+    remove: () => {},
+    get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+    addImage: () => {},
+    list: {},
+    getTextureKeys: () => []
+  };
+}

@@ -19,7 +19,7 @@ interface SceneData {
   wsManager?: any;
 }
 
-const SCENARIOS: Scenario[] = [
+export const SCENARIOS: Scenario[] = [
   { key: 'scenario1', name: 'Dona Isa', img: scenario1Img },
   { key: 'scenario2', name: 'Acácia', img: scenario2Img },
   // Add more scenarios here as needed

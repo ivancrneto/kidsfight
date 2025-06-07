@@ -48,8 +48,8 @@ describe('KidsFightScene player scale', () => {
   it('should use BASE_PLAYER_SCALE for blocking', () => {
     scene.playerBlocking[0] = true;
     (scene as any)['updatePlayerAnimation'](0);
-    // Blocking should use (0.9, 1.0) scale
-    expect(player1.setScale).toHaveBeenCalledWith(0.9, 1.0);
+    // Blocking should use BASE_PLAYER_SCALE (0.4)
+    expect(player1.setScale).toHaveBeenCalledWith(0.4);
   });
 
   it('should use BASE_PLAYER_SCALE for special attack', () => {

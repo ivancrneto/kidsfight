@@ -172,15 +172,16 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
   preload(): void {
     // Load character sprites as spritesheets (assuming 96x96 frame size)
-    this.load.spritesheet('player1', player1RawImg, { frameWidth: 400, frameHeight: 512 });
-    this.load.spritesheet('player2', player2RawImg, { frameWidth: 400, frameHeight: 512 });
-    this.load.spritesheet('player3', player3RawImg, { frameWidth: 400, frameHeight: 512 });
-    this.load.spritesheet('player4', player4RawImg, { frameWidth: 400, frameHeight: 512 });
-    this.load.spritesheet('player5', player5RawImg, { frameWidth: 400, frameHeight: 512 });
-    this.load.spritesheet('player6', player6RawImg, { frameWidth: 400, frameHeight: 512 });
-    this.load.spritesheet('player7', player7RawImg, { frameWidth: 400, frameHeight: 512 });
-    this.load.spritesheet('player8', player8RawImg, { frameWidth: 400, frameHeight: 512 });
-    this.load.spritesheet('player9', player9RawImg, { frameWidth: 450, frameHeight: 512 });
+    // All character sprites are loaded as images. Variable-width slicing is handled in create().
+    this.load.spritesheet('bento', player1RawImg,{ frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('davir', player2RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('jose', player3RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('davis', player4RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('carol', player5RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('roni', player6RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('jacqueline', player7RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('ivan', player8RawImg, { frameWidth: 400, frameHeight: 512 });
+    this.load.spritesheet('d_isa', player9RawImg, { frameWidth: 400, frameHeight: 512 });
     
     // Note: Removed selector.png and will use Phaser shapes instead
     
@@ -269,15 +270,15 @@ export default class PlayerSelectScene extends Phaser.Scene {
     const startY = h / 2 - gridH / 2 + cellH / 2 + 20; // center grid, nudge it slightly lower
     // Setup characters with only name/key, then assign x/y/scale
     const characterDefs = [
-      { name: 'Bento', key: 'player1' },
-      { name: 'Davi R', key: 'player2' },
-      { name: 'José', key: 'player3' },
-      { name: 'Davis', key: 'player4' },
-      { name: 'Carol', key: 'player5' },
-      { name: 'Roni', key: 'player6' },
-      { name: 'Jacqueline', key: 'player7' },
-      { name: 'Ivan', key: 'player8' },
-      { name: 'D. Isa', key: 'player9' }
+      { name: 'Bento', key: 'bento' },
+      { name: 'Davi R', key: 'davir' },
+      { name: 'José', key: 'jose' },
+      { name: 'Davis', key: 'davis' },
+      { name: 'Carol', key: 'carol' },
+      { name: 'Roni', key: 'roni' },
+      { name: 'Jacqueline', key: 'jacqueline' },
+      { name: 'Ivan', key: 'ivan' },
+      { name: 'D. Isa', key: 'd_isa' }
     ];
     this.characters = characterDefs.map((char, i) => {
       const col = i % gridCols;

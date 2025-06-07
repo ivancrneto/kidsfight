@@ -121,6 +121,15 @@ describe('KidsFightScene - Online Mode', () => {
   let mockPlayer2: any;
 
   beforeEach(() => {
+    scene = new KidsFightScene();
+    scene.textures = {
+      exists: () => true,
+      remove: () => {},
+      get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
+      addImage: () => {},
+      list: {},
+      getTextureKeys: () => []
+    };
     // Create fresh mock players for each test
     const playerMocks = [
       {
@@ -200,7 +209,6 @@ describe('KidsFightScene - Online Mode', () => {
     ];
     
     // Create scene and set up test environment
-    scene = new KidsFightScene();
     scene.players = playerMocks;
     // Ensure physics.add has all required mocks: existing, sprite, collider
     if (scene && scene.physics) {
