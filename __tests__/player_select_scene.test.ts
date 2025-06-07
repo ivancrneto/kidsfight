@@ -1,42 +1,93 @@
+// Define mock classes for Phaser objects
+class MockRectangle {
+  setDepth = jest.fn().mockReturnThis();
+  setPosition = jest.fn().mockReturnThis();
+  setVisible = jest.fn().mockReturnThis();
+  setInteractive = jest.fn().mockReturnThis();
+  setFillStyle = jest.fn().mockReturnThis();
+  setOrigin = jest.fn().mockReturnThis();
+  disableInteractive = jest.fn().mockReturnThis();
+  destroy = jest.fn().mockReturnThis();
+  depth = 0;
+  displayWidth = 100;
+  displayHeight = 40;
+}
+
+class MockText {
+  setOrigin = jest.fn().mockReturnThis();
+  setVisible = jest.fn().mockReturnThis();
+  setInteractive = jest.fn().mockReturnThis();
+  setPosition = jest.fn().mockReturnThis();
+  setDepth = jest.fn().mockReturnThis();
+  setText = jest.fn().mockReturnThis();
+  setStyle = jest.fn().mockReturnThis();
+  setBackgroundColor = jest.fn().mockReturnThis();
+  setPadding = jest.fn().mockReturnThis();
+  disableInteractive = jest.fn().mockReturnThis();
+  setTint = jest.fn().mockReturnThis();
+  on = jest.fn().mockReturnThis();
+  setAlign = jest.fn().mockReturnThis();
+  emit = jest.fn().mockReturnThis();
+  depth = 1;
+  displayWidth = 100;
+  displayHeight = 40;
+}
+
+class MockCircle {
+  setOrigin = jest.fn().mockReturnThis();
+  setAlpha = jest.fn().mockReturnThis();
+  setDepth = jest.fn().mockReturnThis();
+  setVisible = jest.fn().mockReturnThis();
+  setStrokeStyle = jest.fn().mockReturnThis();
+  setScale = jest.fn().mockReturnThis();
+  setInteractive = jest.fn().mockReturnThis();
+  setPosition = jest.fn().mockReturnThis();
+  setFillStyle = jest.fn().mockReturnThis();
+  destroy = jest.fn().mockReturnThis();
+}
+
 // PATCH: Define MockScene class for tests
 // Place near the top of the file, before usage in tests
 class MockScene {
+  // Add scene properties
+  scene = {
+    start: jest.fn(),
+    stop: jest.fn(),
+    launch: jest.fn(),
+    pause: jest.fn(),
+    resume: jest.fn(),
+    get: jest.fn(),
+    getIndex: jest.fn(),
+    isActive: jest.fn(),
+    isSleeping: jest.fn(),
+    key: 'playerSelect'
+  };
+  
+  input = {
+    keyboard: { createCursorKeys: jest.fn().mockReturnValue({ left: {}, right: {}, up: {}, down: {} }) }
+  };
+  
+  events = {
+    on: jest.fn().mockReturnThis(),
+    once: jest.fn().mockReturnThis(),
+    emit: jest.fn()
+  };
+  
+  game = { config: { width: 800, height: 600 } };
+  time = { delayedCall: jest.fn() };
+  load = { image: jest.fn(), spritesheet: jest.fn() };
+  physics = { add: { existing: jest.fn() } };
+  
   scale = {
     on: jest.fn().mockReturnThis(),
+    width: 800,
+    height: 600
   };
+  
   add = {
-    rectangle: jest.fn(() => ({
-      setDepth: jest.fn().mockReturnThis(),
-      setPosition: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis(),
-      setInteractive: jest.fn().mockReturnThis(),
-      destroy: jest.fn().mockReturnThis(),
-      depth: 0,
-      displayWidth: 100,
-      displayHeight: 40,
-    })),
-    text: jest.fn(() => ({
-      setOrigin: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis(),
-      setInteractive: jest.fn().mockReturnThis(),
-      setPosition: jest.fn().mockReturnThis(),
-      setDepth: jest.fn().mockReturnThis(),
-      on: jest.fn().mockReturnThis(),
-      depth: 1,
-      displayWidth: 100,
-      displayHeight: 40,
-    })),
-    circle: jest.fn(() => ({
-      setOrigin: jest.fn().mockReturnThis(),
-      setAlpha: jest.fn().mockReturnThis(),
-      setDepth: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis(),
-      setStrokeStyle: jest.fn().mockReturnThis(),
-      setScale: jest.fn().mockReturnThis(),
-      setInteractive: jest.fn().mockReturnThis(),
-      setPosition: jest.fn().mockReturnThis(),
-      destroy: jest.fn().mockReturnThis(),
-    })),
+    rectangle: jest.fn(() => new MockRectangle()),
+    text: jest.fn(() => new MockText()),
+    circle: jest.fn(() => new MockCircle()),
     sprite: jest.fn(() => ({
       setScale: jest.fn().mockReturnThis(),
       setInteractive: jest.fn().mockReturnThis(),
@@ -45,6 +96,18 @@ class MockScene {
       setAlpha: jest.fn().mockReturnThis(),
       setVisible: jest.fn().mockReturnThis(),
       setCrop: jest.fn().mockReturnThis(),
+      on: jest.fn().mockReturnThis(),
+      destroy: jest.fn().mockReturnThis(),
+    })),
+    image: jest.fn(() => ({
+      setOrigin: jest.fn().mockReturnThis(),
+      setDisplaySize: jest.fn().mockReturnThis(),
+      setAlpha: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setTexture: jest.fn().mockReturnThis(),
+      setInteractive: jest.fn().mockReturnThis(),
+      setPosition: jest.fn().mockReturnThis(),
+      setScale: jest.fn().mockReturnThis(),
       on: jest.fn().mockReturnThis(),
       destroy: jest.fn().mockReturnThis(),
     })),

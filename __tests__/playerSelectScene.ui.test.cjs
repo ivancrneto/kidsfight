@@ -29,6 +29,9 @@ jest.mock('phaser', () => {
         setAlpha: jest.fn().mockReturnThis(),
         setPosition: jest.fn().mockReturnThis(),
         setVisible: jest.fn().mockReturnThis(),
+        setText: jest.fn().mockReturnThis(),
+        setBackgroundColor: jest.fn().mockReturnThis(),
+        disableInteractive: jest.fn().mockReturnThis(),
         data: { set: jest.fn() }
       })),
       circle: jest.fn().mockImplementation((x, y, radius, color, alpha) => ({
@@ -52,9 +55,13 @@ jest.mock('phaser', () => {
       image: jest.fn().mockReturnValue({
         setOrigin: jest.fn().mockReturnThis(),
         setScale: jest.fn().mockReturnThis(),
+        setDisplaySize: jest.fn().mockReturnThis(),
         setInteractive: jest.fn().mockReturnThis(),
         on: jest.fn().mockReturnThis(),
-        data: { set: jest.fn() }
+        setAlpha: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        data: { set: jest.fn() },
+        destroy: jest.fn()
       }),
       rectangle: jest.fn().mockReturnValue({
         setOrigin: jest.fn().mockReturnThis(),

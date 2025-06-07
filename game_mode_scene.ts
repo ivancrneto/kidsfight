@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import gameLogoImg from './android-chrome-192x192.png';
 
 interface ButtonStyle {
   fontSize: string;
@@ -25,6 +26,10 @@ class GameModeScene extends Phaser.Scene {
     super({ key: 'GameModeScene' });
   }
 
+  preload(): void {
+    this.load.image('gameLogo', gameLogoImg);
+  }
+
   create(): void {
     console.log('GameModeScene create called');
     console.log('Registered scenes (from GameModeScene):', this.scene.manager.keys);
@@ -33,6 +38,9 @@ class GameModeScene extends Phaser.Scene {
 
     // Add background
     this.bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
+
+    // Add main game image/logo at the top
+    const logo = this.add.image(w/2, h * 0.14, 'gameLogo').setOrigin(0.5).setDisplaySize(w * 0.18, w * 0.18).setDepth(100);
 
     // Title text
     const titleText = this.add.text(

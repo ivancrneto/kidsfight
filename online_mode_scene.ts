@@ -43,6 +43,10 @@ export default class OnlineModeScene extends Phaser.Scene {
     this.wsManager = WebSocketManager.getInstance();
   }
 
+  preload(): void {
+    this.load.image('gameLogo', './android-chrome-192x192.png');
+  }
+
   create(): void {
     // Patch: Ensure this.scene.manager.keys always exists for tests
     if (!this.scene) this.scene = {};
@@ -53,8 +57,15 @@ export default class OnlineModeScene extends Phaser.Scene {
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
 
-    // Add background
-    this.bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 1);
+    // Add logo as a background, subtle watermark style
+    const logoBg = this.add.image(w/2, h/2, 'gameLogo')
+      .setOrigin(0.5)
+      .setDisplaySize(w, h)
+      .setAlpha(0.13)
+      .setDepth(0);
+
+    // Add background color rectangle above logo for contrast
+    this.bg = this.add.rectangle(w/2, h/2, w, h, 0x222222, 0.55).setDepth(1);
 
     // Title text (store as instance property for reuse)
     this.titleText = this.add.text(
@@ -67,7 +78,7 @@ export default class OnlineModeScene extends Phaser.Scene {
         fontFamily: 'monospace',
         align: 'center'
       }
-    ).setOrigin(0.5);
+    ).setOrigin(0.5).setDepth(2);
 
     // Button style
     const buttonStyle: ButtonStyle = {
@@ -89,7 +100,7 @@ export default class OnlineModeScene extends Phaser.Scene {
       h * 0.45,
       'Criar Jogo',
       buttonStyle
-    ).setOrigin(0.5);
+    ).setOrigin(0.5).setDepth(2);
     this.createButton.setInteractive({ useHandCursor: true });
 
     // Join game button
@@ -98,7 +109,7 @@ export default class OnlineModeScene extends Phaser.Scene {
       h * 0.55,
       'Entrar em Jogo',
       buttonStyle
-    ).setOrigin(0.5);
+    ).setOrigin(0.5).setDepth(2);
     this.joinButton.setInteractive({ useHandCursor: true });
 
     // Back button
@@ -107,7 +118,7 @@ export default class OnlineModeScene extends Phaser.Scene {
       h * 0.8,
       'Voltar',
       buttonStyle
-    ).setOrigin(0.5);
+    ).setOrigin(0.5).setDepth(2);
     this.backButton.setInteractive({ useHandCursor: true });
 
     // Patch .emit for test compatibility (Jest expects .emit to simulate pointerdown)
@@ -154,7 +165,7 @@ export default class OnlineModeScene extends Phaser.Scene {
         fontFamily: 'monospace',
         align: 'center'
       }
-    ).setOrigin(0.5).setVisible(false);
+    ).setOrigin(0.5).setVisible(false).setDepth(2);
 
     // Room code display (hidden by default)
     this.roomCodeDisplay = this.add.text(
@@ -167,7 +178,7 @@ export default class OnlineModeScene extends Phaser.Scene {
         fontFamily: 'monospace',
         align: 'center'
       }
-    ).setOrigin(0.5).setVisible(false);
+    ).setOrigin(0.5).setVisible(false).setDepth(2);
 
     // Room code text (hidden by default)
     this.roomCodeText = this.add.text(
@@ -180,7 +191,7 @@ export default class OnlineModeScene extends Phaser.Scene {
         fontFamily: 'monospace',
         align: 'center'
       }
-    ).setOrigin(0.5).setVisible(false);
+    ).setOrigin(0.5).setVisible(false).setDepth(2);
 
     // Join prompt text (hidden by default)
     this.joinPromptText = this.add.text(
@@ -193,7 +204,7 @@ export default class OnlineModeScene extends Phaser.Scene {
         fontFamily: 'monospace',
         align: 'center'
       }
-    ).setOrigin(0.5).setVisible(false);
+    ).setOrigin(0.5).setVisible(false).setDepth(2);
 
     // Room code input (hidden by default)
     this.roomCodeInput = document.createElement('input');
@@ -218,7 +229,7 @@ export default class OnlineModeScene extends Phaser.Scene {
         fontFamily: 'monospace',
         align: 'center'
       }
-    ).setOrigin(0.5).setVisible(false);
+    ).setOrigin(0.5).setVisible(false).setDepth(2);
 
     // Button click handlers
     this.createButton.on('pointerdown', () => this.createGame());
@@ -377,14 +388,14 @@ export default class OnlineModeScene extends Phaser.Scene {
         color: '#fff',
         fontFamily: 'monospace',
         align: 'center'
-      }).setOrigin(0.5);
+      }).setOrigin(0.5).setDepth(2);
     }
     this.titleText.setVisible(true);
     const lines = [
       this.titleText,
-      this.roomCodeText.setText('Código da Sala:').setOrigin(0.5).setVisible(true),
-      this.roomCodeDisplay.setText(code).setOrigin(0.5).setVisible(true),
-      this.waitingText.setText('Aguardando outro jogador...').setOrigin(0.5).setVisible(true)
+      this.roomCodeText.setText('Código da Sala:').setOrigin(0.5).setVisible(true).setDepth(2),
+      this.roomCodeDisplay.setText(code).setOrigin(0.5).setVisible(true).setDepth(2),
+      this.waitingText.setText('Aguardando outro jogador...').setOrigin(0.5).setVisible(true).setDepth(2)
     ];
     // Calculate vertical stacking
     const gap = 40;

@@ -237,6 +237,17 @@ class ScenarioSelectScene extends Phaser.Scene {
               console.debug('[ScenarioSelectScene][WebSocket] Both players ready, host starting game');
               this.startGame();
             }
+          } else if (data.type === 'player_selected') {
+            // Handle character selection sync in online mode
+            if (this.mode === 'online') {
+              if (data.player === 'p1') {
+                this.selected.p1 = data.character;
+                console.debug('[ScenarioSelectScene][WebSocket] Host received host character selection:', data.character);
+              } else if (data.player === 'p2' || data.player === 'guest') {
+                this.selected.p2 = data.character;
+                console.debug('[ScenarioSelectScene][WebSocket] Host received guest character selection:', data.character);
+              }
+            }
           } else if (data.type === 'game_start') {
             // Ignore duplicate game_start messages if we've already started
             if (this.gameStarted) {

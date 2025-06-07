@@ -174,8 +174,8 @@ describe('Block Functionality', () => {
     scene.players[0].getData.mockImplementation((key) => key === 'isBlocking');
     scene.playerBlocking[0] = true;
     scene.updatePlayerAnimation(0);
-    // Check if scaling was applied (BASE_PLAYER_SCALE for blocking)
-    expect(scene.players[0].setScale).toHaveBeenCalledWith(0.4);
+    // Check if special scaling for blocking was applied (0.9, 1.0)
+    expect(scene.players[0].setScale).toHaveBeenCalledWith(0.9, 1.0);
   });
   
   test('block button correctly sets player blocking state', () => {

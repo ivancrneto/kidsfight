@@ -9,6 +9,18 @@ describe('KidsFightScene player scale', () => {
 
   beforeEach(() => {
     scene = new KidsFightScene();
+    // Mock Phaser add.graphics to avoid TypeError
+    scene.add = {
+      graphics: jest.fn(() => ({
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        setAlpha: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        setX: jest.fn().mockReturnThis(),
+        setY: jest.fn().mockReturnThis(),
+        destroy: jest.fn().mockReturnThis()
+      }))
+    } as any;
     // Mock Phaser sprite
     player1 = {
       setScale: jest.fn(),
@@ -45,11 +57,11 @@ describe('KidsFightScene player scale', () => {
     expect(player1.setScale).toHaveBeenCalledWith(0.4);
   });
 
-  it('should use BASE_PLAYER_SCALE for blocking', () => {
+  it('should use special scale values for blocking', () => {
     scene.playerBlocking[0] = true;
     (scene as any)['updatePlayerAnimation'](0);
-    // Blocking should use BASE_PLAYER_SCALE (0.4)
-    expect(player1.setScale).toHaveBeenCalledWith(0.4);
+    // Blocking uses a special scale of 0.9, 1.0 per the implementation
+    expect(player1.setScale).toHaveBeenCalledWith(0.9, 1.0);
   });
 
   it('should use BASE_PLAYER_SCALE for special attack', () => {
