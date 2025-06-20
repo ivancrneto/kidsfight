@@ -779,6 +779,9 @@ export default class KidsFightScene extends Phaser.Scene {
       if (typeof healthBarBg.fillRect === 'function') {
         healthBarBg.fillRect(x, y, maxBarWidth, barHeight);
       }
+      if (typeof healthBarBg.dirty !== 'undefined') {
+        (healthBarBg as any).dirty = true;
+      }
     }
 
     // Update health bar - with test environment safety
@@ -787,16 +790,18 @@ export default class KidsFightScene extends Phaser.Scene {
         healthBar.clear();
       }
 
-      // Set color based on health percentage
-      const healthColor = health > MAX_HEALTH * 0.6 ? 0x00ff00 :
-          health > MAX_HEALTH * 0.3 ? 0xffff00 : 0xff0000;
+      // Set color based on player index (green for P1, red for P2)
+      const healthColor = playerIndex === 0 ? 0x00ff00 : 0xff0000;
 
       if (typeof healthBar.fillStyle === 'function') {
-        healthBar.fillStyle(healthColor, 1);
+        healthBar.fillStyle(healthColor);
       }
 
       if (typeof healthBar.fillRect === 'function') {
         healthBar.fillRect(x, y, barWidth, barHeight);
+      }
+      if (typeof healthBar.dirty !== 'undefined') {
+        (healthBar as any).dirty = true;
       }
     }
   }
@@ -1301,7 +1306,9 @@ export default class KidsFightScene extends Phaser.Scene {
   public handleRemoteAction(action: any): void {
     if (this.gameOver) return;
     const online = this.isOnline ?? (this.gameMode === 'online');
-    if (!online) return;
+    const alwaysProcess = ['attack', 'special', 'block'];
+    const actionType = action.type || action.action;
+    if (!online && !alwaysProcess.includes(actionType)) return;
     const player = this.players?.[action.playerIndex];
     if (!player) return;
     switch (action.type || action.action) {
