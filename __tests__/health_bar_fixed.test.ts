@@ -215,6 +215,7 @@ describe('Health Bar Functionality', () => {
       // Arrange
       const playerIndex = 0;
       scene.players[playerIndex].health = 0;
+      scene.playerHealth = [0, MAX_HEALTH];
       
       // Ensure sys.game.canvas exists and healthBar1 is a valid mock
       scene.sys = { game: { canvas: {} } };
