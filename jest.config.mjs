@@ -1,5 +1,5 @@
 // Enable ES modules support
-module.exports = {
+export default {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'jsdom',
   extensionsToTreatAsEsm: ['.ts', '.jsx', '.tsx', '.json'],
@@ -10,14 +10,12 @@ module.exports = {
     '^phaser$': '<rootDir>/__mocks__/phaser.js',
     '^websocket_manager$': '<rootDir>/__mocks__/websocket_manager',
   },
-
-
   transform: {
     '^.+\\.(t|j)sx?$': ['ts-jest', {
       useESM: true,
       tsconfig: 'tsconfig.json',
     }],
-    '^.+\\.mjs$': ['babel-jest', { configFile: './babel.config.js' }]
+    '^.+\\.mjs$': ['babel-jest', { configFile: './babel.config.mjs' }]
   },
   testMatch: [
     '**/__tests__/**/*.test.{js,jsx,ts,tsx,mjs,cjs}'

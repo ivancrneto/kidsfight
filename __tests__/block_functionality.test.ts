@@ -173,6 +173,7 @@ describe('Block Functionality', () => {
   test('blocking animation is displayed when player is blocking', () => {
     scene.players[0].getData.mockImplementation((key) => key === 'isBlocking');
     scene.playerBlocking[0] = true;
+    scene.players[0].isBlocking = true; // Ensure property is set for updatePlayerAnimation
     scene.updatePlayerAnimation(0);
     // Check if special scaling for blocking was applied (0.9, 1.0)
     expect(scene.players[0].setScale).toHaveBeenCalledWith(0.9, 1.0);
@@ -218,7 +219,8 @@ describe('Block Functionality', () => {
           setScale: jest.fn(),
           getData: jest.fn((key) => key === 'isBlocking'),
           body: { blocked: { down: true }, velocity: { x: 0, y: 0 } },
-          texture: mockTexture
+          texture: mockTexture,
+          isBlocking: true // Ensure property is set for updatePlayerAnimation
         }
       ];
       scene.updatePlayerAnimation(0);

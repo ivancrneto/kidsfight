@@ -2,10 +2,11 @@
   "name": "kidsfight",
   "version": "1.0.0",
   "description": "A multiplayer fighting game for kids",
+  "type": "module",
   "scripts": {
     "start": "parcel index.html",
     "build": "parcel build index.html",
-    "test": "jest --config jest.config.js",
+    "test": "jest --config jest.config.mjs",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -43,5 +44,6 @@
   },
   "browserslist": [
     "last 1 Chrome version"
-  ]
+  ],
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

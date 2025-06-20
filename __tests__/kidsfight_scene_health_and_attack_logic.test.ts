@@ -229,13 +229,8 @@ class TestableKidsFightScene extends KidsFightScene {
   
   // Mock Phaser methods
   public add = {
-    graphics: jest.fn().mockImplementation(() => ({
-      clear: jest.fn(),
-      fillStyle: jest.fn().mockReturnThis(),
-      fillRect: jest.fn(),
-      setDepth: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis()
-    })),
+    // graphics is globally mocked by MockGraphics in setupTests.ts
+    // Do not override here; rely on the global patch for Phaser graphics objects.
     text: jest.fn().mockReturnValue({
       setOrigin: jest.fn().mockReturnThis(),
       setInteractive: jest.fn().mockReturnThis(),

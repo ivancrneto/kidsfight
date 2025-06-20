@@ -518,19 +518,27 @@ class ScenarioSelectScene extends Phaser.Scene {
   // Helper method to transition to the game scene
   private _transitionToGame(data: any, p1Char: string, p2Char: string): void {
     try {
-      console.debug('[ScenarioSelectScene][_transitionToGame] Transitioning to KidsFightScene with:', data);
-      
+      // Defensive: ensure valid character keys for both players
+      const validKeys = ['player1','player2','bento','davir','jose','davis','carol','roni','jacqueline','ivan','d_isa'];
+      const isValid = (k: string) => typeof k === 'string' && validKeys.includes(k);
+      // Try to use provided keys, else fallback to something valid
+      let finalP1 = isValid(p1Char) ? p1Char : (data.p1Char || data.p1 || this.selected?.p1);
+      let finalP2 = isValid(p2Char) ? p2Char : (data.p2Char || data.p2 || this.selected?.p2);
+      if (!isValid(finalP1)) finalP1 = validKeys.find(k => this.textures.exists(k)) || 'player1';
+      if (!isValid(finalP2) || finalP2 === finalP1) finalP2 = validKeys.find(k => this.textures.exists(k) && k !== finalP1) || 'player2';
+      console.debug('[ScenarioSelectScene][_transitionToGame] Transitioning to KidsFightScene with:', { ...data, p1: finalP1, p2: finalP2 });
       this.scene.start('KidsFightScene', {
-        gameMode: 'online',
-        mode: this.mode,
-        p1: p1Char,
-        p2: p2Char,
-        selected: { p1: p1Char, p2: p2Char },
+        ...data,
+        gameMode: data.gameMode || data.mode || this.mode,
+        mode: data.mode || data.gameMode || this.mode,
+        isHost: typeof data.isHost === 'boolean' ? data.isHost : this.isHost,
+        playerIndex: typeof data.playerIndex === 'number' ? data.playerIndex : (this.isHost ? 0 : 1),
+        roomCode: data.roomCode || this.roomCode,
+        p1: finalP1,
+        p2: finalP2,
+        selected: { p1: finalP1, p2: finalP2 },
         scenario: data.scenario || 'scenario1',
         selectedScenario: data.scenario || 'scenario1',
-        roomCode: data.roomCode || this.roomCode,
-        isHost: data.isHost !== undefined ? data.isHost : this.isHost,
-        playerIndex: data.playerIndex !== undefined ? data.playerIndex : (this.isHost ? 0 : 1),
         wsManager: this.wsManager
       });
     } catch (e) {
@@ -540,7 +548,7 @@ class ScenarioSelectScene extends Phaser.Scene {
       this._lastGameStartTime = 0;
     }
   }
-  
+
   // Add a character key validation method
   private validateCharacterKey(key: string): string {
     const validKeys = ['player1', 'player2', 'bento', 'davir', 'jose', 'davis', 'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'];
@@ -618,7 +626,7 @@ class ScenarioSelectScene extends Phaser.Scene {
   }
 
   private updateReadyUI(): void {
-    if (!this.readyButton) return;
+    if (!this.readyButton || !this.readyButton.scene) return;
     
     if (this.mode === 'online') {
       if ((this.isHost && this.hostReady) || (!this.isHost && this.guestReady)) {

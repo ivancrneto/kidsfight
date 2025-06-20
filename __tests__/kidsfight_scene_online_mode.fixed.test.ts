@@ -3,11 +3,29 @@ const mockWebSocketManager = {
   onMessage: jest.fn(),
   connect: jest.fn().mockResolvedValue(undefined),
   on: jest.fn(),
-  send: jest.fn(),
-  close: jest.fn(),
-  sendGameAction: jest.fn(),
+  send: jest.fn().mockReturnValue(true),
+  sendGameAction: jest.fn().mockImplementation((action, data) => {
+    console.log('sendGameAction called with:', { action, data });
+    return true;
+  }),
+  disconnect: jest.fn(),
+  isConnected: jest.fn().mockReturnValue(true),
+  getInstance: jest.fn(function() {
+    return this;
+  }),
+  setMessageCallback: jest.fn(),
+  onClose: jest.fn(),
+  onError: jest.fn(),
+  setHost: jest.fn(),
+  setRoomCode: jest.fn(),
+  getRoomCode: jest.fn().mockReturnValue('TEST123'),
+  simulateMessage: jest.fn(),
+  resetInstance: jest.fn(),
   sendPlayerDamage: jest.fn(),
-  isConnected: () => true
+  close: jest.fn(),
+  mock: {
+    calls: []
+  }
 };
 jest.mock('../websocket_manager', () => ({
   __esModule: true,
@@ -18,7 +36,18 @@ jest.mock('../websocket_manager', () => ({
   )
 }));
 
+// IMPORTANT: Ensure global MockGraphics patch is active for Phaser graphics
+
 import KidsFightScene from '../kidsfight_scene';
+
+// Patch graphics mock for every test to ensure setScrollFactor and setDepth exist
+beforeEach(() => {
+  if (global.Phaser && global.Phaser.Scene && global.Phaser.Scene.prototype) {
+    global.Phaser.Scene.prototype.add = global.Phaser.Scene.prototype.add || {};
+    global.Phaser.Scene.prototype.add.graphics = jest.fn(() => new (global.MockGraphics || require('./setupTests').MockGraphics)());
+  }
+});
+
 import Phaser from 'phaser';
 import { createMockPhysicsAdd } from './test-utils';
 
@@ -121,7 +150,45 @@ describe('KidsFightScene - Online Mode', () => {
   let mockPlayer2: any;
 
   beforeEach(() => {
-    scene = new KidsFightScene();
+    const getMockGraphics = () => new (global.MockGraphics || require('./setupTests').MockGraphics)();
+    const realScene = new KidsFightScene();
+    realScene.add = realScene.add || {};
+    realScene.add.graphics = jest.fn(getMockGraphics);
+    realScene.safeAddGraphics = jest.fn(getMockGraphics);
+    realScene.add.rectangle = jest.fn(() => ({
+      setOrigin: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setFillStyle: jest.fn().mockReturnThis(),
+      setAlpha: jest.fn().mockReturnThis(),
+      setScrollFactor: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setStrokeStyle: jest.fn().mockReturnThis(),
+      destroy: jest.fn(),
+      x: 0, y: 0, radius: 0, color: 0xffffff, on: jest.fn()
+    }));
+    scene = realScene;
+    // Defensive: ensure wsManager is always mocked before use
+    scene.wsManager = scene.wsManager || {
+      send: jest.fn(),
+      connect: jest.fn(),
+      on: jest.fn(),
+      disconnect: jest.fn(),
+      isConnected: jest.fn().mockReturnValue(true)
+    };
+    // Defensive: ensure add, graphics, and rectangle are always mocked
+    scene.add = scene.add || {};
+    scene.add.graphics = scene.add.graphics || jest.fn(getMockGraphics);
+    scene.add.rectangle = scene.add.rectangle || jest.fn(() => ({
+      setOrigin: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
+      setFillStyle: jest.fn().mockReturnThis(),
+      setAlpha: jest.fn().mockReturnThis(),
+      setScrollFactor: jest.fn().mockReturnThis(),
+      setVisible: jest.fn().mockReturnThis(),
+      setStrokeStyle: jest.fn().mockReturnThis(),
+      destroy: jest.fn(),
+      x: 0, y: 0, radius: 0, color: 0xffffff, on: jest.fn()
+    }));
     scene.textures = {
       exists: () => true,
       remove: () => {},
@@ -309,57 +376,11 @@ describe('KidsFightScene - Online Mode', () => {
     // Add updatePlayerAnimation as a spy if not present
     scene.updatePlayerAnimation = jest.fn();
     // Patch: Combine all scene.add mocks into one object
-    scene.add = {
-  circle: jest.fn().mockReturnValue({
-    setAlpha: jest.fn().mockReturnThis(),
-    setDepth: jest.fn().mockReturnThis(),
-    setInteractive: jest.fn().mockReturnThis(),
-    setScrollFactor: jest.fn().mockReturnThis(),
-    on: jest.fn().mockReturnThis(),
-  }),
-      image: jest.fn(() => ({
-        setOrigin: jest.fn().mockReturnThis(),
-        setDisplaySize: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
-        setScrollFactor: jest.fn().mockReturnThis(),
-        setVisible: jest.fn().mockReturnThis(),
-        setAlpha: jest.fn().mockReturnThis(),
-        destroy: jest.fn(),
-      })),
-      rectangle: jest.fn(() => ({
-        setDepth: jest.fn().mockReturnThis(),
-        setScrollFactor: jest.fn().mockReturnThis(),
-        setFillStyle: jest.fn().mockReturnThis(),
-        setStrokeStyle: jest.fn().mockReturnThis(),
-        setVisible: jest.fn().mockReturnThis(),
-        setAlpha: jest.fn().mockReturnThis(),
-        destroy: jest.fn(),
-        setOrigin: jest.fn().mockReturnThis(),
-        setInteractive: jest.fn().mockReturnThis(),
-        on: jest.fn().mockReturnThis(),
-      })),
-      graphics: jest.fn(() => ({
-        fillStyle: jest.fn().mockReturnThis(),
-        fillCircle: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
-        setScrollFactor: jest.fn().mockReturnThis(),
-        fillRect: jest.fn().mockReturnThis(),
-setVisible: jest.fn().mockReturnThis(),
-        clear: jest.fn().mockReturnThis(),
-        destroy: jest.fn(),
-      })),
-      text: jest.fn(() => ({
-        setOrigin: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
-        setScrollFactor: jest.fn().mockReturnThis(),
-        setAlpha: jest.fn().mockReturnThis(),
-        setFontSize: jest.fn().mockReturnThis(),
-        setColor: jest.fn().mockReturnThis(),
-        setVisible: jest.fn().mockReturnThis(),
-        setStyle: jest.fn().mockReturnThis(),
-        destroy: jest.fn(),
-      })),
-    };
+    // Use the global MockGraphics for all graphics objects to ensure setScrollFactor and setDepth are always present.
+// Remove local scene.add.graphics mock; rely on global patch from setupTests.js/ts.
+// If a local mock is needed for a specific test, ensure it is a faithful clone of global MockGraphics.
+// (No local scene.add.graphics mock here)
+
     // Ensure sys.game.canvas and device are mocked before create()
     scene.sys = scene.sys || {};
     scene.sys.game = scene.sys.game || {};
@@ -380,8 +401,18 @@ setVisible: jest.fn().mockReturnThis(),
     // Call the handler directly to simulate a right button press
     if (handler) handler();
     // Debug log the calls for troubleshooting
-    console.log('send calls:', scene.wsManager.send.mock.calls);
-    console.log('sendGameAction calls:', scene.wsManager.sendGameAction.mock.calls);
+    if (scene.wsManager && typeof scene.wsManager.send === 'function') {
+      console.log('send calls:', (scene.wsManager.send as jest.Mock).mock?.calls || 'send not mocked');
+    } else {
+      console.log('wsManager.send is not a function');
+    }
+    
+    if (scene.wsManager && typeof scene.wsManager.sendGameAction === 'function') {
+      console.log('sendGameAction calls:', (scene.wsManager.sendGameAction as jest.Mock).mock?.calls || 'sendGameAction not mocked');
+    } else {
+      console.log('wsManager.sendGameAction is not a function');
+    }
+    
     patchPlayerBodies(scene);
   });
 
@@ -476,6 +507,7 @@ describe('Player Movement', () => {
         scene.isHost = true;
         scene.gameMode = 'online';
         scene.tryAttack = jest.fn();
+        scene.playerSpecial = [3, 0]; // Set player 0 to have 3 special points
         const specialAction = { type: 'special', playerIndex: 0 };
         scene.handleRemoteAction(specialAction);
         expect(scene.tryAttack).toHaveBeenCalledWith(0, 1, expect.any(Number), true);

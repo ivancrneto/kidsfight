@@ -226,11 +226,12 @@ export class WebSocketManager {
     }
   }
 
-  public sendPositionUpdate(playerIndex: number, x: number, y: number, velocityX = 0, velocityY = 0, flipX = false, frame?: number): boolean {
+  public sendPositionUpdate(playerIndex: number, x: number, y: number, velocityX = 0, velocityY = 0, flipX = false, frame?: number, cause?: string): boolean {
     if (typeof x !== 'number' || typeof y !== 'number' || typeof velocityX !== 'number' || typeof velocityY !== 'number') return false;
     try {
-      return this.send({ type: 'position_update', playerIndex, x, y, velocityX, velocityY, flipX, frame, timestamp: Date.now() });
+      return this.send({ type: 'position_update', playerIndex, x, y, velocityX, velocityY, flipX, frame, timestamp: Date.now(), ...(cause ? { cause } : {}) });
     } catch (e) {
+      console.error('[WSM] Error sending position update:', { playerIndex, x, y, velocityX, velocityY, flipX, frame, cause }, e);
       return false;
     }
   }

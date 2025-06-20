@@ -30,7 +30,7 @@ declare class WebSocketManager {
     sendReplayRequest(request: any): boolean;
     sendReplayResponse(response: any): boolean;
     sendHealthUpdate(playerIndex: number, health: number): boolean;
-    sendPositionUpdate(playerIndex: number, x: number, y: number, velocityX: number, velocityY: number, flipX: boolean, frame: number): boolean;
+    sendPositionUpdate(playerIndex: number, x: number, y: number, velocityX: number, velocityY: number, flipX: boolean, frame?: number, cause?: string): boolean;
 }
 
 export { WebSocketManager };

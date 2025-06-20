@@ -9,6 +9,8 @@ export const createMockPlayer = () => ({
   setFlipY: jest.fn().mockReturnThis(),
   setPosition: jest.fn().mockReturnThis(),
   setDepth: jest.fn().mockReturnThis(),
+  setFrame: jest.fn().mockReturnThis(),
+  setAngle: jest.fn().mockReturnThis(),
   setOrigin: jest.fn().mockReturnThis(),
   setDisplaySize: jest.fn().mockReturnThis(),
   setImmovable: jest.fn().mockReturnThis(),

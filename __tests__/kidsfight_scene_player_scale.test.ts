@@ -58,6 +58,7 @@ describe('KidsFightScene player scale', () => {
   });
 
   it('should use special scale values for blocking', () => {
+    player1.isBlocking = true;
     scene.playerBlocking[0] = true;
     (scene as any)['updatePlayerAnimation'](0);
     // Blocking uses a special scale of 0.9, 1.0 per the implementation

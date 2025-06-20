@@ -56,6 +56,14 @@ function createTestScene() {
   return scene;
 }
 
+function createHealthBarMock() {
+  return {
+    setScrollFactor: jest.fn(),
+    setDepth: jest.fn(),
+    destroy: jest.fn(),
+  };
+}
+
 describe('KidsFightScene Health Bars', () => {
   let scene: any;
   
@@ -105,18 +113,33 @@ describe('KidsFightScene Health Bars', () => {
     
     it('should destroy existing health bars before creating new ones', () => {
       // Add mock health bars to simulate existing bars
-      scene.healthBar1 = {...mockGraphics};
-      scene.healthBar2 = {...mockGraphics};
-      scene.healthBarBg1 = {...mockRectangle};
-      scene.healthBarBg2 = {...mockRectangle};
-      
+      const oldBar1 = { ...mockGraphics, destroy: jest.fn() };
+      const oldBar2 = { ...mockGraphics, destroy: jest.fn() };
+      const oldBg1 = { ...mockRectangle, destroy: jest.fn() };
+      const oldBg2 = { ...mockRectangle, destroy: jest.fn() };
+      scene.healthBar1 = oldBar1;
+      scene.healthBar2 = oldBar2;
+      scene.healthBarBg1 = oldBg1;
+      scene.healthBarBg2 = oldBg2;
+
       scene.createHealthBars(1, 1);
-      
-      // Should destroy existing objects before creating new ones
-      expect(scene.healthBar1.destroy).toHaveBeenCalled();
-      expect(scene.healthBar2.destroy).toHaveBeenCalled();
-      expect(scene.healthBarBg1.destroy).toHaveBeenCalled();
-      expect(scene.healthBarBg2.destroy).toHaveBeenCalled();
+
+      // Assert destroy was called on the old objects
+      expect(oldBar1.destroy).toHaveBeenCalled();
+      expect(oldBar2.destroy).toHaveBeenCalled();
+      expect(oldBg1.destroy).toHaveBeenCalled();
+      expect(oldBg2.destroy).toHaveBeenCalled();
+    });
+    
+    it('should call setScrollFactor and setDepth on both health bars when created', () => {
+      // FIX: Ensure healthBar1 and healthBar2 have setScrollFactor and setDepth as jest.fn mocks before calling createHealthBars.
+      scene.healthBar1 = { setScrollFactor: jest.fn(), setDepth: jest.fn() };
+      scene.healthBar2 = { setScrollFactor: jest.fn(), setDepth: jest.fn() };
+      scene.createHealthBars();
+      expect(scene.healthBar1.setScrollFactor).toHaveBeenCalledWith(0, 0);
+      expect(scene.healthBar1.setDepth).toHaveBeenCalledWith(2);
+      expect(scene.healthBar2.setScrollFactor).toHaveBeenCalledWith(0, 0);
+      expect(scene.healthBar2.setDepth).toHaveBeenCalledWith(2);
     });
   });
   

@@ -199,7 +199,7 @@ function setupScene(localPlayerIndex = 0) {
     this.checkWinner();
     
     // Send WebSocket message if this is the local player's attack
-    if (this.gameMode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
+    if (this.gameMode === 'online' && this.wsManager?.isConnected?.() && typeof this.wsManager.send === 'function') {
       if (attackerIdx === this.localPlayerIndex) {
         const healthUpdate = {
           type: 'health_update',

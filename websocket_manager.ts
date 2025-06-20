@@ -17,6 +17,8 @@ export interface WebSocketMessage {
   flipX?: boolean;
   frame?: number;
   timestamp?: number;
+  cause?: string; // <-- NEW: allow sending cause
+  animation?: string; // <-- NEW: allow sending animation
   [key: string]: any; // For any additional dynamic properties
 }
 
@@ -370,14 +372,23 @@ class WebSocketManager {
     }
   }
 
-  public sendPositionUpdate(playerIndex: number, x: number, y: number, velocityX: number, velocityY: number, flipX: boolean, frame?: number): boolean {
-    if (!this.isConnected()) {
-      console.error('[WSM] Cannot send position update - not connected');
-      return false;
-    }
-
+  public sendPositionUpdate(
+    playerIndex: number,
+    x: number,
+    y: number,
+    velocityX: number,
+    velocityY: number,
+    flipX: boolean,
+    frame?: number,
+    cause?: string,
+    animation?: string
+  ): boolean {
+    // DEBUG: Log all arguments received
+    console.log('[WSM][DEBUG] sendPositionUpdate called with:', {
+      playerIndex, x, y, velocityX, velocityY, flipX, frame, cause, animation
+    });
     try {
-      const message: WebSocketMessage = {
+      const message: any = {
         type: 'position_update',
         playerIndex,
         x,
@@ -386,11 +397,16 @@ class WebSocketManager {
         velocityY,
         flipX,
         frame,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-
+      if (cause) message.cause = cause;
+      if (animation) message.animation = animation;
       const messageString = JSON.stringify(message);
       this._ws!.send(messageString);
+      // DEBUG: Log outgoing position_update
+      if (message.type === 'position_update') {
+        console.log('[WSM] Sending position_update:', messageString);
+      }
       return true;
     } catch (error) {
       console.error('[WSM] Error sending position update:', error);

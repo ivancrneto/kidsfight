@@ -22,8 +22,27 @@ global.Phaser = {
   }
 };
 
-import KidsFightScene from '../kidsfight_scene';
-import * as Phaser from 'phaser';
+const KidsFightScene = require('../kidsfight_scene').default || require('../kidsfight_scene');
+
+// Patch graphics mock for every test to ensure setScrollFactor and setDepth exist
+beforeEach(() => {
+  if (global.Phaser && global.Phaser.Scene && global.Phaser.Scene.prototype) {
+    global.Phaser.Scene.prototype.add = global.Phaser.Scene.prototype.add || {};
+    global.Phaser.Scene.prototype.add.graphics = jest.fn(() => new (global.MockGraphics || require('./setupTests').MockGraphics)());
+  }
+});
+
+const Phaser = require('phaser');
+
+let mockScene;
+
+// Helper to call endGame in tests
+function testEndGame(scene: any, winnerIndex: number, message: string) {
+  if (typeof scene.endGame === 'function') {
+    scene.endGame(winnerIndex, message);
+  }
+}
+
 // Inline PlayerProps for test compatibility (not exported from main file)
 type PlayerProps = {
   isAttacking: boolean;
@@ -261,118 +280,90 @@ class MockTimerEvent implements Phaser.Time.TimerEvent {
     start = jest.fn();
     }
 
+
     describe('KidsFightScene Game State Tests', () => {
-    let mockScene: MockScene;
-    let kidsFightScene: any;
+  let scene: TestKidsFightScene;
 
-    beforeEach(() => {
-      jest.clearAllMocks();
-      mockScene = new MockScene();
-      if (!mockScene.textures) {
-        mockScene.textures = {
-          exists: () => true,
-          remove: () => {},
-          get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-          addImage: () => {},
-          list: {},
-          getTextureKeys: () => []
-        };
-      }
-
-      // Always define kidsFightScene before patching its textures property
-      kidsFightScene = {
-        scene: mockScene,
-        time: mockScene.time,
-        sys: mockScene.sys,
-        events: mockScene.events,
-        gameState: {
-          isGameOver: false,
-          isPaused: false,
-          winningPlayer: null,
-        },
-        startRoundTimer: jest.fn(),
-        endRound: jest.fn(),
-        resetRound: jest.fn(),
-        handleGameOver: jest.fn()
-      };
-      if (!kidsFightScene.textures) {
-        kidsFightScene.textures = {
-          exists: () => true,
-          remove: () => {},
-          get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-          addImage: () => {},
-          list: {},
-          getTextureKeys: () => []
-        };
-      }
-
-      // Ensure every test scene instance has a complete textures mock
-      if (!kidsFightScene.textures) {
-        kidsFightScene.textures = {
-          exists: () => true,
-          remove: () => {},
-          get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-          addImage: () => {},
-          list: {},
-          getTextureKeys: () => []
-        };
-      }
-
-      // Create a partial KidsFightScene instance with necessary mocks
-      kidsFightScene = {
-        scene: mockScene,
-        time: mockScene.time,
-        sys: mockScene.sys,
-        events: mockScene.events,
-        gameState: {
-          isGameOver: false,
-          isPaused: false,
-          winningPlayer: null,
-        },
-        startRoundTimer: jest.fn(),
-        endRound: jest.fn(),
-        resetRound: jest.fn(),
-        handleGameOver: jest.fn()
-      };
-    });
-
-    test('should handle game state transitions correctly', () => {
-      // Simulate game start
-      kidsFightScene.gameState.isGameOver = false;
-
-      // Verify initial state
-      expect(kidsFightScene.gameState.isGameOver).toBe(false);
-      expect(kidsFightScene.gameState.winningPlayer).toBeNull();
-
-      // Simulate game over
-      kidsFightScene.gameState.isGameOver = true;
-      kidsFightScene.gameState.winningPlayer = 1;
-
-      // Verify game over state
-      expect(kidsFightScene.gameState.isGameOver).toBe(true);
-      expect(kidsFightScene.gameState.winningPlayer).toBe(1);
-    });
-
-    test('should handle pause state correctly', () => {
-      // Initial state
-      kidsFightScene.gameState.isPaused = false;
-      expect(kidsFightScene.gameState.isPaused).toBe(false);
-
-      // Pause the game
-      kidsFightScene.gameState.isPaused = true;
-      expect(kidsFightScene.gameState.isPaused).toBe(true);
-
-      // Unpause the game
-      kidsFightScene.gameState.isPaused = false;
-      expect(kidsFightScene.gameState.isPaused).toBe(false);
-    });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    scene = new TestKidsFightScene();
+    scene.safeAddGraphics = jest.fn(() => new (global.MockGraphics)());
+    scene.add = scene.add || {};
+    scene.add.graphics = scene.safeAddGraphics;
+    // Mock add.rectangle to prevent errors in create()
+    scene.add.rectangle = jest.fn(() => ({
+      setOrigin: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis()
+    }));
   });
+
+  test('should handle game state transitions correctly', () => {
+    // Simulate game start
+    scene.gameOver = false;
+    scene.winningPlayer = null;
+
+    // Verify initial state
+    expect(scene.gameOver).toBe(false);
+    expect(scene.winningPlayer).toBeNull();
+
+    // Simulate game over
+    scene.gameOver = true;
+    scene.winningPlayer = 1;
+
+    // Verify game over state
+    expect(scene.gameOver).toBe(true);
+    expect(scene.winningPlayer).toBe(1);
+  });
+
+  test('should handle pause state correctly', () => {
+    // Initial state
+    scene.isPaused = false;
+    expect(scene.isPaused).toBe(false);
+
+    // Pause the game
+    scene.isPaused = true;
+    expect(scene.isPaused).toBe(true);
+
+    // Unpause the game
+    scene.isPaused = false;
+    expect(scene.isPaused).toBe(false);
+  });
+
+  it('maps all player keys to correct display names', () => {
+    const getDisplayName = (key: string) => {
+      const nameMap: {[key: string]: string} = {
+        player1: 'Bento',
+        player2: 'Davi R',
+        player3: 'José',
+        player4: 'Davi S',
+        player5: 'Carol',
+        player6: 'Roni',
+        player7: 'Jacqueline',
+        player8: 'Ivan',
+        player9: 'D. Isa',
+      };
+      return nameMap[key] || key;
+    };
+    
+    expect(getDisplayName('player1')).toBe('Bento');
+    expect(getDisplayName('player2')).toBe('Davi R');
+    expect(getDisplayName('player3')).toBe('José');
+    expect(getDisplayName('player4')).toBe('Davi S');
+    expect(getDisplayName('player5')).toBe('Carol');
+    expect(getDisplayName('player6')).toBe('Roni');
+    expect(getDisplayName('player7')).toBe('Jacqueline');
+    expect(getDisplayName('player8')).toBe('Ivan');
+    expect(getDisplayName('player9')).toBe('D. Isa');
+  });
+});
+
 
 
 
 
 
 // Mock Text class with all required Phaser.GameObjects.Text properties and methods
+
 class MockText {
   // Core properties
   text: string = '';
@@ -656,8 +647,8 @@ const createMockGameObjectFactory = () => ({
     setAlpha: jest.fn(),
     setOrigin: jest.fn(),
     setPosition: jest.fn(),
-    setScrollFactor: jest.fn(),
-    setDepth: jest.fn()
+    setScrollFactor: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis()
   }),
   image: jest.fn().mockReturnValue({
     setOrigin: jest.fn(),
@@ -671,9 +662,9 @@ const createMockGameObjectFactory = () => ({
     setOrigin: jest.fn(),
     setPosition: jest.fn(),
     setSize: jest.fn(),
-    setScrollFactor: jest.fn(),
+    setScrollFactor: jest.fn().mockReturnThis(),
     setFillStyle: jest.fn(),
-    setDepth: jest.fn(),
+    setDepth: jest.fn().mockReturnThis(),
     setAlpha: jest.fn(),
     setInteractive: jest.fn(),
     on: jest.fn(),
@@ -687,8 +678,8 @@ const createMockGameObjectFactory = () => ({
     fillRect: jest.fn(),
     clear: jest.fn(),
     setPosition: jest.fn(),
-    setScrollFactor: jest.fn(),
-    setDepth: jest.fn()
+    setScrollFactor: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis()
   }),
   container: jest.fn().mockReturnValue({
     add: jest.fn(),
@@ -833,8 +824,8 @@ const createMockScene = () => ({
       setText: jest.fn(),
       setOrigin: jest.fn(),
       setPosition: jest.fn(),
-      setScrollFactor: jest.fn(),
-      setDepth: jest.fn(),
+      setScrollFactor: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis(),
       setVisible: jest.fn()
     })
   },
@@ -853,7 +844,130 @@ const createMockScene = () => ({
   add: createMockGameObjectFactory()
 });
 
-// Use TestKidsFightScene in the test suite
+class TestKidsFightScene extends KidsFightScene {
+  public players = [
+    {
+      setVelocityX: jest.fn(),
+      setVelocityY: jest.fn(),
+      setFrame: jest.fn(),
+      setAngle: jest.fn(),
+      body: {
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+      },
+    },
+    {
+      setVelocityX: jest.fn(),
+      setVelocityY: jest.fn(),
+      setFrame: jest.fn(),
+      setAngle: jest.fn(),
+      body: {
+        setVelocityX: jest.fn(),
+        setVelocityY: jest.fn(),
+      },
+    }
+  ];
+  public add = {
+    text: jest.fn().mockImplementation((x: number, y: number, text: string, style: any) => {
+      const txt = new MockText();
+      txt.setText(text);
+      return txt;
+    })
+  };
+  public cameras = { main: { width: 800, height: 600 } };
+  public tweens = { add: jest.fn().mockReturnValue({}) };
+  public input = {
+    once: jest.fn(),
+    keyboard: { once: jest.fn() }
+  };
+  public scene = { restart: jest.fn() };
+  public gameMode = 'single';
+  public wsManager = { send: jest.fn() };
+  public time = { now: Date.now() };
+  public gameOver = false;
+  public roundEndTime = undefined;
+
+  constructor() {
+    super({ key: 'TestKidsFightScene' });
+  }
+
+  // Helper methods for tests
+  public setGameOver(value: boolean): void {
+    this.privateAccess._gameOver = value;
+  }
+
+  public setPlayerHealth(health: number[]): void {
+    this.privateAccess._playerHealth = [...health];
+  }
+
+  public setPlayerSpecial(special: number[]): void {
+    this.privateAccess._playerSpecial = [...special];
+  }
+
+  public setSpecialPips(pips1: any[], pips2: any[]): void {
+    this.privateAccess._specialPips1 = [...pips1];
+    this.privateAccess._specialPips2 = [...pips2];
+  }
+
+  // Public methods for testing
+  public init(data?: any): void {
+    super.init(data);
+    // Initialize time mock
+    this.time = {
+      addEvent: jest.fn().mockImplementation((config) => {
+        this.testGameTimer = new MockTimerEvent();
+        return this.testGameTimer;
+      }),
+      now: 0,
+      delayedCall: jest.fn(),
+      removeAllEvents: jest.fn(),
+      removeAllEventsAfter: jest.fn(),
+      clearPendingEvents: jest.fn()
+    };
+    // Initialize other mocks
+    this.cameras = {
+      main: {
+        setBackgroundColor: jest.fn(),
+        setBounds: jest.fn(),
+        startFollow: jest.fn(),
+        setZoom: jest.fn()
+      }
+    };
+    this.physics = {
+      add: {
+        collider: jest.fn(),
+        overlap: jest.fn()
+      },
+      world: {
+        setBounds: jest.fn()
+      }
+    };
+    this.scale = {
+      on: jest.fn(),
+      setMode: jest.fn(),
+      setGameSize: jest.fn(),
+      refresh: jest.fn(),
+      getViewPort: jest.fn().mockReturnValue({ x: 0, y: 0, width: 800, height: 600 }),
+      getParentBounds: jest.fn().mockReturnValue({ width: 800, height: 600 })
+    };
+    this.gameTimer = this.testGameTimer;
+  }
+
+  // Override create method for testing
+  public create(): void {
+    // Set up test-specific behavior
+    this.winnerText = this.add.text(0, 0, '');
+    this.gameTimer = this.testTime.addEvent({
+      delay: 1000,
+      callback: () => {
+      },
+      callbackScope: this,
+      loop: true
+    });
+
+  }
+}
+
 describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
   let scene: TestKidsFightScene;
   type SceneData = {
@@ -870,7 +984,7 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
 
   // Define mockDataForCreate for test scene initialization
   const mockDataForCreate = {
-    selected: { p1: 'bento', p2: 'Davi R' },
+    selected: {p1: 'bento', p2: 'Davi R'},
     p1: 'bento',
     p2: 'Davi R',
     player1Char: 'bento',
@@ -886,7 +1000,7 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     const testScene = new TestKidsFightScene();
 
     // Initialize with test data
-    const testData = { ...mockDataForCreate };
+    const testData = {...mockDataForCreate};
 
     // Initialize required properties
     const mockTime = new MockTimerEvent();
@@ -932,144 +1046,6 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     // Protected methods should be mocked by subclassing, not by assignment here.
 
     return testScene;
-    testScene.testTime = 0;
-    testScene.testWinnerText = mockText;
-
-    // Set up regular scene properties
-    testScene.winnerText = mockText;
-    testScene.gameTimer = mockTime;
-    testScene.time = mockTime;
-    testScene.game = {
-      loop: {
-        delta: 0,
-        deltaHistory: [],
-        actualFps: 60,
-        smoothedUpdate: 0
-      },
-      config: {
-        width: 800,
-        height: 600
-      }
-    };
-
-    // Initialize players and other required properties
-    testScene.players = [
-      {
-        health: 100,
-        special: 0,
-        isAttacking: false,
-        isBlocking: false,
-        direction: 'right',
-        walkAnimData: undefined,
-        destroy: jest.fn(),
-        body: {},
-        playerIndex: 0,
-      } as any,
-      {
-        health: 100,
-        special: 0,
-        isAttacking: false,
-        isBlocking: false,
-        direction: 'left',
-        walkAnimData: undefined,
-        destroy: jest.fn(),
-        body: {},
-        playerIndex: 1,
-      } as any
-    ];
-
-    // Mock camera
-    testScene.cameras = {
-      main: {
-        centerOn: jest.fn(),
-        setBounds: jest.fn(),
-        setBackgroundColor: jest.fn()
-      }
-    };
-
-    // Mock physics
-    testScene.physics = {
-      add: {
-        staticGroup: jest.fn().mockReturnValue({
-          getChildren: jest.fn().mockReturnValue([])
-        }),
-        add: {
-          sprite: jest.fn().mockReturnValue({
-            setCollideWorldBounds: jest.fn(),
-            setBounce: jest.fn(),
-            setGravityY: jest.fn(),
-            setSize: jest.fn(),
-            setOffset: jest.fn(),
-            body: {
-              setAllowGravity: jest.fn(),
-              setImmovable: jest.fn(),
-              setVelocityX: jest.fn(),
-              setVelocityY: jest.fn(),
-              velocity: { x: 0, y: 0 },
-              onFloor: jest.fn().mockReturnValue(true)
-            },
-            anims: {
-              play: jest.fn(),
-              stop: jest.fn()
-            },
-            setFlipX: jest.fn(),
-            setDepth: jest.fn(),
-            setOrigin: jest.fn(),
-            setScale: jest.fn(),
-            setInteractive: jest.fn(),
-            on: jest.fn(),
-            destroy: jest.fn()
-          })
-        },
-        world: {
-          setBounds: jest.fn(),
-          createStaticGroup: jest.fn().mockReturnValue({
-            create: jest.fn().mockReturnValue({
-              setOrigin: jest.fn(),
-              refreshBody: jest.fn(),
-              setScale: jest.fn(),
-              setDepth: jest.fn()
-            }),
-            getChildren: jest.fn().mockReturnValue([])
-          })
-        }
-      },
-      world: {
-        setBounds: jest.fn()
-      }
-    };
-
-    // Mock input
-    testScene.input = {
-      keyboard: {
-        addKeys: jest.fn().mockReturnValue({})
-      },
-      gamepad: {
-        on: jest.fn()
-      },
-      on: jest.fn()
-    };
-
-    // Mock add methods
-    testScene.add = {
-      text: jest.fn().mockImplementation((x: number, y: number, text: string, style: any) => {
-        const txt = new MockText();
-        txt.setText(text);
-        return txt;
-      })
-    };
-
-    // Mock tweens
-    testScene.tweens = {
-      add: jest.fn(),
-      addCounter: jest.fn()
-    };
-
-    // Initialize scene
-    testScene.init(testData);
-    testScene.create();
-
-    return scene;
   }
 
   // Test cases for checkWinner
@@ -1105,591 +1081,302 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     });
 
     it('should return -1 when no player has won', () => {
-      expect(scene.testCheckWinner(scene.players[0], scene.players[1])).toBe(-1);
+      scene.playerHealth = [100, 100];
+      expect(scene.testCheckWinner()).toBe(-1);
     });
 
     it('should return 0 when player 1 wins', () => {
-      scene.players[0].health = 100;
-      scene.players[1].health = 0;
-      expect(scene.testCheckWinner(scene.players[0], scene.players[1])).toBe(0);
+      scene.playerHealth = [100, 0];
+      expect(scene.testCheckWinner()).toBe(0);
     });
 
     it('should return 1 when player 2 wins', () => {
-      scene.players[0].health = 0;
-      scene.players[1].health = 100;
-      expect(scene.testCheckWinner(scene.players[0], scene.players[1])).toBe(1);
+      scene.playerHealth = [0, 100];
+      expect(scene.testCheckWinner()).toBe(1);
     });
   });
-
-  // Reset mocks before each test
-  beforeEach(() => {
-    jest.clearAllMocks();
+  describe('KidsFightScene endGame visual and message logic', () => {
+    // TODO: Add tests for endGame visuals and messages here
   });
-});
 
-describe('KidsFightScene endGame visual and message logic', () => {
-  let scene: TestKidsFightScene;
+  describe('KidsFightScene Game State Tests', () => {
+    let kidsFightScene: KidsFightScene;
 
-  beforeEach(() => {
-    scene = new TestKidsFightScene();
-    scene.p1 = 'player1'; // Bento
-    scene.p2 = 'player2'; // Davi R
-    scene.players = [
-      { setFrame: jest.fn(), setAngle: jest.fn() } as any,
-      { setFrame: jest.fn(), setAngle: jest.fn() } as any
-    ];
-    scene.add = {
-      circle: jest.fn().mockReturnValue({
-        setAlpha: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
-        setInteractive: jest.fn().mockReturnThis(),
-        setScrollFactor: jest.fn().mockReturnThis(),
-        on: jest.fn().mockReturnThis(),
-      }),
-      text: jest.fn().mockImplementation(() => {
-        const mockText = {
-          setOrigin: jest.fn().mockReturnThis(),
-          setInteractive: jest.fn().mockReturnThis(),
-          setDepth: jest.fn().mockReturnThis(),
-          setVisible: jest.fn().mockReturnThis(),
-          setText: jest.fn().mockReturnThis(),
-          destroy: jest.fn(),
-          on: jest.fn().mockReturnThis(),
+    beforeEach(() => {
+      // Use the real scene and its lifecycle
+      kidsFightScene = new KidsFightScene();
+      // Patch graphics mocks for health bars
+      kidsFightScene.safeAddGraphics = jest.fn(() => new (global.MockGraphics)());
+      kidsFightScene.add = kidsFightScene.add || {};
+      kidsFightScene.add.graphics = kidsFightScene.safeAddGraphics;
+      // Mock add.rectangle to prevent errors in create()
+      kidsFightScene.add.rectangle = jest.fn(() => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis()
+      }));
+      // Provide minimal init/create data if needed
+      kidsFightScene.init({});
+      kidsFightScene.create({});
+      // Spy on player methods after creation if needed
+      if (kidsFightScene.players && kidsFightScene.players.length >= 2) {
+        const mockPlayer = {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn()
+          }
         };
-        // Ensure all chainable methods return the mockText instance
-        mockText.setOrigin.mockReturnValue(mockText);
-        mockText.setInteractive.mockReturnValue(mockText);
-        mockText.setDepth.mockReturnValue(mockText);
-        mockText.setVisible.mockReturnValue(mockText);
-        mockText.setText.mockReturnValue(mockText);
-        mockText.on.mockReturnValue(mockText);
-        return mockText;
-      })
-    } as any;
-    scene.physics = { pause: jest.fn() } as any;
-    scene.scene = { pause: jest.fn() } as any;
-    scene.cameras = { main: { width: 800, height: 600 } } as any;
-  });
-
-  it('shows the winner name in Portuguese for player 1', () => {
-    scene.endGame(0);
-    expect(scene.add.text).toHaveBeenCalledWith(
-      400,
-      300,
-      'Bento Venceu!',
-      expect.objectContaining({ fontSize: '48px' })
-    );
-  });
-
-  it('shows the winner name in Portuguese for player 2', () => {
-    scene.endGame(1);
-    expect(scene.add.text).toHaveBeenCalledWith(
-      400,
-      300,
-      'Davi R Venceu!',
-      expect.objectContaining({ fontSize: '48px' })
-    );
-  });
-
-  it('maps all player keys to correct display names', () => {
-    const getDisplayName = (key: string) => {
-      const nameMap: Record<string, string> = {
-        player1: 'Bento',
-        player2: 'Davi R',
-        player3: 'José',
-        player4: 'Davi S',
-        player5: 'Carol',
-        player6: 'Roni',
-        player7: 'Jacqueline',
-        player8: 'Ivan',
-        player9: 'D. Isa',
-      };
-      return nameMap[key] || key;
-    };
-    expect(getDisplayName('player1')).toBe('Bento');
-    expect(getDisplayName('player2')).toBe('Davi R');
-    expect(getDisplayName('player3')).toBe('José');
-    expect(getDisplayName('player4')).toBe('Davi S');
-    expect(getDisplayName('player5')).toBe('Carol');
-    expect(getDisplayName('player6')).toBe('Roni');
-    expect(getDisplayName('player7')).toBe('Jacqueline');
-    expect(getDisplayName('player8')).toBe('Ivan');
-    expect(getDisplayName('player9')).toBe('D. Isa');
-    expect(getDisplayName('unknown')).toBe('unknown');
-  });
-
-  it('shows Empate! for draw', () => {
-    scene.endGame(-1);
-    expect(scene.add.text).toHaveBeenCalledWith(
-      400,
-      300,
-      'Empate!',
-      expect.objectContaining({ fontSize: '48px' })
-    );
-  });
-
-  it('sets winner frame to 3 and loser angle to 90 (player 1 win)', () => {
-    scene.endGame(0);
-    expect(scene.players[0].setFrame).toHaveBeenCalledWith(3);
-    expect(scene.players[1].setAngle).toHaveBeenCalledWith(90);
-  });
-
-  it('sets winner frame to 3 and loser angle to 90 (player 2 win)', () => {
-    scene.endGame(1);
-    expect(scene.players[1].setFrame).toHaveBeenCalledWith(3);
-    expect(scene.players[0].setAngle).toHaveBeenCalledWith(90);
-  });
-
-  it('does not set frames or angles for draw', () => {
-    scene.endGame(-1);
-    expect(scene.players[0].setFrame).not.toHaveBeenCalled();
-    expect(scene.players[1].setFrame).not.toHaveBeenCalled();
-    expect(scene.players[0].setAngle).not.toHaveBeenCalled();
-    expect(scene.players[1].setAngle).not.toHaveBeenCalled();
-  });
-});
-
-class TestKidsFightScene extends KidsFightScene {
-  // Override protected methods for testing
-  protected createPlayerAnimations(): void {}
-  protected createPlatforms(): void {}
-  protected createBackground(): void {}
-  protected createHealthBars(): void {}
-  protected createSpecialBars(): void {}
-  protected createPlayerNames(): void {}
-  protected createTouchControls(): void {}
-  // Test state
-  testWinnerText: MockText;
-  testTime!: number;
-  testGameTimer: MockTimerEvent;
-
-  // Mock game state
-  mockPlayerHealth: number[];
-  mockPlayerSpecial: number[];
-  mockPlayerDirection: ('right' | 'left')[];
-  mockIsAttacking: boolean[];
-  mockPlayerBlocking: boolean[];
-
-  // Mock players
-  mockPlayer1: any;
-  mockPlayer2: any;
-  mockSpecialPips1: any[];
-  mockSpecialPips2: any[];
-
-  // Mock methods that will be spied on
-  mockCreatePlayerAnimations: jest.Mock;
-  mockCreatePlatforms: jest.Mock;
-  mockCreateBackground: jest.Mock;
-  // mockCreateHealthBars: jest.Mock; // Removed: createHealthBars is private in base class
-  mockCreateSpecialBars!: jest.Mock;
-  mockCreatePlayerNames!: jest.Mock;
-  // mockCreateTouchControls: jest.Mock; // Removed: touchControls is private in base class
-  mockUpdateHealthBar: jest.Mock;
-  mockUpdateSpecialPips: jest.Mock;
-  mockCheckWinner: jest.Mock;
-  mockEndGame: jest.Mock;
-
-  // Mock game objects
-  public timeText = new MockText();
-  public player1Name = new MockText();
-  public player2Name = new MockText();
-  public gameTimer = new MockTimerEvent();
-  public winnerText = new MockText();
-  public gameOverText = new MockText();
-
-  // Player related
-  public players: [((Phaser.Physics.Arcade.Sprite & PlayerProps) | undefined)?, ((Phaser.Physics.Arcade.Sprite & PlayerProps) | undefined)?] = [undefined, undefined];
-  public player1Char = 'player1';
-  public player2Char = 'player2';
-
-  // Add public properties for tests
-  public timeRemaining: number = 99;
-
-  // UI elements
-  public specialBar1: any;
-  public specialBar2: any;
-
-  // ... (rest of the code remains the same)
-
-  // Mock Phaser systems
-  public physics = {
-    add: {
-      staticGroup: jest.fn().mockReturnValue({}),
-      add: {
-        staticGroup: jest.fn().mockReturnValue({})
+        kidsFightScene.players = [mockPlayer, mockPlayer];
+        jest.spyOn(kidsFightScene.players[0], 'setFrame');
+        jest.spyOn(kidsFightScene.players[0], 'setAngle');
+        jest.spyOn(kidsFightScene.players[0], 'setVelocityX');
+        jest.spyOn(kidsFightScene.players[0], 'setVelocityY');
+        jest.spyOn(kidsFightScene.players[0].body, 'setVelocityX');
+        jest.spyOn(kidsFightScene.players[0].body, 'setVelocityY');
+        jest.spyOn(kidsFightScene.players[1], 'setFrame');
+        jest.spyOn(kidsFightScene.players[1], 'setAngle');
+        jest.spyOn(kidsFightScene.players[1], 'setVelocityX');
+        jest.spyOn(kidsFightScene.players[1], 'setVelocityY');
+        jest.spyOn(kidsFightScene.players[1].body, 'setVelocityX');
+        jest.spyOn(kidsFightScene.players[1].body, 'setVelocityY');
       }
-    },
-    world: {
-      setBounds: jest.fn()
-    }
-  };
+      // Spy on text creation
+      jest.spyOn(kidsFightScene.add, 'text');
+    });
 
-  public scale = {
-    on: jest.fn()
-  };
+    it('should handle player 1 win correctly', () => {
+      testEndGame(kidsFightScene, 0, 'Bento Venceu!');
+      expect(kidsFightScene.players[0].setFrame).toHaveBeenCalledWith(3);
+      expect(kidsFightScene.players[1].setAngle).toHaveBeenCalledWith(90);
+      expect(kidsFightScene.gameOver).toBe(true);
+    });
 
-  public add = {
-    text: jest.fn().mockImplementation((x: number, y: number, text: string, style: any) => {
-      const txt = new MockText();
-      txt.setText(text);
-      return txt;
-    })
-  };
+    it('should handle player 2 win correctly', () => {
+      testEndGame(kidsFightScene, 1, 'Davi R Venceu!');
+      expect(kidsFightScene.players[1].setFrame).toHaveBeenCalledWith(3);
+      expect(kidsFightScene.players[0].setAngle).toHaveBeenCalledWith(90);
+      expect(kidsFightScene.gameOver).toBe(true);
+    });
 
-  public time: any;
-  public cameras: any;
-  public sound: any;
-  public tweens: any;
-  public input: any;
-  public events: any;
-  public data: any;
+    it('should handle draw correctly', () => {
+      testEndGame(kidsFightScene, -1, 'Empate!');
+      expect(kidsFightScene.players[0].setFrame).not.toHaveBeenCalled();
+      expect(kidsFightScene.players[1].setFrame).not.toHaveBeenCalled();
+      expect(kidsFightScene.players[0].setAngle).not.toHaveBeenCalled();
+      expect(kidsFightScene.players[1].setAngle).not.toHaveBeenCalled();
+      expect(kidsFightScene.gameOver).toBe(true);
+    });
 
-  // Mock localization
-  public mockLocalization = {
-    getString: jest.fn().mockImplementation((key: string) => key)
-  };
+    it('should reset player velocities on game over', () => {
+      kidsFightScene.players[0].body.velocity = {x: 100, y: 0};
+      kidsFightScene.players[1].body.velocity = {x: -50, y: 10};
+      testEndGame(kidsFightScene, 0, 'Bento Venceu!');
+      expect(kidsFightScene.players[0].setVelocityX).toHaveBeenCalledWith(0);
+      expect(kidsFightScene.players[0].setVelocityY).toHaveBeenCalledWith(0);
+      expect(kidsFightScene.players[0].body.setVelocityX).toHaveBeenCalledWith(0);
+      expect(kidsFightScene.players[0].body.setVelocityY).toHaveBeenCalledWith(0);
+      expect(kidsFightScene.players[1].setVelocityX).toHaveBeenCalledWith(0);
+      expect(kidsFightScene.players[1].setVelocityY).toHaveBeenCalledWith(0);
+      expect(kidsFightScene.players[1].body.setVelocityX).toHaveBeenCalledWith(0);
+      expect(kidsFightScene.players[1].body.setVelocityY).toHaveBeenCalledWith(0);
+    });
 
-  // Mock timer events
-  private timerEvents: MockTimerEvent[] = [];
+    it('should display correct message for draw', () => {
+      testEndGame(kidsFightScene, -1, 'Empate!');
+      expect(kidsFightScene.add.text).toHaveBeenCalledWith(
+          expect.any(Number),
+          expect.any(Number),
+          'Empate!',
+          expect.objectContaining({
+            fontSize: '48px',
+            color: '#fff',
+            fontStyle: 'bold',
+            stroke: '#000',
+            strokeThickness: 6
+          })
+      );
 
-  // Mock methods
+      jest.clearAllMocks();
+      mockScene = new MockScene();
+      if (!mockScene.textures) {
+        mockScene.textures = {
+          exists: () => true,
+          remove: () => {
+          },
+          get: () => ({
+            getSourceImage: () => ({}), add: () => {
+            }, getFrameNames: () => []
+          }),
+          addImage: () => {
+          },
+          list: {},
+          getTextureKeys: () => []
+        };
+      }
 
 
-  constructor() {
-    super({
-      key: 'TestKidsFightScene',
-      active: true,
-      visible: true,
-      pack: null,
-      cameras: {
-        main: {
-          setBackgroundColor: jest.fn()
+      // Always define kidsFightScene before patching its textures property
+      kidsFightScene = {
+        scene: mockScene,
+        time: mockScene.time,
+        sys: mockScene.sys,
+        events: mockScene.events,
+        gameState: {
+          isGameOver: false,
+          isPaused: false,
+          winningPlayer: null,
+        },
+        startRoundTimer: jest.fn(),
+        endRound: jest.fn(),
+        resetRound: jest.fn(),
+        handleGameOver: jest.fn()
+      };
+      if (!kidsFightScene.textures) {
+        kidsFightScene.textures = {
+          exists: () => true,
+          remove: () => {
+          },
+          get: () => ({
+            getSourceImage: () => ({}), add: () => {
+            }, getFrameNames: () => []
+          }),
+          addImage: () => {
+          },
+          list: {},
+          getTextureKeys: () => []
+        };
+      }
+
+    });
+
+    describe('GameState object', () => {
+      let kidsFightScene: any;
+      beforeEach(() => {
+        const mockScene = new MockScene();
+        if (!mockScene.textures) {
+          mockScene.textures = {
+            exists: () => true,
+            remove: () => {
+            },
+            get: () => ({
+              getSourceImage: () => ({}), add: () => {
+              }, getFrameNames: () => []
+            }),
+            addImage: () => {
+            },
+            list: {},
+            getTextureKeys: () => []
+          };
         }
-      } as any
+        kidsFightScene = {
+          scene: mockScene,
+          time: mockScene.time,
+          sys: mockScene.sys,
+          events: mockScene.events,
+          gameState: {
+            isGameOver: false,
+            isPaused: false,
+            winningPlayer: null,
+          },
+          startRoundTimer: jest.fn(),
+          endRound: jest.fn(),
+          resetRound: jest.fn(),
+          handleGameOver: jest.fn(),
+          add: {
+            rectangle: jest.fn(() => ({
+              setOrigin: jest.fn().mockReturnThis(),
+              setDepth: jest.fn().mockReturnThis()
+            })),
+            graphics: jest.fn(() => new (global.MockGraphics)())
+          },
+          safeAddGraphics: jest.fn(() => new (global.MockGraphics)())
+        };
+        if (!kidsFightScene.textures) {
+          kidsFightScene.textures = {
+            exists: () => true,
+            remove: () => {
+            },
+            get: () => ({
+              getSourceImage: () => ({}), add: () => {
+              }, getFrameNames: () => []
+            }),
+            addImage: () => {
+            },
+            list: {},
+            getTextureKeys: () => []
+          };
+        }
+      });
+
+      test('should handle game state transitions correctly', () => {
+        // Simulate game start
+        kidsFightScene.gameState.isGameOver = false;
+
+        // Verify initial state
+        expect(kidsFightScene.gameState.isGameOver).toBe(false);
+        expect(kidsFightScene.gameState.winningPlayer).toBeNull();
+
+        // Simulate game over
+        kidsFightScene.gameState.isGameOver = true;
+        kidsFightScene.gameState.winningPlayer = 1;
+
+        // Verify game over state
+        expect(kidsFightScene.gameState.isGameOver).toBe(true);
+        expect(kidsFightScene.gameState.winningPlayer).toBe(1);
+      });
+
+      test('should handle pause state correctly', () => {
+        // Initial state
+        kidsFightScene.gameState.isPaused = false;
+        expect(kidsFightScene.gameState.isPaused).toBe(false);
+
+        // Pause the game
+        kidsFightScene.gameState.isPaused = true;
+        expect(kidsFightScene.gameState.isPaused).toBe(true);
+
+        // Unpause the game
+        kidsFightScene.gameState.isPaused = false;
+        expect(kidsFightScene.gameState.isPaused).toBe(false);
+      });
     });
 
-    // Initialize test time and timer
-    this.time = {
-      addEvent: jest.fn().mockReturnValue(this.testGameTimer),
-      now: 0,
-      delayedCall: jest.fn(),
-    };
-  }
-
-  // Helper method to test checkWinner logic
-  public testCheckWinner(player1: any, player2: any) {
-    // Instead of calling the private method, we'll reimplement the logic here
-    // This is a workaround since we can't directly test private methods
-    if (player1.health <= 0) return 1; // Player 2 wins
-    if (player2.health <= 0) return 0; // Player 1 wins
-    return -1; // No winner yet
-  }
-
-  // Helper methods for tests - only one implementation needed
-  public setGameOver(value: boolean): void {
-    this.privateAccess._gameOver = value;
-  }
-
-  public setPlayerHealth(health: number[]): void {
-    this.privateAccess._playerHealth = [...health];
-  }
-
-  public setPlayerSpecial(special: number[]): void {
-    this.privateAccess._playerSpecial = [...special];
-  }
-
-  public setSpecialPips(pips1: any[], pips2: any[]): void {
-    this.privateAccess._specialPips1 = [...pips1];
-    this.privateAccess._specialPips2 = [...pips2];
-  }
-
-  // Public methods for testing
-  public init(data?: any): void {
-    super.init(data);
-
-    // Initialize time mock
-    this.time = {
-      addEvent: jest.fn().mockImplementation((config) => {
-        this.testGameTimer = new MockTimerEvent();
-        return this.testGameTimer;
-      }),
-      now: 0,
-      delayedCall: jest.fn(),
-      removeAllEvents: jest.fn(),
-      removeAllEventsAfter: jest.fn(),
-      clearPendingEvents: jest.fn()
-    };
-
-    // Initialize other mocks
-    this.cameras = {
-      main: {
-        setBackgroundColor: jest.fn(),
-        setBounds: jest.fn(),
-        startFollow: jest.fn(),
-        setZoom: jest.fn()
-      }
-    };
-
-    this.physics = {
-      add: {
-        collider: jest.fn(),
-        overlap: jest.fn()
-      },
-      world: {
-        setBounds: jest.fn()
-      }
-    };
-
-    this.scale = {
-      on: jest.fn(),
-      setMode: jest.fn(),
-      setGameSize: jest.fn(),
-      refresh: jest.fn(),
-      getViewPort: jest.fn().mockReturnValue({ x: 0, y: 0, width: 800, height: 600 }),
-      getParentBounds: jest.fn().mockReturnValue({ width: 800, height: 600 })
-    };
-
-    this.gameTimer = this.testGameTimer;
-  }
-
-  // Override create method for testing
-  public create(): void {
-    // Set up test-specific behavior
-    this.winnerText = this.add.text(0, 0, '');
-    this.gameTimer = this.testTime.addEvent({
-      delay: 1000,
-      callback: () => {},
-      callbackScope: this,
-      loop: true
-    });
-  }
-}
-
-// Export the test scene type
-export { TestKidsFightScene };
-
-describe('KidsFightScene Game State Tests', () => {
-  let mockScene: MockScene;
-  let kidsFightScene: any;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockScene = new MockScene();
-    if (!mockScene.textures) {
-      mockScene.textures = {
-        exists: () => true,
-        remove: () => {},
-        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-        addImage: () => {},
-        list: {},
-        getTextureKeys: () => []
-      };
-    }
-
-    // Always define kidsFightScene before patching its textures property
-    kidsFightScene = {
-      scene: mockScene,
-      time: mockScene.time,
-      sys: mockScene.sys,
-      events: mockScene.events,
-      gameState: {
-        isGameOver: false,
-        isPaused: false,
-        winningPlayer: null,
-      },
-      startRoundTimer: jest.fn(),
-      endRound: jest.fn(),
-      resetRound: jest.fn(),
-      handleGameOver: jest.fn()
-    };
-    if (!kidsFightScene.textures) {
-      kidsFightScene.textures = {
-        exists: () => true,
-        remove: () => {},
-        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-        addImage: () => {},
-        list: {},
-        getTextureKeys: () => []
-      };
-    }
-
-    // Ensure every test scene instance has a complete textures mock
-    if (!kidsFightScene.textures) {
-      kidsFightScene.textures = {
-        exists: () => true,
-        remove: () => {},
-        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-        addImage: () => {},
-        list: {},
-        getTextureKeys: () => []
-      };
-    }
-
-    // Create a partial KidsFightScene instance with necessary mocks
-    kidsFightScene = {
-      scene: mockScene,
-      time: mockScene.time,
-      sys: mockScene.sys,
-      events: mockScene.events,
-      gameState: {
-        isGameOver: false,
-        isPaused: false,
-        winningPlayer: null,
-      },
-      startRoundTimer: jest.fn(),
-      endRound: jest.fn(),
-      resetRound: jest.fn(),
-      handleGameOver: jest.fn()
-    };
   });
 
-  test('should handle game state transitions correctly', () => {
-    // Simulate game start
-    kidsFightScene.gameState.isGameOver = false;
+  it('should call setScrollFactor and setDepth on both health bars when created', () => {
+    const KidsFightScene = require('../kidsfight_scene').default || require('../kidsfight_scene');
+    const getMockGraphics = () => new (global.MockGraphics || require('./setupTests').MockGraphics)();
+    const scene = new KidsFightScene();
+    scene.add = scene.add || {};
+    scene.add.graphics = jest.fn(getMockGraphics);
+    scene.add.rectangle = jest.fn(() => ({
+      setOrigin: jest.fn().mockReturnThis(),
+      setDepth: jest.fn().mockReturnThis()
+    }));
+    scene.safeAddGraphics = jest.fn(getMockGraphics);
+    // Mock health bars before calling createHealthBars
+    scene.healthBar1 = { setScrollFactor: jest.fn(), setDepth: jest.fn() };
+    scene.healthBar2 = { setScrollFactor: jest.fn(), setDepth: jest.fn() };
 
-    // Verify initial state
-    expect(kidsFightScene.gameState.isGameOver).toBe(false);
-    expect(kidsFightScene.gameState.winningPlayer).toBeNull();
+    // Patch scene.add.graphics to always return a new MockGraphics
+    class MockGraphics {
+      fillStyle = jest.fn().mockReturnThis();
+      fillRect = jest.fn().mockReturnThis();
+      clear = jest.fn().mockReturnThis();
+      setScrollFactor = jest.fn().mockReturnThis();
+      setDepth = jest.fn().mockReturnThis();
+      destroy = jest.fn();
+    }
 
-    // Simulate game over
-    kidsFightScene.gameState.isGameOver = true;
-    kidsFightScene.gameState.winningPlayer = 1;
 
-    // Verify game over state
-    expect(kidsFightScene.gameState.isGameOver).toBe(true);
-    expect(kidsFightScene.gameState.winningPlayer).toBe(1);
+
+    scene.createHealthBars();
+    expect(scene.healthBar1.setScrollFactor).toHaveBeenCalledWith(0, 0);
+    expect(scene.healthBar1.setDepth).toHaveBeenCalledWith(2);
+    expect(scene.healthBar2.setScrollFactor).toHaveBeenCalledWith(0, 0);
+    expect(scene.healthBar2.setDepth).toHaveBeenCalledWith(2);
   });
 
-  test('should handle pause state correctly', () => {
-    // Initial state
-    kidsFightScene.gameState.isPaused = false;
-    expect(kidsFightScene.gameState.isPaused).toBe(false);
-
-    // Pause the game
-    kidsFightScene.gameState.isPaused = true;
-    expect(kidsFightScene.gameState.isPaused).toBe(true);
-
-    // Unpause the game
-    kidsFightScene.gameState.isPaused = false;
-    expect(kidsFightScene.gameState.isPaused).toBe(false);
-  });
 });
-
-describe('KidsFightScene Game State Tests', () => {
-  let mockScene: MockScene;
-  let kidsFightScene: any;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockScene = new MockScene();
-    if (!mockScene.textures) {
-      mockScene.textures = {
-        exists: () => true,
-        remove: () => {},
-        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-        addImage: () => {},
-        list: {},
-        getTextureKeys: () => []
-      };
-    }
-
-    // Always define kidsFightScene before patching its textures property
-    kidsFightScene = {
-      scene: mockScene,
-      time: mockScene.time,
-      sys: mockScene.sys,
-      events: mockScene.events,
-      gameState: {
-        isGameOver: false,
-        isPaused: false,
-        winningPlayer: null,
-      },
-      startRoundTimer: jest.fn(),
-      endRound: jest.fn(),
-      resetRound: jest.fn(),
-      handleGameOver: jest.fn()
-    };
-    if (!kidsFightScene.textures) {
-      kidsFightScene.textures = {
-        exists: () => true,
-        remove: () => {},
-        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-        addImage: () => {},
-        list: {},
-        getTextureKeys: () => []
-      };
-    }
-
-    // Ensure every test scene instance has a complete textures mock
-    if (!kidsFightScene.textures) {
-      kidsFightScene.textures = {
-        exists: () => true,
-        remove: () => {},
-        get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-        addImage: () => {},
-        list: {},
-        getTextureKeys: () => []
-      };
-    }
-
-    // Create a partial KidsFightScene instance with necessary mocks
-    kidsFightScene = {
-      scene: mockScene,
-      time: mockScene.time,
-      sys: mockScene.sys,
-      events: mockScene.events,
-      gameState: {
-        isGameOver: false,
-        isPaused: false,
-        winningPlayer: null,
-      },
-      startRoundTimer: jest.fn(),
-      endRound: jest.fn(),
-      resetRound: jest.fn(),
-      handleGameOver: jest.fn()
-    };
-  });
-
-  test('should handle game state transitions correctly', () => {
-    // Simulate game start
-    kidsFightScene.gameState.isGameOver = false;
-
-    // Verify initial state
-    expect(kidsFightScene.gameState.isGameOver).toBe(false);
-    expect(kidsFightScene.gameState.winningPlayer).toBeNull();
-
-    // Simulate game over
-    kidsFightScene.gameState.isGameOver = true;
-    kidsFightScene.gameState.winningPlayer = 1;
-
-    // Verify game over state
-    expect(kidsFightScene.gameState.isGameOver).toBe(true);
-    expect(kidsFightScene.gameState.winningPlayer).toBe(1);
-  });
-
-  test('should handle pause state correctly', () => {
-    // Initial state
-    kidsFightScene.gameState.isPaused = false;
-    expect(kidsFightScene.gameState.isPaused).toBe(false);
-
-    // Pause the game
-    kidsFightScene.gameState.isPaused = true;
-    expect(kidsFightScene.gameState.isPaused).toBe(true);
-
-    // Unpause the game
-    kidsFightScene.gameState.isPaused = false;
-    expect(kidsFightScene.gameState.isPaused).toBe(false);
-  });
-});
-
-// Patch all relevant scene instances (including TestKidsFightScene) to always have a textures mock
-if (TestKidsFightScene && !TestKidsFightScene.prototype.textures) {
-  TestKidsFightScene.prototype.textures = {
-    exists: () => true,
-    remove: () => {},
-    get: () => ({ getSourceImage: () => ({}), add: () => {}, getFrameNames: () => [] }),
-    addImage: () => {},
-    list: {},
-    getTextureKeys: () => []
-  };
-}

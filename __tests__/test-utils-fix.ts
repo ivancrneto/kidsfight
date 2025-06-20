@@ -228,94 +228,43 @@ export class MockWebSocketManager {
 // Setup mock for Phaser scene
 export function setupMockScene(scene: any) {
   // Set up basic scene properties
-  scene.sys = {
-    game: {
-      canvas: {
-        width: 800,
-        height: 600
-      }
-    },
-    settings: {
-      physics: {
-        arcade: {}
+  Object.defineProperty(scene, 'sys', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: {
+      game: {
+        canvas: {
+          width: 800,
+          height: 600
+        }
+      },
+      settings: {
+        physics: {
+          arcade: {}
+        }
       }
     }
-  };
+  });
   
   // Create a mock add object for creating game objects
-  scene.add = {
-    graphics: jest.fn().mockReturnValue({
-      fillStyle: jest.fn().mockReturnThis(),
-      fillRect: jest.fn().mockReturnThis(),
-      clear: jest.fn().mockReturnThis(),
-      setPosition: jest.fn().mockReturnThis(),
-      setSize: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis(),
-      destroy: jest.fn(),
-      lineStyle: jest.fn().mockReturnThis(),
-      lineBetween: jest.fn().mockReturnThis(),
-      strokeRect: jest.fn().mockReturnThis(),
-    }),
-    sprite: jest.fn().mockReturnValue({
-      setOrigin: jest.fn().mockReturnThis(),
-      setPosition: jest.fn().mockReturnThis(),
-      setScale: jest.fn().mockReturnThis(),
-      setDepth: jest.fn().mockReturnThis(),
-      setFrame: jest.fn().mockReturnThis(),
-      setInteractive: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis(),
-      destroy: jest.fn(),
-      on: jest.fn().mockImplementation((event, callback) => {
-        if (callback) callback();
-        return this;
+  Object.defineProperty(scene, 'add', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: {
+      graphics: jest.fn().mockReturnValue({
+        fillStyle: jest.fn().mockReturnThis(),
+        fillRect: jest.fn().mockReturnThis(),
+        clear: jest.fn().mockReturnThis(),
+        setPosition: jest.fn().mockReturnThis(),
+        setSize: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+        lineStyle: jest.fn().mockReturnThis(),
+        lineBetween: jest.fn().mockReturnThis(),
+        strokeRect: jest.fn().mockReturnThis(),
       }),
-      play: jest.fn(),
-      anims: {
-        play: jest.fn()
-      }
-    }),
-    text: jest.fn().mockReturnValue({
-      setOrigin: jest.fn().mockReturnThis(),
-      setPosition: jest.fn().mockReturnThis(),
-      setStyle: jest.fn().mockReturnThis(),
-      setText: jest.fn().mockReturnThis(),
-      setInteractive: jest.fn().mockReturnThis(),
-      setFontSize: jest.fn().mockReturnThis(),
-      setDepth: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis(),
-      destroy: jest.fn(),
-      on: jest.fn().mockImplementation((event, callback) => {
-        if (callback) callback();
-        return this;
-      })
-    }),
-    image: jest.fn().mockReturnValue({
-      setOrigin: jest.fn().mockReturnThis(),
-      setPosition: jest.fn().mockReturnThis(),
-      setScale: jest.fn().mockReturnThis(),
-      setDepth: jest.fn().mockReturnThis(),
-      setInteractive: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis(),
-      on: jest.fn().mockImplementation((event, callback) => {
-        if (callback) callback();
-        return this;
-      }),
-      destroy: jest.fn()
-    }),
-    tween: jest.fn().mockReturnValue({
-      to: jest.fn().mockReturnThis(),
-      setEase: jest.fn().mockReturnThis(),
-      setCallback: jest.fn().mockReturnThis(),
-      start: jest.fn()
-    })
-  };
-  
-  // Create a mock physics system
-  scene.physics = {
-    world: {
-      setBounds: jest.fn()
-    },
-    add: {
       sprite: jest.fn().mockReturnValue({
         setOrigin: jest.fn().mockReturnThis(),
         setPosition: jest.fn().mockReturnThis(),
@@ -323,64 +272,130 @@ export function setupMockScene(scene: any) {
         setDepth: jest.fn().mockReturnThis(),
         setFrame: jest.fn().mockReturnThis(),
         setInteractive: jest.fn().mockReturnThis(),
-        setVelocity: jest.fn().mockReturnThis(),
-        setVelocityX: jest.fn().mockReturnThis(),
-        setVelocityY: jest.fn().mockReturnThis(),
-        setCollideWorldBounds: jest.fn().mockReturnThis(),
-        setBounce: jest.fn().mockReturnThis(),
-        setData: jest.fn().mockReturnThis(),
         setVisible: jest.fn().mockReturnThis(),
-        getData: jest.fn().mockReturnValue(false),
-        setSize: jest.fn().mockReturnThis(),
-        setOffset: jest.fn().mockReturnThis(),
         destroy: jest.fn(),
-        body: {
-          velocity: { x: 0, y: 0 },
-          blocked: { down: true }
-        },
-        on: jest.fn().mockImplementation((event, callback) => {
+        on: jest.fn().mockImplementation(function(event, callback) {
           if (callback) callback();
           return this;
         }),
+        play: jest.fn(),
         anims: {
           play: jest.fn()
         }
       }),
-      group: jest.fn().mockReturnValue({
-        create: jest.fn().mockReturnValue({
-          setOrigin: jest.fn().mockReturnThis(),
-          setPosition: jest.fn().mockReturnThis(),
-          setScale: jest.fn().mockReturnThis(),
-          setDepth: jest.fn().mockReturnThis(),
-          setVisible: jest.fn().mockReturnThis(),
-          destroy: jest.fn()
-        }),
-        children: {
-          iterate: jest.fn()
-        }
+      text: jest.fn().mockReturnValue({
+        setOrigin: jest.fn().mockReturnThis(),
+        setPosition: jest.fn().mockReturnThis(),
+        setStyle: jest.fn().mockReturnThis(),
+        setText: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        setFontSize: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+        on: jest.fn().mockImplementation(function(event, callback) {
+          if (callback) callback();
+          return this;
+        })
       }),
-      staticGroup: jest.fn().mockReturnValue({
-        create: jest.fn().mockReturnValue({
-          setOrigin: jest.fn().mockReturnThis(),
-          setPosition: jest.fn().mockReturnThis(),
-          setScale: jest.fn().mockReturnThis(),
-          setDepth: jest.fn().mockReturnThis(),
-          refreshBody: jest.fn(),
-          setVisible: jest.fn().mockReturnThis(),
-          destroy: jest.fn()
+      image: jest.fn().mockReturnValue({
+        setOrigin: jest.fn().mockReturnThis(),
+        setPosition: jest.fn().mockReturnThis(),
+        setScale: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        setVisible: jest.fn().mockReturnThis(),
+        on: jest.fn().mockImplementation(function(event, callback) {
+          if (callback) callback();
+          return this;
         }),
-        children: {
-          iterate: jest.fn()
-        }
-      }),
-      collider: jest.fn().mockReturnValue({
         destroy: jest.fn()
       }),
-      overlap: jest.fn().mockReturnValue({
-        destroy: jest.fn()
+      tween: jest.fn().mockReturnValue({
+        to: jest.fn().mockReturnThis(),
+        setEase: jest.fn().mockReturnThis(),
+        setCallback: jest.fn().mockReturnThis(),
+        start: jest.fn()
       })
     }
-  };
+  });
+  
+  // Create a mock physics system
+  Object.defineProperty(scene, 'physics', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: {
+      world: {
+        setBounds: jest.fn()
+      },
+      add: {
+        sprite: jest.fn().mockReturnValue({
+          setOrigin: jest.fn().mockReturnThis(),
+          setPosition: jest.fn().mockReturnThis(),
+          setScale: jest.fn().mockReturnThis(),
+          setDepth: jest.fn().mockReturnThis(),
+          setFrame: jest.fn().mockReturnThis(),
+          setInteractive: jest.fn().mockReturnThis(),
+          setVelocity: jest.fn().mockReturnThis(),
+          setVelocityX: jest.fn().mockReturnThis(),
+          setVelocityY: jest.fn().mockReturnThis(),
+          setCollideWorldBounds: jest.fn().mockReturnThis(),
+          setBounce: jest.fn().mockReturnThis(),
+          setData: jest.fn().mockReturnThis(),
+          setVisible: jest.fn().mockReturnThis(),
+          getData: jest.fn().mockReturnValue(false),
+          setSize: jest.fn().mockReturnThis(),
+          setOffset: jest.fn().mockReturnThis(),
+          destroy: jest.fn(),
+          body: {
+            velocity: { x: 0, y: 0 },
+            blocked: { down: true }
+          },
+          on: jest.fn().mockImplementation(function(event, callback) {
+            if (callback) callback();
+            return this;
+          }),
+          anims: {
+            play: jest.fn()
+          }
+        }),
+        group: jest.fn().mockReturnValue({
+          create: jest.fn().mockReturnValue({
+            setOrigin: jest.fn().mockReturnThis(),
+            setPosition: jest.fn().mockReturnThis(),
+            setScale: jest.fn().mockReturnThis(),
+            setDepth: jest.fn().mockReturnThis(),
+            setVisible: jest.fn().mockReturnThis(),
+            destroy: jest.fn()
+          }),
+          children: {
+            iterate: jest.fn()
+          }
+        }),
+        staticGroup: jest.fn().mockReturnValue({
+          create: jest.fn().mockReturnValue({
+            setOrigin: jest.fn().mockReturnThis(),
+            setPosition: jest.fn().mockReturnThis(),
+            setDisplaySize: jest.fn().mockReturnThis(),
+            setDepth: jest.fn().mockReturnThis(),
+            setVisible: jest.fn().mockReturnThis(),
+            refreshBody: jest.fn(),
+            destroy: jest.fn()
+          }),
+          children: {
+            iterate: jest.fn()
+          }
+        }),
+        collider: jest.fn().mockReturnValue({
+          destroy: jest.fn()
+        }),
+        overlap: jest.fn().mockReturnValue({
+          destroy: jest.fn()
+        })
+      }
+    }
+  });
   
   // Create a mock input system
   scene.input = {

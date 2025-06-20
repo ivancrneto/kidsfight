@@ -269,7 +269,8 @@ server.on('connection', (ws) => {
           if (target) {
             target.send(JSON.stringify({
               type: 'game_action',
-              action: data.action
+              action: data.action,
+              ...(typeof data.action === 'object' && data.action && 'payload' in data ? { payload: data.action.payload } : {})
             }));
           }
           break;

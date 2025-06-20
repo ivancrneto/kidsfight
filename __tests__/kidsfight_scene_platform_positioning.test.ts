@@ -23,14 +23,14 @@ describe('KidsFightScene - Platform & Player Positioning', () => {
     scene.textures = createMockTextureManager();
     scene.physics = {
       add: {
-        sprite: jest.fn(() => ({
+        sprite: jest.fn().mockReturnValue({
           setOrigin: jest.fn().mockReturnThis(),
           setScale: jest.fn().mockReturnThis(),
           setFlipX: jest.fn().mockReturnThis(),
           setAlpha: jest.fn().mockReturnThis(),
           setDepth: jest.fn().mockReturnThis(),
           setVisible: jest.fn().mockReturnThis(),
-        })),
+        }),
         staticGroup: jest.fn(() => {
           const chain = {
             create: jest.fn(() => ({

@@ -276,51 +276,74 @@ class KidsFightScene {
     }
   }
   
-  // Simplified checkWinner method for testing
+  // Updated checkWinner method for test mock to match main implementation
   checkWinner() {
     if (this.gameOver) return;
-    
     if (this.playerHealth[0] <= 0) {
       // Player 2 won
       const winner = this.getCharacterName(this.p2SpriteKey);
-      this.endGame(`${winner} Venceu!`);
+      this.endGame(1, `${winner} Venceu!`);
       return true;
     } else if (this.playerHealth[1] <= 0) {
       // Player 1 won
       const winner = this.getCharacterName(this.p1SpriteKey);
-      this.endGame(`${winner} Venceu!`);
+      this.endGame(0, `${winner} Venceu!`);
       return true;
     } else if (this.timeLeft <= 0) {
       // Time's up - check who has more health
       if (this.playerHealth[0] > this.playerHealth[1]) {
         const winner = this.getCharacterName(this.p1SpriteKey);
-        this.endGame(`${winner} Venceu!`);
+        this.endGame(0, `${winner} Venceu!`);
       } else if (this.playerHealth[1] > this.playerHealth[0]) {
         const winner = this.getCharacterName(this.p2SpriteKey);
-        this.endGame(`${winner} Venceu!`);
+        this.endGame(1, `${winner} Venceu!`);
       } else {
-        this.endGame('Empate!');
+        this.endGame(-1, 'Empate!');
       }
       return true;
     }
-    
     return false;
   }
   
-  // Simplified endGame method for testing
-  endGame(message) {
+  // Updated endGame method for test mock to match main implementation
+  endGame(winnerIndex, message) {
     this.gameOver = true;
     this.gameOverMessage = message;
-    this.add.text(400, 300, message, {
-      fontSize: '32px',
-      fill: '#ffffff'
-    }).setOrigin(0.5).setDepth(1000);
-    
-    const playAgainBtn = this.add.rectangle(400, 350, 200, 50, 0x00ff00);
-    playAgainBtn.setInteractive();
-    playAgainBtn.on('pointerdown', () => {
-      this.scene.start('PlayerSelectScene');
-    });
+    // Reset velocities and set frames/angles as in main code
+    if (this.players && this.players[0] && this.players[1]) {
+      [0, 1].forEach(i => {
+        this.players[i].setVelocityX?.(0);
+        this.players[i].setVelocityY?.(0);
+        this.players[i].body?.setVelocityX?.(0);
+        this.players[i].body?.setVelocityY?.(0);
+      });
+      if (winnerIndex === 0) {
+        this.players[0].setFrame?.(3);
+        this.players[1].setAngle?.(90);
+      } else if (winnerIndex === 1) {
+        this.players[1].setFrame?.(3);
+        this.players[0].setAngle?.(90);
+      }
+      // For draw (winnerIndex === -1), do NOT call setFrame or setAngle
+    }
+    if (this.add?.text) {
+      this.add.text(400, 300, message, {
+        fontSize: '48px',
+        color: '#fff',
+        fontStyle: 'bold',
+        stroke: '#000',
+        strokeThickness: 6
+      }).setOrigin(0.5).setDepth(1000);
+    }
+    if (this.add?.rectangle) {
+      const playAgainBtn = this.add.rectangle(400, 350, 200, 50, 0x00ff00);
+      playAgainBtn.setInteractive?.();
+      if (playAgainBtn.on && this.scene?.start) {
+        playAgainBtn.on('pointerdown', () => {
+          this.scene.start('PlayerSelectScene');
+        });
+      }
+    }
   }
 }
 

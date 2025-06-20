@@ -8,6 +8,7 @@ import { setupMockScene, MockWebSocketManager } from './test-utils-fix';
 
 // Create a test harness class that extends KidsFightScene to expose protected methods for testing
 class TestKidsFightScene extends KidsFightScene {
+  public localPlayerIndex: number = 0;
   constructor() {
     super({});
     
@@ -191,6 +192,8 @@ describe('KidsFightScene - Online Mode', () => {
     
     beforeEach(() => {
       scene = new TestKidsFightScene();
+      // Ensure wsManager.send is always a fresh Jest mock
+      scene.wsManager.send = jest.fn();
     });
     
     it('should allow players[0] movement as host in online mode', () => {

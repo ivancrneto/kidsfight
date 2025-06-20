@@ -1,6 +1,15 @@
 import { WebSocketManager } from '../websocket_manager';
 import KidsFightScene from '../kidsfight_scene';
 
+// Patch graphics mock for every test to ensure setScrollFactor and setDepth exist
+beforeEach(() => {
+  if (global.Phaser && global.Phaser.Scene && global.Phaser.Scene.prototype) {
+    global.Phaser.Scene.prototype.add = global.Phaser.Scene.prototype.add || {};
+    global.Phaser.Scene.prototype.add.graphics = jest.fn(() => new (global.MockGraphics || require('./setupTests').MockGraphics)());
+  }
+});
+
+
 const wsFactory = () => ({
   send: jest.fn(),
   close: jest.fn(),
@@ -11,6 +20,11 @@ const wsFactory = () => ({
 
 describe('KidsFightScene - showHitEffect', () => {
   let scene: any;
+const getMockGraphics = () => new (global.MockGraphics || require('./setupTests').MockGraphics)();
+// After assigning scene in each test, add:
+// scene.add = scene.add || {};
+// scene.add.graphics = jest.fn(getMockGraphics);
+// scene.safeAddGraphics = jest.fn(getMockGraphics);
   let mockSprite: any;
   let mockPlayer1: any;
   let mockPlayer2: any;

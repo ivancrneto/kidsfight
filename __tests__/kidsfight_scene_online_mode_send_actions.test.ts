@@ -7,12 +7,19 @@ describe('KidsFightScene - Online Mode Action Sending', () => {
 
   beforeEach(() => {
     wsManagerMock = {
-      send: jest.fn()
+      send: jest.fn(),
+      isConnected: () => true
     };
     scene = new KidsFightScene({});
     scene.gameMode = 'online';
     scene.localPlayerIndex = 1;
     scene.wsManager = wsManagerMock;
+    scene.players = [
+      {} as any, // dummy for index 0
+      {
+        body: { touching: { down: true }, blocked: { down: true } }
+      } as any,
+    ];
     scene.player1 = {
       setData: jest.fn(),
       getData: jest.fn(() => false),
@@ -58,6 +65,8 @@ describe('KidsFightScene - Online Mode Action Sending', () => {
   });
 
   it('sends attack with correct playerIndex', () => {
+    scene.wsManager = wsManagerMock;
+    wsManagerMock.send = jest.fn();
     scene.handleAttack();
     expect(wsManagerMock.send).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'attack', playerIndex: 1 })
@@ -65,6 +74,8 @@ describe('KidsFightScene - Online Mode Action Sending', () => {
   });
 
   it('sends special with correct playerIndex', () => {
+    scene.wsManager = wsManagerMock;
+    wsManagerMock.send = jest.fn();
     scene.handleSpecial();
     expect(wsManagerMock.send).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'special', playerIndex: 1 })
