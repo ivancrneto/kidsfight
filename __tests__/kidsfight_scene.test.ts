@@ -713,6 +713,9 @@ describe('KidsFightScene', () => {
         this.testEndGameCalled = {winnerIndex, message};
       });
 
+      // Replace the scene's endGame method with our mock
+      scene.endGame = mockEndGame;
+
       // Mock physics system
       const mockPhysics = {
         add: {
