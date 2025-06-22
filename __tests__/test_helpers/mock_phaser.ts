@@ -14,7 +14,8 @@ export function setupPhaserMocks(scene: any) {
       setInteractive: jest.fn().mockReturnThis(),
       on: jest.fn().mockReturnThis(),
       setText: jest.fn().mockReturnThis(),
-      setVisible: jest.fn().mockReturnThis()
+      setVisible: jest.fn().mockReturnThis(),
+      destroy: jest.fn().mockReturnThis(),
     })
   };
   

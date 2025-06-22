@@ -511,11 +511,9 @@ class KidsFightScene extends Phaser.Scene {
     if (this.players[0]) {
       this.updatePlayerAnimation(this.players[0], 0);
     }
-    
     if (this.players[1]) {
       this.updatePlayerAnimation(this.players[1], 1);
     }
-    
     // Reset blocking state each frame
     if (this.players[0]) this.players[0].isBlocking = false;
     if (this.players[1]) this.players[1].isBlocking = false;

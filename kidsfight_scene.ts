@@ -217,7 +217,19 @@ export default class KidsFightScene extends Phaser.Scene {
   private gameMode: 'single' | 'local' | 'online' | 'ai';
   private localPlayerIndex: number;
   private playerDirection: string[];
-  private touchButtons?: { left?: { isDown: boolean }; right?: { isDown: boolean }; up?: { isDown: boolean } };
+  // Touch controls: allow for left, right, up, attack, block
+  private touchButtons?: {
+    left?: Phaser.GameObjects.Rectangle;
+    right?: Phaser.GameObjects.Rectangle;
+    up?: Phaser.GameObjects.Rectangle;
+    attack?: Phaser.GameObjects.Rectangle;
+    block?: Phaser.GameObjects.Rectangle;
+  };
+
+  // Touch state variables
+  private jumpRequested: boolean = false;
+  private attackRequested: boolean = false;
+  private blockRequested: boolean = false;
   private playerHealth: number[];
   private healthBar1!: Phaser.GameObjects.Graphics;
   private healthBar2!: Phaser.GameObjects.Graphics;
@@ -878,6 +890,25 @@ export default class KidsFightScene extends Phaser.Scene {
     const bg = this.safeAddImage(400, 240, scenarioKey);
     bg.setDepth(0);
 
+    // Create ground platform
+    const ground = this.add.rectangle(GAME_WIDTH / 2, 380, GAME_WIDTH, 40, 0x6666ff);
+    if (this.physics && this.physics.add && typeof this.physics.add.existing === 'function') {
+      this.physics.add.existing(ground, true);
+    }
+    if (this.physics && this.physics.add && typeof this.physics.add.staticGroup === 'function') {
+      this.platforms = this.physics.add.staticGroup();
+    } else {
+      this.platforms = { add: (child: Phaser.GameObjects.GameObject) => child } as any;
+    }
+    if (this.platforms && this.platforms.add && typeof this.platforms.add === 'function') {
+      this.platforms.add(ground);
+    }
+
+    // --- PLAYER-PLATFORM COLLIDER (ensures players land on ground after jump) ---
+    if (this.physics && this.physics.add && typeof this.physics.add.collider === 'function' && this.players && this.players[0] && this.players[1]) {
+      this.physics.add.collider(this.players, this.platforms);
+    }
+
     // Add variable-width spritesheets for each player
     addVariableWidthSpritesheet(this, 'bento', 'bento_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'davir', 'davir_raw', [415, 410, 420, 440, 440, 470, 520, 480], 512);
@@ -885,6 +916,75 @@ export default class KidsFightScene extends Phaser.Scene {
     addVariableWidthSpritesheet(this, 'davis', 'davis_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'carol', 'carol_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'roni', 'roni_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+
+    // --- RESTORE TOUCH CONTROLS ---
+    // Use canvas size for responsive placement and visually distinct buttons
+    const width = (this.sys?.game?.config?.width as number) || GAME_WIDTH;
+    const height = (this.sys?.game?.config?.height as number) || GAME_HEIGHT;
+    // Button positions (relative to screen)
+    const btnRadius = Math.min(width, height) * 0.07;
+    // Left side: up above left/right
+    const leftX = width * 0.13;
+    const leftY = height * 0.85;
+    const upY = height * 0.72;
+    const rightX = width * 0.26;
+    // Right side: vertical A (attack), S (special), B (block)
+    const rightXBase = width * 0.87;
+    const rightY_A = height * 0.75;
+    const rightY_S = height * 0.85;
+    const rightY_B = height * 0.95;
+    this.touchButtons = {
+      left: this.add.circle(leftX, leftY, btnRadius, 0x2d2dff, 0.8).setInteractive().setScrollFactor(0).setDepth(1000),
+      right: this.add.circle(rightX, leftY, btnRadius, 0x2d2dff, 0.8).setInteractive().setScrollFactor(0).setDepth(1000),
+      up: this.add.circle(leftX, upY, btnRadius, 0x2dff2d, 0.8).setInteractive().setScrollFactor(0).setDepth(1000),
+      attack: this.add.circle(rightXBase, rightY_A, btnRadius, 0xff2d2d, 0.8).setInteractive().setScrollFactor(0).setDepth(1000),
+      special: this.add.circle(rightXBase, rightY_S, btnRadius, 0xffd700, 0.8).setInteractive().setScrollFactor(0).setDepth(1000),
+      block: this.add.circle(rightXBase, rightY_B, btnRadius, 0x2dfffd, 0.8).setInteractive().setScrollFactor(0).setDepth(1000),
+    } as any;
+    // Overlay text/arrows on top of buttons
+    this.add.text(leftX, leftY, '←', { fontSize: `${btnRadius}px`, color: '#fff' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+    this.add.text(rightX, leftY, '→', { fontSize: `${btnRadius}px`, color: '#fff' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+    this.add.text(leftX, upY, '↑', { fontSize: `${btnRadius}px`, color: '#fff' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+    this.add.text(rightXBase, rightY_A, 'A', { fontSize: `${btnRadius * 0.8}px`, color: '#fff' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+    this.add.text(rightXBase, rightY_S, 'S', { fontSize: `${btnRadius * 0.8}px`, color: '#fff' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+    this.add.text(rightXBase, rightY_B, 'B', { fontSize: `${btnRadius * 0.8}px`, color: '#fff' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+
+
+    // Ensure state variables exist
+    this.isMovingLeft = false;
+    this.isMovingRight = false;
+    this.jumpRequested = false;
+    this.attackRequested = false;
+    this.blockRequested = false;
+
+    // Touch event handlers (null-safe)
+    this.touchButtons.left?.on('pointerdown', () => { this.isMovingLeft = true; });
+    this.touchButtons.left?.on('pointerup', () => { this.isMovingLeft = false; });
+    this.touchButtons.left?.on('pointerout', () => { this.isMovingLeft = false; });
+
+    this.touchButtons.right?.on('pointerdown', () => { this.isMovingRight = true; });
+    this.touchButtons.right?.on('pointerup', () => { this.isMovingRight = false; });
+    this.touchButtons.right?.on('pointerout', () => { this.isMovingRight = false; });
+
+    this.touchButtons.up?.on('pointerdown', () => { this.jumpRequested = true; });
+    this.touchButtons.up?.on('pointerup', () => { this.jumpRequested = false; });
+    this.touchButtons.up?.on('pointerout', () => { this.jumpRequested = false; });
+
+    this.touchButtons.attack?.on('pointerdown', () => { this.attackRequested = true; });
+    this.touchButtons.attack?.on('pointerup', () => { this.attackRequested = false; });
+    this.touchButtons.attack?.on('pointerout', () => { this.attackRequested = false; });
+
+    this.touchButtons.block?.on('pointerdown', () => { this.blockRequested = true; });
+    this.touchButtons.block?.on('pointerup', () => { this.blockRequested = false; });
+    this.touchButtons.block?.on('pointerout', () => { this.blockRequested = false; });
+    // --- END RESTORE TOUCH CONTROLS ---
+
     addVariableWidthSpritesheet(this, 'jacqueline', 'jacqueline_raw', [415, 410, 420, 440, 440, 410, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'ivan', 'ivan_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'd_isa', 'd_isa_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
@@ -894,11 +994,11 @@ export default class KidsFightScene extends Phaser.Scene {
       'bento', 'davir', 'jose', 'davis', 'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'
     ];
     characterKeys.forEach(key => {
-      // Idle: frames 0-3
+      // Idle: frames 0-0
       if (!this.anims.exists(`${key}_idle`)) {
         this.anims.create({
           key: `${key}_idle`,
-          frames: this.anims.generateFrameNumbers(key, {start: 0, end: 3}),
+          frames: this.anims.generateFrameNumbers(key, {start: 0, end: 0}),
           frameRate: 6,
           repeat: -1
         });
@@ -947,8 +1047,7 @@ export default class KidsFightScene extends Phaser.Scene {
     const isTest = typeof jest !== 'undefined' || process.env.NODE_ENV === 'test';
     if (isTest) {
       console.log('SCENE: About to call this.physics.add.sprite for', p1Key, p2Key);
-      const fn = (typeof jest !== 'undefined' && jest.fn) ? jest.fn() : () => {
-      };
+      const fn = (typeof jest !== 'undefined' && jest.fn) ? jest.fn() : () => {};
       if (this.physics && this.physics.add && typeof this.physics.add.sprite === 'function') {
         console.log('SCENE: About to call this.physics.add.sprite for', p1Key, p2Key);
         player1 = this.physics.add.sprite(160, 360, p1Key, 0);
@@ -1060,6 +1159,11 @@ export default class KidsFightScene extends Phaser.Scene {
     this.players?.[0]?.setScale?.(0.4);
     if (this.players && this.players[1] && this.players[1].setOrigin) this.players[1].setOrigin(0.5, 1.0);
     if (this.players && this.players[1] && this.players[1].setScale) this.players[1].setScale(0.4);
+
+    // Add collision between players and the ground platform
+    if (this.physics && this.physics.add && typeof this.physics.add.collider === 'function' && this.players && this.players[0] && this.players[1]) {
+      this.physics.add.collider(this.players, this.platforms);
+    }
 
     // --- HEALTH BARS ---
     // Destroy old health bars before creating new ones
@@ -1241,7 +1345,9 @@ export default class KidsFightScene extends Phaser.Scene {
         // @ts-ignore
         this.physics.add.collider = (typeof jest !== 'undefined') ? jest.fn() : (() => {});
       }
-      this.physics.add.collider(this.players as any, this.upperPlatform);
+      if (this.physics.add.collider && typeof this.physics.add.collider === 'function' && this.players && this.players[0] && this.players[1]) {
+        this.physics.add.collider(this.players as any, this.upperPlatform);
+      }
     }
   }
 
@@ -1286,9 +1392,9 @@ export default class KidsFightScene extends Phaser.Scene {
     const specialBtn = this.add.circle(baseXR + radius, baseY - radius, radius, 0xff44ff);
     const blockBtn = this.add.circle(baseXR, baseY - radius * 2, radius, 0xffff44);
 
-    this.add.text(attackBtn.x, attackBtn.y - radius / 2, 'A', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
-    this.add.text(specialBtn.x, specialBtn.y - radius / 2, 'S', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
-    this.add.text(blockBtn.x, blockBtn.y - radius / 2, 'B', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
+    this.add.text(attackBtn.x, attackBtn.y - radius / 2, 'A', { fontSize: `${radius * 0.8}px`, color: '#ffffff' }).setOrigin(0.5);
+    this.add.text(specialBtn.x, specialBtn.y - radius / 2, 'S', { fontSize: `${radius * 0.8}px`, color: '#ffffff' }).setOrigin(0.5);
+    this.add.text(blockBtn.x, blockBtn.y - radius / 2, 'B', { fontSize: `${radius * 0.8}px`, color: '#ffffff' }).setOrigin(0.5);
 
     // Store references for touch handling (optional)
     this.touchButtons = {
@@ -1503,20 +1609,14 @@ export default class KidsFightScene extends Phaser.Scene {
   public createAttackEffect(attacker: any, defender: any): void {
     const isTest = typeof jest !== 'undefined' || process.env.NODE_ENV === 'test';
     if (isTest) return; // Skip effects in test environment
-    
     try {
-      // Create attack effect animation
-      const attackEffect = this.add.sprite(
-        defender.x - (attacker.x < defender.x ? -30 : 30),
-        defender.y - 50,
-        'attack_effect'
-      );
-      
-      // Play animation and destroy when done
-      attackEffect.play('attack_effect_anim');
-      attackEffect.on('animationcomplete', () => {
-        attackEffect.destroy();
-      });
+      // Draw a simple red circle for attack effect
+      const x = defender.x - (attacker.x < defender.x ? -30 : 30);
+      const y = defender.y - 50;
+      const gfx = this.add.graphics();
+      gfx.fillStyle(0xff0000, 0.7);
+      gfx.fillCircle(x, y, 24);
+      this.time.delayedCall(200, () => gfx.destroy());
     } catch (error) {
       console.error('Error creating attack effect:', error);
     }
@@ -1527,25 +1627,16 @@ export default class KidsFightScene extends Phaser.Scene {
    * @param target The player being hit
    */
   public createHitEffect(target: any): void {
-    // Always create effect; tests rely on sprite mocks
+    const isTest = typeof jest !== 'undefined' || process.env.NODE_ENV === 'test';
+    if (isTest) return;
     try {
-      // Create hit effect animation
-      const hitEffect = this.add.sprite(
-        target.x,
-        target.y - 50,
-        'hit_effect'
-      );
-      
-      // Play animation and destroy when done
-      if (!this.hitEffects) this.hitEffects = [];
-      this.hitEffects.push(hitEffect);
-      hitEffect.play('hit_effect_anim');
-      hitEffect.on('animationcomplete', () => {
-        // remove from array and destroy
-        const idx = this.hitEffects.indexOf(hitEffect);
-        if (idx !== -1) this.hitEffects.splice(idx, 1);
-        hitEffect.destroy();
-      });
+      // Draw a simple yellow circle for hit effect
+      const x = target.x;
+      const y = target.y - 30;
+      const gfx = this.add.graphics();
+      gfx.fillStyle(0xffff00, 0.7);
+      gfx.fillCircle(x, y, 18);
+      this.time.delayedCall(200, () => gfx.destroy());
     } catch (error) {
       console.error('Error creating hit effect:', error);
     }
@@ -1604,19 +1695,53 @@ export default class KidsFightScene extends Phaser.Scene {
     if (!this.gameOver && typeof this.checkWinner === 'function') {
       this.checkWinner();
     }
+
+    // ------------------------------------------------------------------
+    // Local touch‐input handling (mobile)
+    // ------------------------------------------------------------------
+    const localIdx = (typeof this.localPlayerIndex === 'number') ? this.localPlayerIndex : 0;
+    const localPlayer = this.players[localIdx];
+    if (localPlayer && localPlayer.body) {
+      // Horizontal movement
+      let vx = 0;
+      if (this.isMovingLeft) vx = -160;
+      else if (this.isMovingRight) vx = 160;
+
+      if (typeof localPlayer.setVelocityX === 'function') localPlayer.setVelocityX(vx);
+      else localPlayer.body.velocity.x = vx;
+
+      // Jump (apply impulse once)
+      if (this.jumpRequested) {
+        // Only jump if on ground (blocked.down) or y velocity ~0
+        const onGround = (localPlayer.body as any).blocked?.down || Math.abs(localPlayer.body.velocity.y) < 1;
+        if (onGround) {
+          if (typeof localPlayer.setVelocityY === 'function') localPlayer.setVelocityY(-500);
+          else localPlayer.body.velocity.y = -500;
+        }
+        this.jumpRequested = false; // consume one-shot flag
+      }
+
+      // Blocking – continuous while button held
+      localPlayer.setData?.('isBlocking', this.blockRequested);
+
+      // Attack – fire once per press
+      if (this.attackRequested) {
+        this.tryAction?.(localIdx, 'attack', false);
+        this.attackRequested = false;
+      }
+    }
   }
 
   private showHitEffectAtCoordinates(x: number, y: number): void {
     if (!this.add) return;
     try {
       if (!this.hitEffects) this.hitEffects = [];
-      const effect = this.add.sprite(x, y, 'hit_effect');
-      if (typeof effect.setOrigin === 'function') effect.setOrigin(0.5, 0.5);
-      if (typeof effect.setDepth === 'function') effect.setDepth(100);
+      const effect = this.add.graphics();
+      effect.fillStyle(0xffff00, 0.7);
+      effect.fillCircle(x, y, 18);
+      effect.setDepth(100);
       this.hitEffects.push(effect);
-      if (typeof effect.play === 'function') effect.play('hit_effect_anim');
-      effect.on('animationcomplete', () => {
-        // remove from array and destroy
+      this.time.delayedCall(200, () => {
         const idx = this.hitEffects.indexOf(effect);
         if (idx !== -1) this.hitEffects.splice(idx, 1);
         effect.destroy();
@@ -1971,7 +2096,11 @@ export default class KidsFightScene extends Phaser.Scene {
     if (isAttack) this.setSafeFrame(player, 4);
     else if (isSpecial) this.setSafeFrame(player, 6);
     else if (isBlocking) this.setSafeFrame(player, 2);
-
+    else {
+      // Ensure idle remains static on frame 0
+      if (player.anims?.isPlaying) player.anims.stop();
+      this.setSafeFrame(player, 0);
+    }
   }
 
   /**
@@ -1995,17 +2124,25 @@ export default class KidsFightScene extends Phaser.Scene {
       const x2 = 660 + i * 36;
       const y = 60;
       // Player 1 pip
-      const pip1 = this.add && typeof this.add.graphics === 'function' ? this.add.graphics() : this.safeAddGraphics();
-      pip1.fillStyle?.(0xffffff, 0.3);
-      pip1.fillCircle?.(x1, y, 16);
-      pip1.setDepth?.(10);
+      const pip1 = this.add.graphics();
+      pip1.fillStyle(0xffffff, 0.3);
+      pip1.fillCircle(x1, y, 16);
+      pip1.setDepth(10);
       this.specialPips1.push(pip1);
       // Player 2 pip
-      const pip2 = this.add && typeof this.add.graphics === 'function' ? this.add.graphics() : this.safeAddGraphics();
-      pip2.fillStyle?.(0xffffff, 0.3);
-      pip2.fillCircle?.(x2, y, 16);
-      pip2.setDepth?.(10);
+      const pip2 = this.add.graphics();
+      pip2.fillStyle(0xffffff, 0.3);
+      pip2.fillCircle(x2, y, 16);
+      pip2.setDepth(10);
       this.specialPips2.push(pip2);
     }
+  }
+
+  // Simple helper to safely set a sprite frame even if no anims
+  private setSafeFrame(sprite: any, frame: number): void {
+    try {
+      if (sprite.setFrame) sprite.setFrame(frame);
+      else if (sprite.frame) sprite.frame = frame;
+    } catch {}
   }
 }

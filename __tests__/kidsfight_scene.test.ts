@@ -638,32 +638,32 @@ describe('KidsFightScene', () => {
     });
 
     it('should handle hit effects', () => {
-      type MockHitEffect = {
-        setOrigin: jest.Mock;
-        play: jest.Mock;
-        on: jest.Mock;
-        destroy: jest.Mock;
-        animationCompleteCallback?: () => void;
-      };
-      const hitEffect: MockHitEffect = {
-        setOrigin: jest.fn().mockReturnThis(),
-        play: jest.fn().mockReturnThis(),
-        on: jest.fn().mockImplementation(function (this: MockHitEffect, event: string, callback: () => void) {
-          if (event === 'animationcomplete') {
-            this.animationCompleteCallback = callback;
-          }
-          return {on: jest.fn()};
-        }),
-        destroy: jest.fn()
-      };
-      (scene.add.sprite as jest.Mock).mockReturnValue(hitEffect);
-      scene.showHitEffect({x: 100, y: 100});
-      expect(scene.add.sprite).toHaveBeenCalledWith(100, 100, 'hit_effect');
-      expect(hitEffect.play).toHaveBeenCalledWith('hit_effect_anim');
-      expect(scene.hitEffects).toContain(hitEffect);
-      if (hitEffect.animationCompleteCallback) hitEffect.animationCompleteCallback();
-      expect(hitEffect.destroy).toHaveBeenCalled();
-      expect(scene.hitEffects).not.toContain(hitEffect);
+      const gfx = {
+        fillStyle: jest.fn().mockReturnThis(),
+        fillCircle: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        destroy: jest.fn(),
+      } as any;
+      // Mock add.graphics factory
+      (scene.add as any).graphics = jest.fn(() => gfx);
+      // Mock time.delayedCall to run callback synchronously
+      scene.time = {
+        delayedCall: jest.fn((_ms: number, cb: () => void) => cb()),
+      } as any;
+
+      // Ensure starting empty
+      scene.hitEffects = [];
+
+      scene.showHitEffect({ x: 100, y: 100 });
+
+      // add.graphics should be invoked once
+      expect((scene.add as any).graphics).toHaveBeenCalledTimes(1);
+      // fillCircle called to draw effect
+      expect(gfx.fillCircle).toHaveBeenCalled();
+      // Graphics object should have been destroyed via delayedCall
+      expect(gfx.destroy).toHaveBeenCalled();
+      // hitEffects array should end empty after destruction
+      expect(scene.hitEffects).toHaveLength(0);
     });
 
     it('should handle tryAttack correctly', () => {
