@@ -210,6 +210,8 @@ export default class KidsFightScene extends Phaser.Scene {
   private players: Phaser.Physics.Arcade.Sprite[];
   private platforms: Phaser.Physics.Arcade.StaticGroup;
   private upperPlatforms: Phaser.Physics.Arcade.StaticGroup;
+  private upperPlatform: any;
+  private mainPlatform: any;
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private attackKey: Phaser.Input.Keyboard.Key;
   private blockKey: Phaser.Input.Keyboard.Key;
@@ -955,8 +957,9 @@ export default class KidsFightScene extends Phaser.Scene {
         const screenWidth = this.sys?.game?.canvas?.width || 800;
         const player1X = Math.max(screenWidth * 0.2, 160); // 20% from left, minimum 160px
         const player2X = Math.min(screenWidth * 0.8, screenWidth - 160); // 80% from left, minimum 160px from right
-        player1 = this.physics.add.sprite(player1X, 360, p1Key, 0);
-        player2 = this.physics.add.sprite(player2X, 360, p2Key, 0);
+        // Position players above the platform so they can fall onto it
+        player1 = this.physics.add.sprite(player1X, 310, p1Key, 0);
+        player2 = this.physics.add.sprite(player2X, 310, p2Key, 0);
         Object.assign(player1, {
           setCollideWorldBounds: fn,
           setScale: fn,
@@ -1004,7 +1007,8 @@ export default class KidsFightScene extends Phaser.Scene {
       const screenWidth = this.sys.game.canvas.width || 800;
       // Position players proportionally to screen width
       const player1X = Math.max(screenWidth * 0.15, 80); // 15% from left, minimum 80px
-      player1 = this.physics.add.sprite(player1X, platformHeight, p1Key, 0) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+      // Position player above the platform so they can fall onto it
+      player1 = this.physics.add.sprite(player1X, platformHeight - 50, p1Key, 0) as Phaser.Physics.Arcade.Sprite & PlayerProps;
       if (player1.setOrigin) player1.setOrigin(0.5, 1.0);
       if (player1.setScale) player1.setScale(0.4);
       player1.setBounce(0.2);
@@ -1026,7 +1030,8 @@ export default class KidsFightScene extends Phaser.Scene {
 
       // Player 2 (right, facing left)
       const player2X = Math.min(screenWidth * 0.85, screenWidth - 80); // 85% from left, minimum 80px from right edge
-      player2 = this.physics.add.sprite(player2X, platformHeight, p2Key, 0) as Phaser.Physics.Arcade.Sprite & PlayerProps;
+      // Position player above the platform so they can fall onto it
+      player2 = this.physics.add.sprite(player2X, platformHeight - 50, p2Key, 0) as Phaser.Physics.Arcade.Sprite & PlayerProps;
       if (player2.setOrigin) player2.setOrigin(0.5, 1.0);
       if (player2.setScale) player2.setScale(0.4);
       player2.setBounce(0.2);
@@ -1232,25 +1237,53 @@ export default class KidsFightScene extends Phaser.Scene {
    */
   private createPlatforms(): void {
     if (!this.add) return;
+    
+    // Get screen dimensions for responsive platform sizing
+    const screenWidth = this.sys?.game?.canvas?.width || 800;
+    const screenHeight = this.sys?.game?.canvas?.height || 480;
+    
+    // Create upper platform
     const upperY = 200;
     this.upperPlatform = this.add.rectangle?.(400, upperY, 300, 20, 0xffffff, 0.0);
-    if (this.upperPlatform && this.physics?.add) {
-      if (typeof this.physics.add.existing === 'function') {
-        this.physics.add.existing(this.upperPlatform, true);
-      } else {
-        // stub existing for tests
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        this.physics.add.existing = (typeof jest !== 'undefined') ? jest.fn() : (() => {});
-        this.physics.add.existing(this.upperPlatform, true);
+    
+    // Create main platform that spans the width of the screen
+    const mainPlatformY = 360; // This should match the platformHeight used for player positioning
+    this.mainPlatform = this.add.rectangle?.(screenWidth / 2, mainPlatformY, screenWidth, 20, 0xffffff, 0.0);
+    
+    // Add physics to platforms
+    if (this.physics?.add) {
+      // Setup physics for upper platform
+      if (this.upperPlatform) {
+        if (typeof this.physics.add.existing === 'function') {
+          this.physics.add.existing(this.upperPlatform, true);
+        } else {
+          // stub existing for tests
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          this.physics.add.existing = (typeof jest !== 'undefined') ? jest.fn() : (() => {});
+          this.physics.add.existing(this.upperPlatform, true);
+        }
       }
+      
+      // Setup physics for main platform
+      if (this.mainPlatform) {
+        if (typeof this.physics.add.existing === 'function') {
+          this.physics.add.existing(this.mainPlatform, true);
+        } else if (!jest.isMockFunction(this.physics.add.existing)) {
+          // Already stubbed above
+        }
+      }
+      
       // Ensure collider exists (tests spy on it)
       if (!this.physics.add.collider) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         this.physics.add.collider = (typeof jest !== 'undefined') ? jest.fn() : (() => {});
       }
+      
+      // Add colliders for both platforms
       this.physics.add.collider(this.players as any, this.upperPlatform);
+      this.physics.add.collider(this.players as any, this.mainPlatform);
     }
   }
 

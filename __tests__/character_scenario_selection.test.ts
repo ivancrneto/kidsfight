@@ -1366,12 +1366,12 @@ describe('Character and Scenario Selection', () => {
       
       if (bentoCall) {
         expect(bentoCall[0]).toBeCloseTo(160);
-        expect(bentoCall[1]).toBeCloseTo(360);
+        expect(bentoCall[1]).toBeCloseTo(310);
       }
       
       if (roniCall) {
         expect(roniCall[0]).toBeCloseTo(640);
-        expect(roniCall[1]).toBeCloseTo(360);
+        expect(roniCall[1]).toBeCloseTo(310);
       }
       
       // Check player 1 (bento) properties
