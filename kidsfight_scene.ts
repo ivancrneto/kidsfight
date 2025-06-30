@@ -1229,6 +1229,9 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Create static platforms (upper etc.) – simplified for tests.
     this.createPlatforms();
+    
+    // Create touch controls for mobile devices
+    this.createTouchControls();
   }
 
 
