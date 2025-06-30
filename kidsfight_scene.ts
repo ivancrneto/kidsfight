@@ -1335,7 +1335,72 @@ export default class KidsFightScene extends Phaser.Scene {
     this.add.text(specialBtn.x, specialBtn.y - radius / 2, 'S', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
     this.add.text(blockBtn.x, blockBtn.y - radius / 2, 'B', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
 
-    // Store references for touch handling (optional)
+    // Make buttons interactive
+    leftBtn.setInteractive();
+    rightBtn.setInteractive();
+    jumpBtn.setInteractive();
+    attackBtn.setInteractive();
+    specialBtn.setInteractive();
+    blockBtn.setInteractive();
+
+    // Add event handlers for touch input
+    leftBtn.on('pointerdown', () => {
+      if (this.player1) {
+        this.player1.setVelocityX(-160);
+        this.player1.setFlipX(true);
+        this.playerDirection[0] = 'left';
+      }
+    });
+
+    leftBtn.on('pointerup', () => {
+      if (this.player1) {
+        this.player1.setVelocityX(0);
+      }
+    });
+
+    rightBtn.on('pointerdown', () => {
+      if (this.player1) {
+        this.player1.setVelocityX(160);
+        this.player1.setFlipX(false);
+        this.playerDirection[0] = 'right';
+      }
+    });
+
+    rightBtn.on('pointerup', () => {
+      if (this.player1) {
+        this.player1.setVelocityX(0);
+      }
+    });
+
+    jumpBtn.on('pointerdown', () => {
+      if (this.player1 && this.player1.body && this.player1.body.touching.down) {
+        this.player1.setVelocityY(-330);
+      }
+    });
+
+    attackBtn.on('pointerdown', () => {
+      this.tryAction(0, 'attack', false);
+    });
+
+    specialBtn.on('pointerdown', () => {
+      this.tryAction(0, 'special', true);
+    });
+
+    blockBtn.on('pointerdown', () => {
+      if (this.player1) {
+        this.player1.setData('isBlocking', true);
+        this.playerBlocking[0] = true;
+      }
+    });
+
+    blockBtn.on('pointerup', () => {
+      if (this.player1) {
+        this.player1.setData('isBlocking', false);
+        this.playerBlocking[0] = false;
+      }
+    });
+
+    // Store references for touch handling
     this.touchButtons = {
       left: leftBtn,
       right: rightBtn,
