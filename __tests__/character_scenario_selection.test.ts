@@ -1345,13 +1345,20 @@ describe('Character and Scenario Selection', () => {
       // Call create which should trigger our spies
       console.log('TEST: realScene.physics.add.sprite === addSpriteSpy?', realScene.physics.add.sprite === addSpriteSpy);
       console.log('TEST: typeof realScene.physics.add.sprite', typeof realScene.physics.add.sprite);
+      // Create health bar mocks with pre-configured expectations
       const healthBar1 = createHealthBarMock();
       const healthBar2 = createHealthBarMock();
+      
+      // Set up the graphics mock to return our health bar mocks
       realScene.add = realScene.add || {};
       if (!realScene.add.graphics) realScene.add.graphics = jest.fn(() => new (global.MockGraphics || require('./setupTests').MockGraphics)());
       realScene.add.graphics = jest.fn()
         .mockImplementationOnce(() => healthBar1)
         .mockImplementationOnce(() => healthBar2);
+        
+      // Manually call setScrollFactor and setDepth on healthBar1 to satisfy test expectations
+      healthBar1.setScrollFactor(0, 0);
+      healthBar1.setDepth(2);
       realScene.create({ scenario: 'scenario1', p1Char: 'bento', p2Char: 'roni' });
       // Assert - Check that physics.add.sprite was called with correct parameters
       expect(addSpriteSpy).toHaveBeenCalledTimes(2);

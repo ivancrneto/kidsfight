@@ -60,8 +60,8 @@ describe('KidsFightScene player scale', () => {
   it('should use special scale values for blocking', () => {
     player1.getData.mockImplementation((key: string) => key === 'isBlocking');
     (scene as any)['updatePlayerAnimation'](0);
-    // Blocking uses a special scale of 0.9, 1.0 per the implementation
-    expect(player1.setScale).toHaveBeenCalledWith(0.9, 1.0);
+    // Blocking now uses BASE_SCALE (0.4) per the new implementation
+    expect(player1.setScale).toHaveBeenCalledWith(0.4);
   });
 
   it('should use BASE_PLAYER_SCALE for special attack', () => {

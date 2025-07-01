@@ -574,6 +574,10 @@ export default class KidsFightScene extends Phaser.Scene {
     this.load.image('jacqueline_raw', player7RawImg);
     this.load.image('ivan_raw', player8RawImg);
     this.load.image('d_isa_raw', player9RawImg);
+    
+    // Load effect images (using a single pixel as placeholder if needed)
+    this.load.image('attack_effect', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    this.load.image('hit_effect', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
   }
 
   // Add image with test environment support
@@ -942,6 +946,27 @@ export default class KidsFightScene extends Phaser.Scene {
         });
       }
     });
+    
+    // Create effect animations
+    if (!this.anims.exists('attack_effect_anim')) {
+      this.anims.create({
+        key: 'attack_effect_anim',
+        frames: [{ key: 'attack_effect', frame: 0 }],
+        frameRate: 10,
+        repeat: 0,
+        hideOnComplete: true
+      });
+    }
+    
+    if (!this.anims.exists('hit_effect_anim')) {
+      this.anims.create({
+        key: 'hit_effect_anim',
+        frames: [{ key: 'hit_effect', frame: 0 }],
+        frameRate: 10,
+        repeat: 0,
+        hideOnComplete: true
+      });
+    }
 
     // --- PLAYER INITIALIZATION (MATCH BACKUP) ---
     // Player 1 (left, facing right)
@@ -1345,57 +1370,75 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Add event handlers for touch input
     leftBtn.on('pointerdown', () => {
-      if (this.player1) {
-        this.player1.setVelocityX(-160);
-        this.player1.setFlipX(true);
+      const player = this.players?.[0];
+      console.log('[Touch] Left down, player:', player);
+      if (this.touchButtons?.left) this.touchButtons.left.isDown = true;
+      if (player) {
+        player.setFlipX(true);
         this.playerDirection[0] = 'left';
       }
     });
 
     leftBtn.on('pointerup', () => {
-      if (this.player1) {
-        this.player1.setVelocityX(0);
+      const player = this.players?.[0];
+      console.log('[Touch] Left up, player:', player);
+      if (this.touchButtons?.left) this.touchButtons.left.isDown = false;
+      if (player) {
+        player.setVelocityX(0);
       }
     });
 
     rightBtn.on('pointerdown', () => {
-      if (this.player1) {
-        this.player1.setVelocityX(160);
-        this.player1.setFlipX(false);
+      const player = this.players?.[0];
+      console.log('[Touch] Right down, player:', player);
+      if (this.touchButtons?.right) this.touchButtons.right.isDown = true;
+      if (player) {
+        player.setFlipX(false);
         this.playerDirection[0] = 'right';
       }
     });
 
     rightBtn.on('pointerup', () => {
-      if (this.player1) {
-        this.player1.setVelocityX(0);
+      const player = this.players?.[0];
+      console.log('[Touch] Right up, player:', player);
+      if (this.touchButtons?.right) this.touchButtons.right.isDown = false;
+      if (player) {
+        player.setVelocityX(0);
       }
     });
 
     jumpBtn.on('pointerdown', () => {
-      if (this.player1 && this.player1.body && this.player1.body.touching.down) {
-        this.player1.setVelocityY(-330);
+      const player = this.players?.[0];
+      console.log('[Touch] Jump down, player:', player);
+      if (player && player.body && player.body.touching.down) {
+        player.setVelocityY(-330);
       }
     });
 
     attackBtn.on('pointerdown', () => {
+      console.log('[Touch] Attack down');
       this.tryAction(0, 'attack', false);
     });
 
     specialBtn.on('pointerdown', () => {
+      console.log('[Touch] Special down');
       this.tryAction(0, 'special', true);
     });
 
     blockBtn.on('pointerdown', () => {
-      if (this.player1) {
-        this.player1.setData('isBlocking', true);
+      const player = this.players?.[0];
+      console.log('[Touch] Block down, player:', player);
+      if (player) {
+        player.setData('isBlocking', true);
         this.playerBlocking[0] = true;
       }
     });
 
     blockBtn.on('pointerup', () => {
-      if (this.player1) {
-        this.player1.setData('isBlocking', false);
+      const player = this.players?.[0];
+      console.log('[Touch] Block up, player:', player);
+      if (player) {
+        player.setData('isBlocking', false);
         this.playerBlocking[0] = false;
       }
     });
@@ -1517,14 +1560,14 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Visual effects
     if (special && typeof this.createSpecialAttackEffect === 'function') {
-    this.createSpecialAttackEffect(attacker, defender);
-  } else if (!special && typeof this.createAttackEffect === 'function') {
+      this.createSpecialAttackEffect(attacker, defender);
+    } else if (!special && typeof this.createAttackEffect === 'function') {
       this.createAttackEffect(attacker, defender);
     }
     if (typeof this.createHitEffect === 'function') {
       this.createHitEffect(defender);
     } else if (typeof this.showHitEffect === 'function') {
-      const hitX = defender.x + (defenderIdx === 0 ? 20 : -20);
+      const hitX = defender.x + (defenderIdxComputed === 0 ? 20 : -20);
       this.showHitEffect({ x: hitX, y: defender.y - 30 });
     }
 
@@ -1611,52 +1654,95 @@ export default class KidsFightScene extends Phaser.Scene {
    * @param defender The defending player
    */
   public createAttackEffect(attacker: any, defender: any): void {
-    const isTest = typeof jest !== 'undefined' || process.env.NODE_ENV === 'test';
-    if (isTest) return; // Skip effects in test environment
-    
     try {
-      // Create attack effect animation
-      const attackEffect = this.add.sprite(
-        defender.x - (attacker.x < defender.x ? -30 : 30),
-        defender.y - 50,
-        'attack_effect'
-      );
+      // Check if we're in a test environment
+      const isTest = typeof jest !== 'undefined';
       
-      // Play animation and destroy when done
-      attackEffect.play('attack_effect_anim');
-      attackEffect.on('animationcomplete', () => {
-        attackEffect.destroy();
-      });
-    } catch (error) {
+      // Calculate position
+      const x = defender.x - (attacker.x < defender.x ? -30 : 30);
+      const y = defender.y - 50;
+      
+      // Create graphics object - always use the graphics object returned by this.add.graphics()
+      const graphicsObj = this.add.graphics();
+      
+      // Draw the effect
+      graphicsObj.fillStyle(0xff0000, 0.7); // Red color for regular attack
+      graphicsObj.fillCircle(x, y, 24);
+      
+      // Add second circle for better visibility
+      graphicsObj.fillStyle(0xff6600, 0.4); // Orange glow
+      graphicsObj.fillCircle(x, y, 30);
+      
+      // Set depth to ensure visibility
+      graphicsObj.setDepth(100);
+      
+      // Log for debugging (only in real environment)
+      if (!isTest) {
+        console.log('Attack effect created at', x, y);
+      }
+      
+      // Add to effects array for tracking
+      if (!this.hitEffects) this.hitEffects = [];
+      this.hitEffects.push(graphicsObj);
+      
+      // Remove and destroy after a delay
+      if (this.time && typeof this.time.delayedCall === 'function') {
+        this.time.delayedCall(200, () => {
+          const idx = this.hitEffects.indexOf(graphicsObj);
+          if (idx !== -1) this.hitEffects.splice(idx, 1);
+          if (typeof graphicsObj.destroy === 'function') graphicsObj.destroy();
+        });
+      }
+    } catch (error: any) {
       console.error('Error creating attack effect:', error);
     }
   }
 
   /**
    * Create a visual effect for a hit
-   * @param target The player being hit
+   * @param target The player that was hit
    */
   public createHitEffect(target: any): void {
-    // Always create effect; tests rely on sprite mocks
     try {
-      // Create hit effect animation
-      const hitEffect = this.add.sprite(
-        target.x,
-        target.y - 50,
-        'hit_effect'
-      );
+      // Check if we're in a test environment
+      const isTest = typeof jest !== 'undefined';
       
-      // Play animation and destroy when done
+      // Calculate position
+      const x = target.x;
+      const y = target.y - 30;
+      
+      // Create graphics object - always use the graphics object returned by this.add.graphics()
+      const graphicsObj = this.add.graphics();
+      
+      // Draw the effect
+      graphicsObj.fillStyle(0xffff00, 0.7); // Yellow color for hit effect
+      graphicsObj.fillCircle(x, y, 18);
+      
+      // Add second circle for better visibility
+      graphicsObj.fillStyle(0xffffaa, 0.4); // Light yellow glow
+      graphicsObj.fillCircle(x, y, 24);
+      
+      // Set depth to ensure visibility
+      graphicsObj.setDepth(100);
+      
+      // Log for debugging (only in real environment)
+      if (!isTest) {
+        console.log('Hit effect created at', x, y);
+      }
+      
+      // Add to effects array for tracking
       if (!this.hitEffects) this.hitEffects = [];
-      this.hitEffects.push(hitEffect);
-      hitEffect.play('hit_effect_anim');
-      hitEffect.on('animationcomplete', () => {
-        // remove from array and destroy
-        const idx = this.hitEffects.indexOf(hitEffect);
-        if (idx !== -1) this.hitEffects.splice(idx, 1);
-        hitEffect.destroy();
-      });
-    } catch (error) {
+      this.hitEffects.push(graphicsObj);
+      
+      // Remove and destroy after a delay
+      if (this.time && typeof this.time.delayedCall === 'function') {
+        this.time.delayedCall(200, () => {
+          const idx = this.hitEffects.indexOf(graphicsObj);
+          if (idx !== -1) this.hitEffects.splice(idx, 1);
+          if (typeof graphicsObj.destroy === 'function') graphicsObj.destroy();
+        });
+      }
+    } catch (error: any) {
       console.error('Error creating hit effect:', error);
     }
   }
@@ -1681,6 +1767,56 @@ export default class KidsFightScene extends Phaser.Scene {
     }
   }
 
+  private showHitEffectAtCoordinates(x: number, y: number): void {
+    try {
+      // Check if we're in a test environment
+      const isTest = typeof jest !== 'undefined';
+      
+      // Create graphics object - always use the graphics object returned by this.add.graphics()
+      const graphicsObj = this.add.graphics();
+      
+      // Draw the effect
+      graphicsObj.fillStyle(0xffff00, 0.7); // Yellow color for hit effect
+      graphicsObj.fillCircle(x, y, 18);
+      
+      // Add second circle for better visibility
+      graphicsObj.fillStyle(0xffffaa, 0.4); // Light yellow glow
+      graphicsObj.fillCircle(x, y, 24);
+      
+      // Set depth to ensure visibility
+      graphicsObj.setDepth(100);
+      
+      // Log for debugging
+      if (!isTest) {
+        console.log('Hit effect created at coordinates', x, y);
+      }
+      
+      // Add to effects array for tracking
+      if (!this.hitEffects) this.hitEffects = [];
+      this.hitEffects.push(graphicsObj);
+      
+      // Remove and destroy after a delay
+      if (this.time && typeof this.time.delayedCall === 'function') {
+        this.time.delayedCall(200, () => {
+          const idx = this.hitEffects.indexOf(graphicsObj);
+          if (idx !== -1) this.hitEffects.splice(idx, 1);
+          if (typeof graphicsObj.destroy === 'function') graphicsObj.destroy();
+        });
+      }
+      
+      // For tests, manually trigger the animation complete event
+      if (isTest) {
+        setTimeout(() => {
+          const idx = this.hitEffects.indexOf(graphicsObj);
+          if (idx !== -1) this.hitEffects.splice(idx, 1);
+          if (typeof graphicsObj.destroy === 'function') graphicsObj.destroy();
+        }, 0);
+      }
+    } catch (error: any) {
+      console.error('Error creating hit effect at coordinates:', error);
+    }
+  }
+
   // ------------------------------------------------------------------
   // Game loop
   // ------------------------------------------------------------------
@@ -1693,6 +1829,9 @@ export default class KidsFightScene extends Phaser.Scene {
     if (!this.players || this.players.length < 2) return;
     const [p1, p2] = this.players;
     if (!p1 || !p2 || typeof p1.setFlipX !== 'function' || typeof p2.setFlipX !== 'function') return;
+    
+    // Process keyboard input
+    this.processKeyboardInput();
 
     if (p1.x <= p2.x) {
       // Player 1 on the left facing right, Player 2 on the right facing left
@@ -1711,8 +1850,10 @@ export default class KidsFightScene extends Phaser.Scene {
     }
 
     // Update animations for both players
-    this.updatePlayerAnimation(0);
-    this.updatePlayerAnimation(1);
+    if (typeof this.updatePlayerAnimation === 'function') {
+      this.updatePlayerAnimation(0);
+      this.updatePlayerAnimation(1);
+    }
 
     // Now that movement/frame logic done, evaluate win conditions (after external stubs may be in place)
     if (!this.gameOver && typeof this.checkWinner === 'function') {
@@ -1720,54 +1861,72 @@ export default class KidsFightScene extends Phaser.Scene {
     }
   }
 
-  private showHitEffectAtCoordinates(x: number, y: number): void {
-    if (!this.add) return;
-    try {
-      if (!this.hitEffects) this.hitEffects = [];
-      const effect = this.add.sprite(x, y, 'hit_effect');
-      if (typeof effect.setOrigin === 'function') effect.setOrigin(0.5, 0.5);
-      if (typeof effect.setDepth === 'function') effect.setDepth(100);
-      this.hitEffects.push(effect);
-      if (typeof effect.play === 'function') effect.play('hit_effect_anim');
-      effect.on('animationcomplete', () => {
-        // remove from array and destroy
-        const idx = this.hitEffects.indexOf(effect);
-        if (idx !== -1) this.hitEffects.splice(idx, 1);
-        effect.destroy();
-      });
-      if (typeof jest !== 'undefined' || process.env.NODE_ENV === 'test') {
-        setTimeout(() => {
-          effect.emit && effect.emit('animationcomplete');
-        }, 0);
-      }
-    } catch (e) {
-      // Ignore errors for test stubs
+  /**
+   * Process keyboard input for player movement, attack, block, and jump
+   * This ensures player movement continues to work during attack/block/jump actions
+   */
+  private processKeyboardInput(): void {
+    // Skip if we're in a test environment without proper input setup
+    if (typeof jest !== 'undefined') return;
+    
+    // Get local player index (default to 0)
+    const idx = this.localPlayerIndex ?? 0;
+    const player = this.players?.[idx];
+    if (!player) return;
+
+    // Handle both keyboard and touch button input for movement
+    const leftDown = this.cursors?.left?.isDown || this.touchButtons?.left?.isDown;
+    const rightDown = this.cursors?.right?.isDown || this.touchButtons?.right?.isDown;
+
+    if (leftDown) {
+      player.setVelocityX?.(-160);
+      player.setFlipX?.(true);
+    } else if (rightDown) {
+      player.setVelocityX?.(160);
+      player.setFlipX?.(false);
+    } else {
+      player.setVelocityX?.(0);
+    }
+
+    // Jump (keyboard only, but can add touch if desired)
+    if (this.cursors?.up?.isDown && player.body?.touching?.down) {
+      player.setVelocityY?.(-330);
+    }
+
+    if (this.attackKey?.isDown) {
+      this.handleAttack();
+    }
+    if (this.blockKey?.isDown) {
+      this.handleBlock();
     }
   }
 
   /**
-   * Creates a graphics object with test environment support
-   * @returns Graphics object or mock in test environment
+   * Create a graphics object for test environment or use Phaser's graphics in browser
+   * @returns A graphics object (mock in tests, real in browser)
    */
-  public createGfx(): any {
-    if (this.add && this.add.graphics) {
-      return this.add.graphics();
-    } else {
-      // Mock graphics for test environment with unique identifier to ensure each instance is different
+  private createGfx(): any {
+    // Check if we're in a test environment
+    const isTestEnv = typeof jest !== 'undefined';
+    
+    if (isTestEnv) {
+      // In test environment, return a mock object with jest spy functions
       return {
-        _uniqueId: Date.now() + Math.random(),
-        clear: jest.fn().mockReturnThis(),
         fillStyle: jest.fn().mockReturnThis(),
+        fillCircle: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        destroy: jest.fn().mockReturnThis(),
         fillRect: jest.fn().mockReturnThis(),
         lineStyle: jest.fn().mockReturnThis(),
         strokeRect: jest.fn().mockReturnThis(),
-        destroy: jest.fn().mockReturnThis(),
         setScrollFactor: jest.fn().mockReturnThis(),
-        setDepth: jest.fn().mockReturnThis(),
         setX: jest.fn().mockReturnThis(),
         setY: jest.fn().mockReturnThis(),
         setVisible: jest.fn().mockReturnThis()
       };
+    } else {
+      // In browser environment, use the actual Phaser graphics object
+      return this.add.graphics();
     }
   }
 
@@ -1794,6 +1953,21 @@ export default class KidsFightScene extends Phaser.Scene {
     if (this.gameOver || (this as any)._gameOver) return;
     if (this.gameMode === 'online' && this.wsManager?.send) {
       this.wsManager.send({ type: 'attack', playerIndex: idx });
+    }
+  }
+  
+  /** Block action */
+  public handleBlock(): void {
+    const idx = this.localPlayerIndex ?? 0;
+    const player = this.players?.[idx];
+    if (!player) return;
+    
+    // Set player state to blocking
+    (player as any).isBlocking = true;
+    
+    // Send block message in online mode
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      this.wsManager.send({ type: 'block', playerIndex: idx });
     }
   }
 
@@ -2042,7 +2216,31 @@ export default class KidsFightScene extends Phaser.Scene {
    * Visual effect for special attack – tests spy on it.
    */
   public createSpecialAttackEffect(attacker: any, defender: any): void {
-    if (typeof jest !== 'undefined') return; // noop in tests (spy still counted)
+    try {
+      // Check if we're in a test environment
+      const isTest = typeof jest !== 'undefined';
+      if (isTest) return; // Skip in tests, but spy still counted
+      
+      // Draw a special effect (blue circle with larger radius)
+      const x = defender.x - (attacker.x < defender.x ? -40 : 40);
+      const y = defender.y - 60;
+      
+      const gfx = this.add.graphics();
+      gfx.fillStyle(0x0088ff, 0.8); // Blue color for special attack
+      gfx.fillCircle(x, y, 32); // Larger radius for special attack
+      
+      // Add glow effect (second circle)
+      gfx.fillStyle(0x00ffff, 0.4);
+      gfx.fillCircle(x, y, 40);
+      
+      // Set depth to ensure visibility
+      gfx.setDepth(100);
+      
+      // Remove and destroy after a delay
+      this.time.delayedCall(300, () => gfx.destroy());
+    } catch (error) {
+      console.error('Error creating special attack effect:', error);
+    }
   }
 
   // Alias for unit tests
@@ -2071,16 +2269,14 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // The tests rely on getData("isBlocking" | "isSpecialAttacking" | "isAttacking")
     const isBlocking = player.getData?.('isBlocking') ?? player.isBlocking;
+
+    // scale rules
+    // Always use BASE_SCALE regardless of blocking state to prevent size/position issues
+    player.setScale?.(BASE_SCALE);
+
     const isSpecial = player.getData?.('isSpecialAttacking') ?? player.isSpecialAttacking;
     const isAttack = player.getData?.('isAttacking') ?? player.isAttacking;
     const isMoving = player.body?.velocity?.x !== 0;
-
-    // scale rules
-    if (isBlocking) {
-      player.setScale?.(0.9, 1.0);
-    } else {
-      player.setScale?.(BASE_SCALE);
-    }
 
     // Get the texture key to determine which animation set to use
     const textureKey = player.texture?.key || '';
