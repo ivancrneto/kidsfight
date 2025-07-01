@@ -123,9 +123,9 @@ describe('Player Animation Tests', () => {
     // Call the update animation method
     scene.updatePlayerAnimation(0);
     
-    // Verify block frame is set and scale is (0.9, 1.0)
+    // Verify block frame is set and scale is BASE_SCALE (0.4)
     expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(2);
-    expect(mockPlayers[0].setScale).toHaveBeenCalledWith(0.9, 1.0);
+    expect(mockPlayers[0].setScale).toHaveBeenCalledWith(0.4);
     expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
 
@@ -153,7 +153,7 @@ describe('Player Animation Tests', () => {
     
     // Verify block frame is set based on getData value
     expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(2);
-    expect(mockPlayers[0].setScale).toHaveBeenCalledWith(0.9, 1.0);
+    expect(mockPlayers[0].setScale).toHaveBeenCalledWith(0.4);
   });
 
   test('player should use fallback frame if animation does not exist', () => {
