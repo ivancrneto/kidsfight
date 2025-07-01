@@ -175,8 +175,8 @@ describe('Block Functionality', () => {
     scene.playerBlocking[0] = true;
     scene.players[0].isBlocking = true; // Ensure property is set for updatePlayerAnimation
     scene.updatePlayerAnimation(0);
-    // Check if scale for blocking is BASE_SCALE (0.4)
-    expect(scene.players[0].setScale).toHaveBeenCalledWith(0.4);
+    // Check if scale for blocking is historic blocking scale (0.9, 1.0)
+    expect(scene.players[0].setScale).toHaveBeenCalledWith(0.9, 1.0);
   });
   
   test('block button correctly sets player blocking state', () => {

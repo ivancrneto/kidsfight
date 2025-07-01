@@ -2271,8 +2271,12 @@ export default class KidsFightScene extends Phaser.Scene {
     const isBlocking = player.getData?.('isBlocking') ?? player.isBlocking;
 
     // scale rules
-    // Always use BASE_SCALE regardless of blocking state to prevent size/position issues
-    player.setScale?.(BASE_SCALE);
+    // Blocking uses larger scale, else base scale
+    if (isBlocking) {
+      player.setScale?.(0.9, 1.0);
+    } else {
+      player.setScale?.(BASE_SCALE);
+    }
 
     const isSpecial = player.getData?.('isSpecialAttacking') ?? player.isSpecialAttacking;
     const isAttack = player.getData?.('isAttacking') ?? player.isAttacking;
