@@ -49,12 +49,12 @@ describe('KidsFightScene Special Pips', () => {
       scene.specialPips2.forEach(pip => expect(pip).toBeInstanceOf(MockGraphics));
       // fillStyle and fillCircle called for each pip
       scene.specialPips1.forEach(pip => {
-        expect(pip.fillStyle).toHaveBeenCalledWith(0xffffff, 0.3);
+        expect(pip.fillStyle).toHaveBeenCalledWith(0x888888, 0.3);
         expect(pip.fillCircle).toHaveBeenCalled();
         expect(pip.setDepth).toHaveBeenCalledWith(10);
       });
       scene.specialPips2.forEach(pip => {
-        expect(pip.fillStyle).toHaveBeenCalledWith(0xffffff, 0.3);
+        expect(pip.fillStyle).toHaveBeenCalledWith(0x888888, 0.3);
         expect(pip.fillCircle).toHaveBeenCalled();
         expect(pip.setDepth).toHaveBeenCalledWith(10);
       });
@@ -72,11 +72,11 @@ describe('KidsFightScene Special Pips', () => {
       // Player 1: first 2 yellow, last white
       expect(scene.specialPips1[0].fillStyle).toHaveBeenCalledWith(0xffe066, 1);
       expect(scene.specialPips1[1].fillStyle).toHaveBeenCalledWith(0xffe066, 1);
-      expect(scene.specialPips1[2].fillStyle).toHaveBeenCalledWith(0xffffff, 0.3);
+      expect(scene.specialPips1[2].fillStyle).toHaveBeenCalledWith(0x888888, 0.3);
       // Player 2: first yellow, rest white
       expect(scene.specialPips2[0].fillStyle).toHaveBeenCalledWith(0xffe066, 1);
-      expect(scene.specialPips2[1].fillStyle).toHaveBeenCalledWith(0xffffff, 0.3);
-      expect(scene.specialPips2[2].fillStyle).toHaveBeenCalledWith(0xffffff, 0.3);
+      expect(scene.specialPips2[1].fillStyle).toHaveBeenCalledWith(0x888888, 0.3);
+      expect(scene.specialPips2[2].fillStyle).toHaveBeenCalledWith(0x888888, 0.3);
     });
     it('should not throw if fewer than 3 pips exist', () => {
       scene.specialPips1 = [new MockGraphics()];

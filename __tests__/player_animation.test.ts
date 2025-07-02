@@ -106,7 +106,7 @@ describe('Player Animation Tests', () => {
     expect(mockPlayers[0].play).toHaveBeenCalledWith('player1_walk', true);
   });
 
-  test('player should use attack frame when attacking', () => {
+  test('player should flash attack frame then return to idle', () => {
     // Set up player state - attacking
     mockPlayers[0].isAttacking = true;
     
@@ -114,7 +114,8 @@ describe('Player Animation Tests', () => {
     scene.updatePlayerAnimation(0);
     
     // Verify attack frame is set
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(3);
+    expect(mockPlayers[0].play).toHaveBeenCalledWith('player1_attack', true);
+    expect(mockPlayers[0].setFrame).not.toHaveBeenCalled();
     expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
 
@@ -139,7 +140,7 @@ describe('Player Animation Tests', () => {
     scene.updatePlayerAnimation(0);
     
     // Verify special attack frame is set
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(7);
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(6);
     expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
 
@@ -228,3 +229,5 @@ describe('Player Animation Tests', () => {
     expect(mockPlayers[0].y).toBe(150);
   });
 });
+
+

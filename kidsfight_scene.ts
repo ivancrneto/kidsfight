@@ -1120,20 +1120,7 @@ export default class KidsFightScene extends Phaser.Scene {
     this.createHealthBars();
 
     // --- SPECIAL PIPS ---
-    this.specialPips1 = [];
-    this.specialPips2 = [];
-    for (let i = 0; i < 3; i++) {
-      const pip1 = this.safeAddGraphics();
-      pip1.fillStyle(0xffff00, 1);
-      pip1.fillRect(90 + i * 30, 75, 8, 8);
-      pip1.setDepth(2);
-      this.specialPips1.push(pip1);
-      const pip2 = this.safeAddGraphics();
-      pip2.fillStyle(0xffff00, 1);
-      pip2.fillRect(710 - i * 30, 75, 8, 8);
-      pip2.setDepth(2);
-      this.specialPips2.push(pip2);
-    }
+    this.createSpecialPips();
 
     // --- PLAYER NAME LABELS ---
     this.p1NameText = this.add.text(50, 15, this.getCharacterName(p1Key), {
@@ -1565,6 +1552,19 @@ export default class KidsFightScene extends Phaser.Scene {
       // Gain 1 pip on normal attack, capped at 3
       this.playerSpecial[attackerIdx] = Math.min(3, (this.playerSpecial[attackerIdx] || 0) + 1);
       this.updateSpecialPips?.();
+      // Flag normal attacking state for animation/tests
+      attacker.setData?.('isAttacking', true);
+      attacker.isAttacking = true;
+      // Clear attacking flag after animation duration
+      if (typeof setTimeout === 'function') {
+        setTimeout(() => {
+          attacker.setData?.('isAttacking', false);
+          attacker.isAttacking = false;
+        }, 300);
+      } else {
+        attacker.setData?.('isAttacking', false);
+        attacker.isAttacking = false;
+      }
     }
 
     // Visual effects
@@ -2164,7 +2164,7 @@ export default class KidsFightScene extends Phaser.Scene {
       if (!Array.isArray(pipsArr)) return;
       pipsArr.forEach((pip, idx) => {
         if (!pip) return;
-        const color = idx < count ? 0xffe066 : 0xffffff;
+        const color = idx < count ? 0xffe066 : 0x888888;
         const alpha = idx < count ? 1 : 0.3;
         if (typeof pip.setFillStyle === 'function') {
           pip.setFillStyle(color, alpha);
@@ -2270,50 +2270,40 @@ export default class KidsFightScene extends Phaser.Scene {
    * Update animation & scale for a player. Keeps this implementation minimal yet consistent
    * with what unit-tests assert (see kidsfight_scene_player_scale.test.ts).
    */
-  public updatePlayerAnimation(playerIndex: number): void {
+    public updatePlayerAnimation(playerIndex: number): void {
     const player: any = this.players?.[playerIndex];
     if (!player) return;
     const origY = player.y;
 
     const BASE_SCALE = 0.4;
-
-    // The tests rely on getData("isBlocking" | "isSpecialAttacking" | "isAttacking")
-    const isBlocking = player.getData?.('isBlocking') ?? player.isBlocking;
-
-    // Always use base scale for all animation states
     player.setScale?.(BASE_SCALE);
 
-    const isSpecial = player.getData?.('isSpecialAttacking') ?? player.isSpecialAttacking;
-    const isAttack = player.getData?.('isAttacking') ?? player.isAttacking;
+    const isAttack = player.getData?.('isAttacking') || player.isAttacking;
+    const isSpecial = player.getData?.('isSpecialAttacking') || player.isSpecialAttacking;
+    const isBlocking = player.getData?.('isBlocking') || player.isBlocking;
     const isMoving = player.body?.velocity?.x !== 0;
 
-    // Get the texture key to determine which animation set to use
     const textureKey = player.texture?.key || '';
-    
-    // Handle animation states
+
     if (isAttack) {
-      this.setSafeFrame(player, 3);
+      player.play?.(`${textureKey}_attack`, true);
     } else if (isSpecial) {
-      this.setSafeFrame(player, 7);
+      this.setSafeFrame(player, 6);
     } else if (isBlocking) {
       this.setSafeFrame(player, 2);
     } else if (isMoving) {
-      // Only play run animation if actually moving
-      const animKey = `${textureKey}_walk`;
-      if (this.anims.exists(animKey)) {
-        player.play?.(animKey, true);
+      const walkKey = `${textureKey}_walk`;
+      if (this.anims.exists(walkKey)) {
+        player.play?.(walkKey, true);
       } else {
-        this.setSafeFrame(player, 1); // Fallback to frame 1 for walking
+        this.setSafeFrame(player, 1);
       }
     } else {
-      // If not moving, attacking, blocking, or using special - stay in idle state with a fixed frame
-      // This prevents cycling through animation frames
       this.setSafeFrame(player, 0);
-      
-      // Stop any running animations to prevent frame cycling
       player.anims?.stop?.();
-    player.y = origY;
     }
+
+    player.y = origY;
   }
 
   /**
@@ -2324,6 +2314,11 @@ export default class KidsFightScene extends Phaser.Scene {
    * @param recreate Whether to destroy existing pips before recreating
    */
   public createSpecialPips(_playerIndex: number = 0, recreate: number = 1): void {
+    if (!this.add || typeof this.add.graphics !== 'function') {
+      this.specialPips1 = [];
+      this.specialPips2 = [];
+      return;
+    }
     // Destroy existing pips if requested
     if (recreate) {
       [this.specialPips1, this.specialPips2].forEach(arr => {
@@ -2337,16 +2332,18 @@ export default class KidsFightScene extends Phaser.Scene {
       const x2 = 660 + i * 36;
       const y = 60;
       // Player 1 pip
-      const pip1 = this.add && typeof this.add.graphics === 'function' ? this.add.graphics() : this.safeAddGraphics();
-      pip1.fillStyle?.(0xffffff, 0.3);
+      const g1 = this.add.graphics();
+      const pip1 = (g1 && typeof (g1 as any).fillStyle === 'function') ? g1 : this.safeAddGraphics();
+      pip1.fillStyle(0x888888, 0.3);
       pip1.fillCircle?.(x1, y, 16);
-      pip1.setDepth?.(10);
+      pip1.setDepth(10);
       this.specialPips1.push(pip1);
       // Player 2 pip
-      const pip2 = this.add && typeof this.add.graphics === 'function' ? this.add.graphics() : this.safeAddGraphics();
-      pip2.fillStyle?.(0xffffff, 0.3);
+      const g2 = this.add.graphics();
+      const pip2 = (g2 && typeof (g2 as any).fillStyle === 'function') ? g2 : this.safeAddGraphics();
+      pip2.fillStyle(0x888888, 0.3);
       pip2.fillCircle?.(x2, y, 16);
-      pip2.setDepth?.(10);
+      pip2.setDepth(10);
       this.specialPips2.push(pip2);
     }
   }

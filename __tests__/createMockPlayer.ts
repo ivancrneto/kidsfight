@@ -32,7 +32,7 @@ export const createMockPlayer = () => ({
     touching: { down: true },
     onFloor: jest.fn().mockReturnValue(true)
   },
-  anims: { play: jest.fn() },
+  anims: { play: jest.fn(), stop: jest.fn() },
   destroy: jest.fn(),
   texture: { key: 'player' },
   getData: jest.fn().mockImplementation((key) => {

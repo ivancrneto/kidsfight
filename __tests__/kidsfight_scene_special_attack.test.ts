@@ -257,7 +257,7 @@ describe('KidsFightScene - Special Attack', () => {
       // Check that fillStyle was called appropriately on the pip graphics
       expect(scene['specialPips1'][0].fillStyle).toHaveBeenCalledWith(0xffe066, 1); // First pip filled
       expect(scene['specialPips1'][1].fillStyle).toHaveBeenCalledWith(0xffe066, 1); // Second pip filled
-      expect(scene['specialPips1'][2].fillStyle).toHaveBeenCalledWith(0xffffff, 0.3); // Last pip empty
+      expect(scene['specialPips1'][2].fillStyle).toHaveBeenCalledWith(0x888888, 0.3); // Last pip empty
     });
   });
 });

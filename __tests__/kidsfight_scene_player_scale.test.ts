@@ -9,6 +9,12 @@ describe('KidsFightScene player scale', () => {
 
   beforeEach(() => {
     scene = new KidsFightScene();
+    // Mock AnimationManager to make attack animation available
+    scene.anims = {
+      exists: jest.fn().mockReturnValue(true),
+      create: jest.fn(),
+      get: jest.fn()
+    } as any;
     // Mock Phaser add.graphics to avoid TypeError
     scene.add = {
       graphics: jest.fn(() => ({
@@ -45,6 +51,8 @@ describe('KidsFightScene player scale', () => {
     player2.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 0 };
     player1.direction = 'right';
     player2.direction = 'left';
+    player1.play = jest.fn();
+    player2.play = jest.fn();
     scene.players = [player1, player2];
     scene.playerBlocking = [false, false];
     // Mock setSafeFrame to call setFrame directly for testability
@@ -86,7 +94,8 @@ describe('KidsFightScene player scale', () => {
     player1.direction = 'right';
     player1.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 0 };
     (scene as any)['updatePlayerAnimation'](0);
-    expect(player1.setFrame).toHaveBeenCalledWith(3);
+    expect(player1.play).toHaveBeenCalledWith('player1_attack', true);
+    expect(player1.setFrame).not.toHaveBeenCalled();
   });
 
   it('should set correct frame for special attack', () => {
@@ -100,7 +109,7 @@ describe('KidsFightScene player scale', () => {
     player1.direction = 'right';
     player1.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 0 };
     (scene as any)['updatePlayerAnimation'](0);
-    expect(player1.setFrame).toHaveBeenCalledWith(7);
+    expect(player1.setFrame).toHaveBeenCalledWith(6);
   });
 
   it('should use BASE_PLAYER_SCALE for walking', () => {
