@@ -57,10 +57,10 @@ describe('KidsFightScene player scale', () => {
     expect(player1.setScale).toHaveBeenCalledWith(0.4);
   });
 
-  it('should use special scale values for blocking', () => {
+  it('should use base scale for blocking', () => {
     player1.getData.mockImplementation((key: string) => key === 'isBlocking');
     (scene as any)['updatePlayerAnimation'](0);
-    // Blocking now uses BASE_SCALE (0.4) per the new implementation
+    // Blocking now uses base scale (0.4) per new implementation
     expect(player1.setScale).toHaveBeenCalledWith(0.4);
   });
 
@@ -86,7 +86,7 @@ describe('KidsFightScene player scale', () => {
     player1.direction = 'right';
     player1.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 0 };
     (scene as any)['updatePlayerAnimation'](0);
-    expect(player1.setFrame).toHaveBeenCalledWith(4);
+    expect(player1.setFrame).toHaveBeenCalledWith(3);
   });
 
   it('should set correct frame for special attack', () => {
@@ -100,7 +100,7 @@ describe('KidsFightScene player scale', () => {
     player1.direction = 'right';
     player1.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 0 };
     (scene as any)['updatePlayerAnimation'](0);
-    expect(player1.setFrame).toHaveBeenCalledWith(6);
+    expect(player1.setFrame).toHaveBeenCalledWith(7);
   });
 
   it('should use BASE_PLAYER_SCALE for walking', () => {

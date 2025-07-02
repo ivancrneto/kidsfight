@@ -62,6 +62,8 @@ describe('Player Animation Tests', () => {
     
     // Set the mock players in the scene
     scene.setPlayers(mockPlayers);
+    // Initialize Y position for testing to ensure no vertical shift
+    mockPlayers.forEach(p => p.y = 200);
     
     // Mock the anims object
     scene.anims = {
@@ -95,13 +97,13 @@ describe('Player Animation Tests', () => {
     mockPlayers[0].getData.mockImplementation(() => false);
     
     // Mock the anims.exists to return true for the run animation
-    scene.anims.exists.mockImplementation((key: string) => key === 'player1_run');
+    scene.anims.exists.mockImplementation((key: string) => key === 'player1_walk');
     
     // Call the update animation method
     scene.updatePlayerAnimation(0);
     
     // Verify run animation is played
-    expect(mockPlayers[0].play).toHaveBeenCalledWith('player1_run', true);
+    expect(mockPlayers[0].play).toHaveBeenCalledWith('player1_walk', true);
   });
 
   test('player should use attack frame when attacking', () => {
@@ -112,7 +114,7 @@ describe('Player Animation Tests', () => {
     scene.updatePlayerAnimation(0);
     
     // Verify attack frame is set
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(4);
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(3);
     expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
 
@@ -137,7 +139,7 @@ describe('Player Animation Tests', () => {
     scene.updatePlayerAnimation(0);
     
     // Verify special attack frame is set
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(6);
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(7);
     expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
 
@@ -167,7 +169,7 @@ describe('Player Animation Tests', () => {
     scene.updatePlayerAnimation(0);
     
     // Verify fallback frame is used
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(4);
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
     expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
 
@@ -187,5 +189,42 @@ describe('Player Animation Tests', () => {
     expect(spy).toHaveBeenCalledWith(0);
     expect(spy).toHaveBeenCalledWith(1);
     expect(spy).toHaveBeenCalledTimes(2);
+
+  });
+
+  test('player y remains unchanged across all animation states', () => {
+    // Set a baseline Y position
+    mockPlayers[0].y = 150;
+
+    // Idle state
+    mockPlayers[0].body.velocity.x = 0;
+    scene.updatePlayerAnimation(0);
+    expect(mockPlayers[0].y).toBe(150);
+
+    // Run state
+    mockPlayers[0].body.velocity.x = 160;
+    mockPlayers[0].isAttacking = false;
+    mockPlayers[0].isSpecialAttacking = false;
+    mockPlayers[0].isBlocking = false;
+    scene.updatePlayerAnimation(0);
+    expect(mockPlayers[0].y).toBe(150);
+
+    // Attack state
+    mockPlayers[0].body.velocity.x = 0;
+    mockPlayers[0].isAttacking = true;
+    scene.updatePlayerAnimation(0);
+    expect(mockPlayers[0].y).toBe(150);
+
+    // Special attack state
+    mockPlayers[0].isAttacking = false;
+    mockPlayers[0].isSpecialAttacking = true;
+    scene.updatePlayerAnimation(0);
+    expect(mockPlayers[0].y).toBe(150);
+
+    // Block state
+    mockPlayers[0].isSpecialAttacking = false;
+    mockPlayers[0].isBlocking = true;
+    scene.updatePlayerAnimation(0);
+    expect(mockPlayers[0].y).toBe(150);
   });
 });

@@ -918,6 +918,15 @@ export default class KidsFightScene extends Phaser.Scene {
           repeat: -1
         });
       }
+      // Walk: frames 1-2
+      if (!this.anims.exists(`${key}_walk`)) {
+        this.anims.create({
+          key: `${key}_walk`,
+          frames: this.anims.generateFrameNumbers(key, {start: 1, end: 2}),
+          frameRate: 8,
+          repeat: -1
+        });
+      }
       // Jump: frame 6
       if (!this.anims.exists(`${key}_jump`)) {
         this.anims.create({
@@ -2264,14 +2273,14 @@ export default class KidsFightScene extends Phaser.Scene {
   public updatePlayerAnimation(playerIndex: number): void {
     const player: any = this.players?.[playerIndex];
     if (!player) return;
+    const origY = player.y;
 
     const BASE_SCALE = 0.4;
 
     // The tests rely on getData("isBlocking" | "isSpecialAttacking" | "isAttacking")
     const isBlocking = player.getData?.('isBlocking') ?? player.isBlocking;
 
-    // scale rules
-    // Always use BASE_SCALE regardless of blocking state to prevent size/position issues
+    // Always use base scale for all animation states
     player.setScale?.(BASE_SCALE);
 
     const isSpecial = player.getData?.('isSpecialAttacking') ?? player.isSpecialAttacking;
@@ -2283,18 +2292,18 @@ export default class KidsFightScene extends Phaser.Scene {
     
     // Handle animation states
     if (isAttack) {
-      this.setSafeFrame(player, 4);
+      this.setSafeFrame(player, 3);
     } else if (isSpecial) {
-      this.setSafeFrame(player, 6);
+      this.setSafeFrame(player, 7);
     } else if (isBlocking) {
       this.setSafeFrame(player, 2);
     } else if (isMoving) {
       // Only play run animation if actually moving
-      const animKey = `${textureKey}_run`;
+      const animKey = `${textureKey}_walk`;
       if (this.anims.exists(animKey)) {
         player.play?.(animKey, true);
       } else {
-        this.setSafeFrame(player, 4); // Fallback to frame 4 for running
+        this.setSafeFrame(player, 1); // Fallback to frame 1 for walking
       }
     } else {
       // If not moving, attacking, blocking, or using special - stay in idle state with a fixed frame
@@ -2303,6 +2312,7 @@ export default class KidsFightScene extends Phaser.Scene {
       
       // Stop any running animations to prevent frame cycling
       player.anims?.stop?.();
+    player.y = origY;
     }
   }
 
