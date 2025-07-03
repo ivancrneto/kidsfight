@@ -2160,21 +2160,53 @@ export default class KidsFightScene extends Phaser.Scene {
    * Update the special meter pips graphics based on current playerSpecial values.
    */
   public updateSpecialPips(): void {
-    const update = (pipsArr: any[], count: number) => {
-      if (!Array.isArray(pipsArr)) return;
-      pipsArr.forEach((pip, idx) => {
-        if (!pip) return;
-        const color = idx < count ? 0xffe066 : 0x888888;
-        const alpha = idx < count ? 1 : 0.3;
-        if (typeof pip.setFillStyle === 'function') {
-          pip.setFillStyle(color, alpha);
-        } else if (typeof pip.fillStyle === 'function') {
-          pip.fillStyle(color, alpha);
-        }
-      });
-    };
-    update(this.specialPips1 as any, this.playerSpecial?.[0] ?? 0);
-    update(this.specialPips2 as any, this.playerSpecial?.[1] ?? 0);
+    const STEP = 36;
+    const Y = 60;
+    const RADIUS = 16;
+    const OFFSET1 = 140;
+    const OFFSET2 = 660;
+    const count1 = this.playerSpecial?.[0] ?? 0;
+    const count2 = this.playerSpecial?.[1] ?? 0;
+    // Update Player 1 pips
+    this.specialPips1?.forEach((pip, idx) => {
+      if (!pip) return;
+      const color = idx < count1 ? 0xffe066 : 0x888888;
+      const alpha = idx < count1 ? 1 : 0.3;
+      pip.clear?.();
+      pip.fillStyle(color, alpha);
+      pip.fillCircle?.(OFFSET1 + idx * STEP, Y, RADIUS);
+      pip.setDepth?.(10);
+    });
+    // Update Player 2 pips
+    this.specialPips2?.forEach((pip, idx) => {
+      if (!pip) return;
+      const color = idx < count2 ? 0xffe066 : 0x888888;
+      const alpha = idx < count2 ? 1 : 0.3;
+      pip.clear?.();
+      pip.fillStyle(color, alpha);
+      pip.fillCircle?.(OFFSET2 + idx * STEP, Y, RADIUS);
+      pip.setDepth?.(10);
+    });
+
+    // Show 'S' in the last pip when fully charged
+    if (count1 >= 3) {
+      if (!this.specialReadyText1) {
+        this.specialReadyText1 = this.add.text(OFFSET1 + 2 * STEP, Y, 'S', { fontSize: '16px', color: '#000' }).setOrigin(0.5).setDepth(11);
+      } else {
+        this.specialReadyText1.setVisible(true);
+      }
+    } else if (this.specialReadyText1) {
+      this.specialReadyText1.setVisible(false);
+    }
+    if (count2 >= 3) {
+      if (!this.specialReadyText2) {
+        this.specialReadyText2 = this.add.text(OFFSET2 + 2 * STEP, Y, 'S', { fontSize: '16px', color: '#000' }).setOrigin(0.5).setDepth(11);
+      } else {
+        this.specialReadyText2.setVisible(true);
+      }
+    } else if (this.specialReadyText2) {
+      this.specialReadyText2.setVisible(false);
+    }
   }
 
   /**

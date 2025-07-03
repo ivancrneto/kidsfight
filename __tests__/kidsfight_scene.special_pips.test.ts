@@ -21,7 +21,7 @@ describe('KidsFightScene Special Pips', () => {
       canvas: { width: 800, height: 480 },
       device: { os: {} }
     };
-    scene = new KidsFightScene({});
+    scene = new KidsFightScene();
     scene.add = mockAdd;
     scene.sys = { game: mockGame };
     scene.specialPips1 = [];
@@ -45,15 +45,15 @@ describe('KidsFightScene Special Pips', () => {
       expect(scene.specialPips1.length).toBe(3);
       expect(scene.specialPips2.length).toBe(3);
       // Each pip should be a MockGraphics instance
-      scene.specialPips1.forEach(pip => expect(pip).toBeInstanceOf(MockGraphics));
-      scene.specialPips2.forEach(pip => expect(pip).toBeInstanceOf(MockGraphics));
+      scene.specialPips1.forEach((pip: any) => expect(pip).toBeInstanceOf(MockGraphics));
+      scene.specialPips2.forEach((pip: any) => expect(pip).toBeInstanceOf(MockGraphics));
       // fillStyle and fillCircle called for each pip
-      scene.specialPips1.forEach(pip => {
+      scene.specialPips1.forEach((pip: any) => {
         expect(pip.fillStyle).toHaveBeenCalledWith(0x888888, 0.3);
         expect(pip.fillCircle).toHaveBeenCalled();
         expect(pip.setDepth).toHaveBeenCalledWith(10);
       });
-      scene.specialPips2.forEach(pip => {
+      scene.specialPips2.forEach((pip: any) => {
         expect(pip.fillStyle).toHaveBeenCalledWith(0x888888, 0.3);
         expect(pip.fillCircle).toHaveBeenCalled();
         expect(pip.setDepth).toHaveBeenCalledWith(10);
@@ -83,6 +83,37 @@ describe('KidsFightScene Special Pips', () => {
       scene.specialPips2 = [new MockGraphics()];
       scene.playerSpecial = [1, 0];
       expect(() => scene.updateSpecialPips()).not.toThrow();
+    });
+  });
+
+  describe('specialReadyText overlay', () => {
+    it('shows S when fully charged and hides otherwise', () => {
+      // Setup mock text creation
+      const mockText1: any = { setOrigin: jest.fn().mockReturnThis(), setDepth: jest.fn().mockReturnThis(), setVisible: jest.fn().mockReturnThis(), text: '' };
+      const mockText2: any = { setOrigin: jest.fn().mockReturnThis(), setDepth: jest.fn().mockReturnThis(), setVisible: jest.fn().mockReturnThis(), text: '' };
+      mockAdd.text = jest.fn((x, y, t, style) => {
+        if (x === 140 + 2 * 36) { mockText1.text = t; return mockText1; } else { mockText2.text = t; return mockText2; }
+      });
+      scene.specialPips1 = [new MockGraphics(), new MockGraphics(), new MockGraphics()];
+      scene.specialPips2 = [new MockGraphics(), new MockGraphics(), new MockGraphics()];
+      scene.playerSpecial = [3, 3];
+      scene.updateSpecialPips();
+      expect(mockAdd.text).toHaveBeenCalledTimes(2);
+      expect(mockText1.text).toBe('S');
+      expect(mockText2.text).toBe('S');
+    });
+
+    it('hides S when not fully charged', () => {
+      const mockText1: any = { setVisible: jest.fn() };
+      const mockText2: any = { setVisible: jest.fn() };
+      scene.specialReadyText1 = mockText1;
+      scene.specialReadyText2 = mockText2;
+      scene.specialPips1 = [new MockGraphics(), new MockGraphics(), new MockGraphics()];
+      scene.specialPips2 = [new MockGraphics(), new MockGraphics(), new MockGraphics()];
+      scene.playerSpecial = [2, 2];
+      scene.updateSpecialPips();
+      expect(mockText1.setVisible).toHaveBeenCalledWith(false);
+      expect(mockText2.setVisible).toHaveBeenCalledWith(false);
     });
   });
 });
