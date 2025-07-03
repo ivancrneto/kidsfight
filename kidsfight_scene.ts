@@ -883,6 +883,15 @@ export default class KidsFightScene extends Phaser.Scene {
     // Render background
     const bg = this.safeAddImage(400, 240, scenarioKey);
     bg.setDepth(0);
+    // Scale background to fill screen on mobile
+    bg.setOrigin?.(0.5, 0.5);
+    if (typeof bg.setDisplaySize === 'function') {
+      const cw = this.sys?.game?.canvas?.width;
+      const ch = this.sys?.game?.canvas?.height;
+      if (typeof cw === 'number' && typeof ch === 'number') {
+        bg.setDisplaySize(cw, ch);
+      }
+    }
 
     // Add variable-width spritesheets for each player
     addVariableWidthSpritesheet(this, 'bento', 'bento_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
