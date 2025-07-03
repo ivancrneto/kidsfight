@@ -109,13 +109,15 @@ describe('Player Animation Tests', () => {
   test('player should flash attack frame then return to idle', () => {
     // Set up player state - attacking
     mockPlayers[0].isAttacking = true;
-    
+
     // Call the update animation method
     scene.updatePlayerAnimation(0);
-    
-    // Verify attack frame is set
-    expect(mockPlayers[0].play).toHaveBeenCalledWith('player1_attack', true);
-    expect(mockPlayers[0].setFrame).not.toHaveBeenCalled();
+
+    // Verify flash of attack frame then revert to idle
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledTimes(2);
+    expect(mockPlayers[0].setFrame).toHaveBeenNthCalledWith(1, 4);
+    expect(mockPlayers[0].setFrame).toHaveBeenNthCalledWith(2, 0);
+    expect(mockPlayers[0].play).not.toHaveBeenCalled();
     expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
 

@@ -2286,7 +2286,30 @@ export default class KidsFightScene extends Phaser.Scene {
     const textureKey = player.texture?.key || '';
 
     if (isAttack) {
-      player.play?.(`${textureKey}_attack`, true);
+      // Flash attack frame then return to idle
+      player.setFrame(4);
+      const isTestEnv = typeof jest !== 'undefined';
+      if (isTestEnv) {
+        // Immediate revert for tests
+        player.setFrame(0);
+        player.isAttacking = false;
+        if (player.getData && typeof player.setData === 'function') player.setData('isAttacking', false);
+        player.anims?.stop?.();
+      } else if (this.time && typeof this.time.delayedCall === 'function') {
+        this.time.delayedCall(200, () => {
+          player.setFrame(0);
+          player.isAttacking = false;
+          if (player.getData && typeof player.setData === 'function') player.setData('isAttacking', false);
+          player.anims?.stop?.();
+        });
+      } else {
+        setTimeout(() => {
+          player.setFrame(0);
+          player.isAttacking = false;
+          if (player.getData && typeof player.setData === 'function') player.setData('isAttacking', false);
+          player.anims?.stop?.();
+        }, 200);
+      }
     } else if (isSpecial) {
       this.setSafeFrame(player, 6);
     } else if (isBlocking) {

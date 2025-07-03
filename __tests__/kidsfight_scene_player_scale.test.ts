@@ -94,8 +94,10 @@ describe('KidsFightScene player scale', () => {
     player1.direction = 'right';
     player1.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 0 };
     (scene as any)['updatePlayerAnimation'](0);
-    expect(player1.play).toHaveBeenCalledWith('player1_attack', true);
-    expect(player1.setFrame).not.toHaveBeenCalled();
+    expect(player1.setFrame).toHaveBeenCalledTimes(2);
+    expect(player1.setFrame).toHaveBeenNthCalledWith(1, 4);
+    expect(player1.setFrame).toHaveBeenNthCalledWith(2, 0);
+    expect(player1.play).not.toHaveBeenCalled();
   });
 
   it('should set correct frame for special attack', () => {

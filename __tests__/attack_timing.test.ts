@@ -48,10 +48,10 @@ describe('Attack animation timing', () => {
 
   test('updatePlayerAnimation shows attack then returns to idle after duration', () => {
     scene.tryAttack(0, 1, Date.now(), false);
-    // First update: should play attack animation
+    // First update: should flash attack frame
     scene.updatePlayerAnimation(0);
-    expect(mockPlayers[0].play).toHaveBeenCalledWith('player1_attack', true);
-    mockPlayers[0].play.mockClear();
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(4);
+    mockPlayers[0].setFrame.mockClear();
     // Advance past attack duration
     jest.advanceTimersByTime(300);
     scene.updatePlayerAnimation(0);
