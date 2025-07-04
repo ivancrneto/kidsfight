@@ -401,13 +401,8 @@ class WebSocketManager {
       };
       if (cause) message.cause = cause;
       if (animation) message.animation = animation;
-      const messageString = JSON.stringify(message);
-      this._ws!.send(messageString);
-      // DEBUG: Log outgoing position_update
-      if (message.type === 'position_update') {
-        console.log('[WSM] Sending position_update:', messageString);
-      }
-      return true;
+      if (this._roomCode) message.roomCode = this._roomCode;
+      return this.send(message);
     } catch (error) {
       console.error('[WSM] Error sending position update:', error);
       return false;

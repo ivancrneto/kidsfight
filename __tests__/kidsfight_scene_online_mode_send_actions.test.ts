@@ -46,14 +46,14 @@ describe('KidsFightScene - Online Mode Action Sending', () => {
   it('sends move left with correct playerIndex', () => {
     scene.handleLeftDown();
     expect(wsManagerMock.send).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'move', direction: -1, playerIndex: 1 })
+      expect.objectContaining({ type: 'position_update', playerIndex: 1 })
     );
   });
 
   it('sends move right with correct playerIndex', () => {
     scene.handleRightDown();
     expect(wsManagerMock.send).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'move', direction: 1, playerIndex: 1 })
+      expect.objectContaining({ type: 'position_update', playerIndex: 1 })
     );
   });
 

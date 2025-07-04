@@ -178,6 +178,7 @@ export default class KidsFightScene extends Phaser.Scene {
   public readonly ATTACK_DAMAGE = 5;
   public readonly SPECIAL_DAMAGE = 10;
   public readonly MAX_HEALTH = 100;
+  public SPECIAL_COST: number = 3;
 
   /* ------------------------------------------------------------------
    * EXISTING PROPERTIES (unchanged)
@@ -187,7 +188,7 @@ export default class KidsFightScene extends Phaser.Scene {
   public player1?: any;
   public player2?: any;
   private hitEffects: Phaser.GameObjects.Sprite[] = [];
-  private playerSpecial: number[] = [0, 0];
+  public playerSpecial: number[] = [0, 0];
   private playerBlocking: boolean[] = [false, false];
   private lastAttackTime: number[] = [0, 0];
   private lastSpecialTime: number[] = [0, 0];
@@ -207,7 +208,7 @@ export default class KidsFightScene extends Phaser.Scene {
       player.setFrame(frame);
     }
   };
-  private players: Phaser.Physics.Arcade.Sprite[];
+  public players: Player[];
   private platforms: Phaser.Physics.Arcade.StaticGroup;
   private upperPlatforms: Phaser.Physics.Arcade.StaticGroup;
   private upperPlatform: any;
@@ -216,8 +217,8 @@ export default class KidsFightScene extends Phaser.Scene {
   private attackKey: Phaser.Input.Keyboard.Key;
   private blockKey: Phaser.Input.Keyboard.Key;
   private gameOver: boolean;
-  private gameMode: 'single' | 'local' | 'online' | 'ai';
-  private localPlayerIndex: number;
+  public gameMode: 'single' | 'local' | 'online' | 'ai';
+  public localPlayerIndex: number;
   private playerDirection: string[];
   private touchButtons?: { left?: { isDown: boolean }; right?: { isDown: boolean }; up?: { isDown: boolean } };
   private playerHealth: number[];
@@ -267,19 +268,21 @@ export default class KidsFightScene extends Phaser.Scene {
       if (action) this.handleRemoteAction?.(action);
     });
   }
-  private isHost: boolean;
-  private lastPositionUpdateTime: number;
+  private isHost: boolean = false;
+  private lastPositionUpdateTime: number = 0;
+  private replayPopupElements: Phaser.GameObjects.GameObject[] = [];
+  private replayPopupShown: boolean = false;
 
   // Additional properties for keyboard controls
-  private keyA: Phaser.Input.Keyboard.Key;
-  private keyD: Phaser.Input.Keyboard.Key;
-  private keyW: Phaser.Input.Keyboard.Key;
-  private keyS: Phaser.Input.Keyboard.Key;
-  private keySpace: Phaser.Input.Keyboard.Key;
-  private keyQ: Phaser.Input.Keyboard.Key;
-  private cursors2: Phaser.Types.Input.Keyboard.CursorKeys;
-  private keyShift: Phaser.Input.Keyboard.Key;
-  private keyEnter: Phaser.Input.Keyboard.Key;
+  private keyA!: Phaser.Input.Keyboard.Key;
+  private keyD!: Phaser.Input.Keyboard.Key;
+  private keyW!: Phaser.Input.Keyboard.Key;
+  private keyS!: Phaser.Input.Keyboard.Key;
+  private keySpace!: Phaser.Input.Keyboard.Key;
+  private keyQ!: Phaser.Input.Keyboard.Key;
+  private cursors2!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private keyShift!: Phaser.Input.Keyboard.Key;
+  private keyEnter!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super({key: 'KidsFightScene'});
@@ -358,6 +361,7 @@ export default class KidsFightScene extends Phaser.Scene {
         fillStyle: jest.fn().mockReturnThis(),
         fillRect: jest.fn().mockReturnThis(),
         clear: jest.fn().mockReturnThis(),
+          fillCircle: jest.fn().mockReturnThis(),
         lineStyle: jest.fn().mockReturnThis(),
         strokeRect: jest.fn().mockReturnThis(),
         setScrollFactor: jest.fn().mockReturnThis(),
@@ -861,13 +865,17 @@ export default class KidsFightScene extends Phaser.Scene {
         this._wsManager.connect();
       }
       if (this._wsManager && typeof this._wsManager.setMessageCallback === 'function') {
-        this._wsManager.setMessageCallback((msg: any) => {
-          if (msg && msg.action) {
-            this.handleRemoteAction(msg.action);
+        this._wsManager.setMessageCallback((event: any) => {
+          const action = event && ((event as any).action || (event as any).data);
+          if (action) {
+            this.handleRemoteAction(action);
           }
         });
       }
     }
+
+    // Set localPlayerIndex based on host/guest
+    this.localPlayerIndex = this.isHost ? 0 : 1;
 
     console.log('[KidsFightScene] create called with data:', data);
 
@@ -1591,6 +1599,10 @@ export default class KidsFightScene extends Phaser.Scene {
 
     this.updateHealthBar?.(defenderIdxComputed);
     this.updateHealthBar?.(attackerIdx);
+        // Send health update to remote
+        if (this.gameMode === 'online' && attackerIdx === this.localPlayerIndex && this.wsManager && typeof this.wsManager.sendHealthUpdate === 'function') {
+          this.wsManager.sendHealthUpdate(defenderIdxComputed, this.playerHealth[defenderIdxComputed]);
+        }
 
     const winner = this.checkWinner?.();
     if (winner !== undefined && winner !== -1) {
@@ -1604,6 +1616,16 @@ export default class KidsFightScene extends Phaser.Scene {
    * @param action The action data received from WebSocket
    */
   public handleRemoteAction(action: any): void {
+    // Parse raw JSON string if needed
+    if (typeof action === 'string') {
+      try { action = JSON.parse(action); } catch (e) { console.warn('[SCENE][DEBUG] Failed to parse action JSON', action); return; }
+    } else if (action.data && typeof action.data === 'string') {
+      try { action = JSON.parse(action.data); } catch (e) { console.warn('[SCENE][DEBUG] Failed to parse action.data JSON', action.data); }
+    }
+    // unwrap game_action envelope
+    if (action.type === 'game_action') {
+      action.type = action.action;
+    }
     if (this.gameOver) return;
     const isTestEnv = typeof jest !== 'undefined' || process.env.NODE_ENV === 'test';
     // In tests we allow handleRemoteAction in any mode for coverage expectations.
@@ -1656,11 +1678,44 @@ export default class KidsFightScene extends Phaser.Scene {
         break;
       }
       case 'position_update': {
-        player.x = action.x;
-        player.y = action.y;
+          console.log('[SCENE][DEBUG] Received position_update', action);
+        if (typeof player.setPosition === 'function') {
+            player.setPosition(action.x, action.y);
+        } else {
+            player.x = action.x;
+            player.y = action.y;
+        }
         player.setVelocityX?.(action.velocityX ?? 0);
         player.setVelocityY?.(action.velocityY ?? 0);
         player.setFlipX?.(!!action.flipX);
+        // Update physics body position if available
+        if (player.body && typeof player.body.reset === 'function') {
+          player.body.reset(action.x, action.y);
+        }
+          // Refresh remote animation
+          if (typeof this.updatePlayerAnimation === 'function') this.updatePlayerAnimation(action.playerIndex);
+        break;
+      }
+      case 'health_update': {
+        const idx = action.playerIndex;
+        if (action.health !== undefined) {
+          this.playerHealth[idx] = action.health;
+          const p = this.players?.[idx];
+          if (p) p.health = action.health;
+          this.updateHealthBar?.(idx);
+        }
+        break;
+      }
+      case 'replay_request': {
+        this.showReplayRequestPopup();
+        break;
+      }
+      case 'replay_response': {
+        if (action.accepted) {
+          this.scene.restart();
+        } else {
+          this.hideReplayPopup();
+        }
         break;
       }
     }
@@ -1671,6 +1726,63 @@ export default class KidsFightScene extends Phaser.Scene {
    * @param attacker The attacking player
    * @param defender The defending player
    */
+  public showReplayRequestPopup(): void {
+    if (this.replayPopupShown) return;
+    this.replayPopupShown = true;
+
+    // Create semi-transparent background
+    const bg = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      400,
+      200,
+      0x000000,
+      0.7
+    );
+
+    // Add text
+    const text = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 40,
+      'Opponent wants to play again',
+      { fontSize: '24px', color: '#ffffff' }
+    ).setOrigin(0.5);
+
+    // Add buttons
+    const acceptButton = this.add.text(
+      this.cameras.main.width / 2 - 60,
+      this.cameras.main.height / 2 + 20,
+      'Accept',
+      { fontSize: '20px', color: '#00ff00', backgroundColor: '#333333', padding: { x: 10, y: 5 } }
+    ).setOrigin(0.5).setInteractive();
+
+    const declineButton = this.add.text(
+      this.cameras.main.width / 2 + 60,
+      this.cameras.main.height / 2 + 20,
+      'Decline',
+      { fontSize: '20px', color: '#ff0000', backgroundColor: '#333333', padding: { x: 10, y: 5 } }
+    ).setOrigin(0.5).setInteractive();
+
+    // Event listeners
+    acceptButton.on('pointerdown', () => {
+      this.wsManager?.sendReplayResponse('rematch', true);
+      this.scene.restart();
+    });
+
+    declineButton.on('pointerdown', () => {
+      this.wsManager?.sendReplayResponse('rematch', false);
+      this.hideReplayPopup();
+    });
+
+    this.replayPopupElements = [bg, text, acceptButton, declineButton];
+  }
+
+  public hideReplayPopup(): void {
+    this.replayPopupElements.forEach(el => el.destroy());
+    this.replayPopupElements = [];
+    this.replayPopupShown = false;
+  }
+
   public createAttackEffect(attacker: any, defender: any): void {
     try {
       // Check if we're in a test environment
@@ -1895,20 +2007,39 @@ export default class KidsFightScene extends Phaser.Scene {
     // Handle both keyboard and touch button input for movement
     const leftDown = this.cursors?.left?.isDown || this.touchButtons?.left?.isDown;
     const rightDown = this.cursors?.right?.isDown || this.touchButtons?.right?.isDown;
-
+    let direction = 0;
     if (leftDown) {
       player.setVelocityX?.(-160);
       player.setFlipX?.(true);
+      direction = -1;
     } else if (rightDown) {
       player.setVelocityX?.(160);
       player.setFlipX?.(false);
+      direction = 1;
     } else {
       player.setVelocityX?.(0);
+      direction = 0;
+    }
+        // Send position update in online mode
+    if (this.gameMode === 'online' && this.wsManager?.sendPositionUpdate) {
+      const vx = player.body?.velocity?.x ?? 0;
+      const vy = player.body?.velocity?.y ?? 0;
+      const frame = (player.frame && (player.frame as any).name) ?? (player as any).frame ?? 0;
+      this.wsManager.send({
+        type: 'position_update',
+        playerIndex: idx,
+        x: player.x,
+        y: player.y,
+        velocityX: vx,
+        velocityY: vy,
+        flipX: !!player.flipX,
+        frame
+      });
     }
 
-    // Jump (keyboard only, but can add touch if desired)
-    if (this.cursors?.up?.isDown && player.body?.touching?.down) {
-      player.setVelocityY?.(-330);
+    // Jump (keyboard only, trigger on JustDown to avoid spam)
+    if (this.cursors?.up && Phaser.Input.Keyboard.JustDown(this.cursors.up as Phaser.Input.Keyboard.Key) && player.body?.touching?.down) {
+      this.handleJumpDown();
     }
 
     if (this.attackKey?.isDown) {
@@ -2001,30 +2132,58 @@ export default class KidsFightScene extends Phaser.Scene {
   }
 
   public handleLeftDown(): void {
+    // send position update on left press
+
     if (this.touchButtons?.left) this.touchButtons.left.isDown = true;
     const idx = this.localPlayerIndex ?? 0;
     const player = this.players?.[idx];
     player?.setVelocityX?.(-160);
     player?.setFlipX?.(true);
 
-    if (this.gameMode === 'online' && this.wsManager?.send) {
-      this.wsManager.send({ type: 'move', direction: -1, playerIndex: idx });
+    if (this.gameMode === 'online') {
+
+      const vx = player.body?.velocity?.x ?? 0;
+      const vy = player.body?.velocity?.y ?? 0;
+      const frame = (player.frame && (player.frame as any).name) ?? (player as any).frame ?? 0;
+      if (this.wsManager?.sendPositionUpdate) {
+        this.wsManager.sendPositionUpdate(idx, player.x, player.y, vx, vy, !!player.flipX, frame);
+      } else if (this.wsManager?.send) {
+        this.wsManager.send({
+          type: 'position_update', playerIndex: idx, x: player.x, y: player.y,
+          velocityX: vx, velocityY: vy, flipX: !!player.flipX, frame
+        });
+      }
     }
   }
 
   public handleRightDown(): void {
+    // send position update on right press
+
     if (this.touchButtons?.right) this.touchButtons.right.isDown = true;
     const idx = this.localPlayerIndex ?? 0;
     const player = this.players?.[idx];
     player?.setVelocityX?.(160);
     player?.setFlipX?.(false);
 
-    if (this.gameMode === 'online' && this.wsManager?.send) {
-      this.wsManager.send({ type: 'move', direction: 1, playerIndex: idx });
+    if (this.gameMode === 'online') {
+
+      const vx = player.body?.velocity?.x ?? 0;
+      const vy = player.body?.velocity?.y ?? 0;
+      const frame = (player.frame && (player.frame as any).name) ?? (player as any).frame ?? 0;
+      if (this.wsManager?.sendPositionUpdate) {
+        this.wsManager.sendPositionUpdate(idx, player.x, player.y, vx, vy, !!player.flipX, frame);
+      } else if (this.wsManager?.send) {
+        this.wsManager.send({
+          type: 'position_update', playerIndex: idx, x: player.x, y: player.y,
+          velocityX: vx, velocityY: vy, flipX: !!player.flipX, frame
+        });
+      }
     }
   }
 
   public handleLeftUp(): void {
+    // send position update on left release
+
     if (this.touchButtons?.left) this.touchButtons.left.isDown = false;
     const idx = this.localPlayerIndex ?? 0;
     const player = this.players?.[idx];
@@ -2044,6 +2203,8 @@ export default class KidsFightScene extends Phaser.Scene {
   }
 
   public handleRightUp(): void {
+    // send position update on right release
+
     if (this.touchButtons?.right) this.touchButtons.right.isDown = false;
     const idx = this.localPlayerIndex ?? 0;
     const player = this.players?.[idx];
@@ -2260,6 +2421,22 @@ export default class KidsFightScene extends Phaser.Scene {
       stroke: '#000',
       strokeThickness: 6,
     })?.setOrigin?.(0.5)?.setDepth?.(1000);
+    // Add rematch buttons
+    if (typeof this.add?.text === 'function') {
+      const centerX = this.cameras.main.width / 2;
+      const centerY = this.cameras.main.height / 2;
+      if (this.gameMode === 'online') {
+        const replayButton = this.add?.text?.(centerX, centerY + 30, 'Request Rematch', { fontSize: '24px', backgroundColor: '#222222', color: '#ffffff', padding: { left: 10, right: 10, top: 5, bottom: 5 } })?.setOrigin?.(0.5)?.setInteractive?.();
+        replayButton?.on?.('pointerdown', () => {
+          this.wsManager?.sendReplayRequest?.('game', 'player', {});
+        });
+      } else {
+        const replayButton = this.add?.text?.(centerX, centerY + 30, 'Play Again', { fontSize: '24px', backgroundColor: '#222222', color: '#ffffff', padding: { left: 10, right: 10, top: 5, bottom: 5 } })?.setOrigin?.(0.5)?.setInteractive?.();
+        replayButton?.on?.('pointerdown', () => {
+          this.scene?.restart?.();
+        });
+      }
+    }
   }
 
   /**
