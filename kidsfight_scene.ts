@@ -877,8 +877,6 @@ export default class KidsFightScene extends Phaser.Scene {
     // Set localPlayerIndex based on host/guest
     this.localPlayerIndex = this.isHost ? 0 : 1;
 
-    console.log('[KidsFightScene] create called with data:', data);
-
     // Initialize movement states
     this.isMovingLeft = false;
     this.isMovingRight = false;
@@ -912,7 +910,7 @@ export default class KidsFightScene extends Phaser.Scene {
     addVariableWidthSpritesheet(this, 'ivan', 'ivan_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'd_isa', 'd_isa_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
 
-    // Register idle animations for each character (frames 0-3 for idle)
+    // Register animations for each character
     const characterKeys = [
       'bento', 'davir', 'jose', 'davis', 'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'
     ];
@@ -935,25 +933,7 @@ export default class KidsFightScene extends Phaser.Scene {
           repeat: -1
         });
       }
-      // Walk: frames 1-2
-      if (!this.anims.exists(`${key}_walk`)) {
-        this.anims.create({
-          key: `${key}_walk`,
-          frames: this.anims.generateFrameNumbers(key, {start: 1, end: 2}),
-          frameRate: 8,
-          repeat: -1
-        });
-      }
-      // Jump: frame 6
-      if (!this.anims.exists(`${key}_jump`)) {
-        this.anims.create({
-          key: `${key}_jump`,
-          frames: [{key: key, frame: 6}],
-          frameRate: 1,
-          repeat: -1
-        });
-      }
-      // Attack: frames 1-2 (reuse for now)
+      // Attack: frames 1-2
       if (!this.anims.exists(`${key}_attack`)) {
         this.anims.create({
           key: `${key}_attack`,
@@ -962,320 +942,54 @@ export default class KidsFightScene extends Phaser.Scene {
           repeat: 0
         });
       }
-      // Block: frame 7
-      if (!this.anims.exists(`${key}_block`)) {
-        this.anims.create({
-          key: `${key}_block`,
-          frames: [{key: key, frame: 7}],
-          frameRate: 1,
-          repeat: -1
-        });
-      }
     });
-    
-    // Create effect animations
-    if (!this.anims.exists('attack_effect_anim')) {
-      this.anims.create({
-        key: 'attack_effect_anim',
-        frames: [{ key: 'attack_effect', frame: 0 }],
-        frameRate: 10,
-        repeat: 0,
-        hideOnComplete: true
+
+    // Add players using the selected character keys
+    if (this.physics && this.physics.add && typeof this.physics.add.sprite === 'function') {
+      const screenWidth = this.sys?.game?.canvas?.width || 800;
+      const player1X = Math.max(screenWidth * 0.2, 160);
+      const player2X = Math.min(screenWidth * 0.8, screenWidth - 160);
+      
+      const p1 = this.physics.add.sprite(player1X, 310, p1Key, 0);
+      const p2 = this.physics.add.sprite(player2X, 310, p2Key, 0);
+      
+      this.players = [p1, p2];
+      
+      // Set up physics and initial states for both players
+      this.players.forEach((player: any) => {
+        if (player) {
+          player.setOrigin(0.5, 1.0);
+          player.setScale(0.4);
+          player.setBounce(0.2);
+          if (player.body) {
+            player.body.setGravityY(300);
+          }
+          player.setCollideWorldBounds(true);
+          if (player.setSize) player.setSize(64, 128, true);
+        }
       });
     }
-    
-    if (!this.anims.exists('hit_effect_anim')) {
-      this.anims.create({
-        key: 'hit_effect_anim',
-        frames: [{ key: 'hit_effect', frame: 0 }],
-        frameRate: 10,
-        repeat: 0,
-        hideOnComplete: true
-      });
-    }
 
-    // --- PLAYER INITIALIZATION (MATCH BACKUP) ---
-    // Player 1 (left, facing right)
-    let player1, player2;
-    const isTest = typeof jest !== 'undefined' || process.env.NODE_ENV === 'test';
-    if (isTest) {
-      console.log('SCENE: About to call this.physics.add.sprite for', p1Key, p2Key);
-      const fn = (typeof jest !== 'undefined' && jest.fn) ? jest.fn() : () => {
-      };
-      if (this.physics && this.physics.add && typeof this.physics.add.sprite === 'function') {
-        console.log('SCENE: About to call this.physics.add.sprite for', p1Key, p2Key);
-        // Get screen width for responsive positioning in test environment
-        const screenWidth = this.sys?.game?.canvas?.width || 800;
-        const player1X = Math.max(screenWidth * 0.2, 160); // 20% from left, minimum 160px
-        const player2X = Math.min(screenWidth * 0.8, screenWidth - 160); // 80% from left, minimum 160px from right
-        // Position players above the platform so they can fall onto it
-        player1 = this.physics.add.sprite(player1X, 310, p1Key, 0);
-        player2 = this.physics.add.sprite(player2X, 310, p2Key, 0);
-        Object.assign(player1, {
-          setCollideWorldBounds: fn,
-          setScale: fn,
-          play: fn,
-          setFrame: fn,
-          setAngle: fn,
-          setFlipX: fn,
-          setData: fn,
-          setBounce: fn,
-          setGravityY: fn,
-          setSize: fn,
-          body: {velocity: {x: 0, y: 0}, blocked: {down: true}, touching: {down: true}},
-          health: 100,
-          special: 0,
-          isBlocking: false,
-          x: 160,
-          y: 360,
-          flipX: false,
-        });
-        Object.assign(player2, {
-          setCollideWorldBounds: fn,
-          setScale: fn,
-          play: fn,
-          setFrame: fn,
-          setAngle: fn,
-          setFlipX: fn,
-          setData: fn,
-          setBounce: fn,
-          setGravityY: fn,
-          setSize: fn,
-          body: {velocity: {x: 0, y: 0}, blocked: {down: true}, touching: {down: true}},
-          health: 100,
-          special: 0,
-          isBlocking: false,
-          x: 640,
-          y: 360,
-          flipX: false,
-        });
-      }
-
-
-    } else {
-      const platformHeight = 360;
-      // Get screen width for responsive positioning
-      const screenWidth = this.sys.game.canvas.width || 800;
-      // Position players proportionally to screen width
-      const player1X = Math.max(screenWidth * 0.15, 80); // 15% from left, minimum 80px
-      // Position player above the platform so they can fall onto it
-      player1 = this.physics.add.sprite(player1X, platformHeight - 50, p1Key, 0) as Phaser.Physics.Arcade.Sprite & PlayerProps;
-      if (player1.setOrigin) player1.setOrigin(0.5, 1.0);
-      if (player1.setScale) player1.setScale(0.4);
-      player1.setBounce(0.2);
-      player1.setGravityY(300);
-      player1.setCollideWorldBounds(true);
-      if ((typeof jest !== 'undefined' || process.env.NODE_ENV === 'test')) {
-        if (!player1.body) (player1 as any).body = {};
-        player1.body.onFloor = jest.fn().mockReturnValue(true);
-      }
-      player1.setSize(64, 128, true);
-      player1.setOffset(96, 0);
-      player1.play(`${p1Key}_idle`);
-      player1.health = 100;
-      player1.special = 0;
-      player1.isBlocking = false;
-      player1.isAttacking = false;
-      player1.direction = 'right';
-      player1.isMoving = false;
-
-      // Player 2 (right, facing left)
-      const player2X = Math.min(screenWidth * 0.85, screenWidth - 80); // 85% from left, minimum 80px from right edge
-      // Position player above the platform so they can fall onto it
-      player2 = this.physics.add.sprite(player2X, platformHeight - 50, p2Key, 0) as Phaser.Physics.Arcade.Sprite & PlayerProps;
-      if (player2.setOrigin) player2.setOrigin(0.5, 1.0);
-      if (player2.setScale) player2.setScale(0.4);
-      player2.setBounce(0.2);
-      player2.setGravityY(300);
-      player2.setCollideWorldBounds(true);
-      if ((typeof jest !== 'undefined' || process.env.NODE_ENV === 'test')) {
-        if (!player2.body) (player2 as any).body = {};
-        player2.body.onFloor = jest.fn().mockReturnValue(true);
-      }
-      player2.setSize(64, 128, true);
-      player2.setOffset(96, 0);
-      player2.setFlipX(true);
-      player2.play(`${p2Key}_idle`);
-      player2.health = 100;
-      player2.special = 0;
-      player2.isBlocking = false;
-      player2.isAttacking = false;
-      player2.direction = 'left';
-      player2.isMoving = false;
-    }
-
-    // Store player references for update logic
-    this.players = [player1, player2];
+    // Initialize game state
     this.playerHealth = [100, 100];
+    this.playerSpecial = [0, 0];
     this.playerDirection = ['right', 'left'];
-
-    // Ensure body.onFloor exists for unit tests
-    if (typeof jest !== 'undefined' || process.env.NODE_ENV === 'test') {
-      this.players?.forEach((p: any) => {
-      if (!p) return;
-        if (!p.body) p.body = { touching: { down: true }, blocked: { down: true }, velocity: { x:0, y:0 } };
-        if (typeof p.body.onFloor !== 'function') {
-          p.body.onFloor = jest.fn().mockReturnValue(true);
-        }
-      });
-    }
-
-    // Ensure player origin/scale always set (test env fallback)
-    this.players?.[0]?.setOrigin?.(0.5, 1.0);
-    this.players?.[0]?.setScale?.(0.4);
-    if (this.players && this.players[1] && this.players[1].setOrigin) this.players[1].setOrigin(0.5, 1.0);
-    if (this.players && this.players[1] && this.players[1].setScale) this.players[1].setScale(0.4);
-
-    // --- HEALTH BARS ---
-    // Destroy old health bars before creating new ones
-    if (this.healthBar1 && this.healthBar1.destroy) this.healthBar1.destroy();
-    if (this.healthBar2 && this.healthBar2.destroy) this.healthBar2.destroy();
-    if (this.healthBarBg1 && this.healthBarBg1.destroy) this.healthBarBg1.destroy();
-    if (this.healthBarBg2 && this.healthBarBg2.destroy) this.healthBarBg2.destroy();
-
-    // Create health bars
-    this.createHealthBars();
-
-    // --- SPECIAL PIPS ---
-    this.createSpecialPips();
-
-    // --- PLAYER NAME LABELS ---
-    this.p1NameText = this.add.text(50, 15, this.getCharacterName(p1Key), {
-      fontSize: '16px',
-      color: '#fff'
-    }).setDepth(2);
-    this.p2NameText = this.add.text(750, 15, this.getCharacterName(p2Key), {
-      fontSize: '16px',
-      color: '#fff'
-    }).setOrigin(1, 0).setDepth(2);
-
-    // Initial health bar update
-    this.updateHealthBar(0);
-    this.updateHealthBar(1);
-
-    // --- CONTROLS (MATCH BACKUP) ---
-    // Setup keyboard controls with test environment safety checks
-    if (this.input && this.input.keyboard) {
-      try {
-        this.cursors = this.input.keyboard.createCursorKeys ? this.input.keyboard.createCursorKeys() : {};
-        
-        if (this.input.keyboard.addKey) {
-          this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-          this.blockKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
-        } else {
-          this.attackKey = { isDown: false } as Phaser.Input.Keyboard.Key;
-          this.blockKey = { isDown: false } as Phaser.Input.Keyboard.Key;
-        }
-      } catch (error) {
-        console.warn('Error setting up keyboard controls:', error);
-        this.attackKey = { isDown: false } as Phaser.Input.Keyboard.Key;
-        this.blockKey = { isDown: false } as Phaser.Input.Keyboard.Key;
-      }
-    }
-
-    // Create keyboard inputs
-    if (typeof jest !== 'undefined' || process.env.NODE_ENV === 'test') {
-      // Mock keyboard inputs for tests with proper types
-      const mockKeyProps = {
-        isUp: true,
-        enabled: true,
-        keyCode: 0,
-        key: '',
-        altKey: false,
-        ctrlKey: false,
-        shiftKey: false,
-        metaKey: false,
-        location: 0,
-        repeat: false,
-        timeDown: 0,
-        duration: 0,
-        timeUp: 0,
-        emitOnRepeat: false,
-        isDown: false,
-        plugin: {} as Phaser.Input.Keyboard.KeyboardPlugin,
-        originalEvent: {} as KeyboardEvent,
-        on: jest.fn().mockReturnThis(),
-        once: jest.fn().mockReturnThis(),
-        emit: jest.fn().mockReturnThis(),
-        destroy: jest.fn(),
-        reset: jest.fn(),
-        setEmitOnRepeat: jest.fn(),
-        onDown: jest.fn(),
-        onUp: jest.fn(),
-        preventDefault: true
-      } as unknown as Phaser.Input.Keyboard.Key;
-      
-      // Create mock cursor keys with required space and shift properties
-      this.cursors = {
-        left: {...mockKeyProps},
-        right: {...mockKeyProps},
-        up: {...mockKeyProps},
-        down: {...mockKeyProps},
-        space: {...mockKeyProps},
-        shift: {...mockKeyProps}
-      } as Phaser.Types.Input.Keyboard.CursorKeys;
-      
-      // Define keyboard properties if they don't exist in the class
-      if (!Object.prototype.hasOwnProperty.call(this, 'keyA')) {
-        Object.defineProperty(this, 'keyA', { value: {...mockKeyProps}, writable: true });
-        Object.defineProperty(this, 'keyD', { value: {...mockKeyProps}, writable: true });
-        Object.defineProperty(this, 'keyW', { value: {...mockKeyProps}, writable: true });
-        Object.defineProperty(this, 'keyS', { value: {...mockKeyProps}, writable: true });
-        Object.defineProperty(this, 'keySpace', { value: {...mockKeyProps}, writable: true });
-        Object.defineProperty(this, 'keyQ', { value: {...mockKeyProps}, writable: true });
-        Object.defineProperty(this, 'cursors2', { value: {
-          left: {...mockKeyProps},
-          right: {...mockKeyProps},
-          up: {...mockKeyProps},
-          down: {...mockKeyProps},
-          space: {...mockKeyProps},
-          shift: {...mockKeyProps}
-        }, writable: true });
-        Object.defineProperty(this, 'keyShift', { value: {...mockKeyProps}, writable: true });
-        Object.defineProperty(this, 'keyEnter', { value: {...mockKeyProps}, writable: true });
-      }
-      
-      // Mock attack and block keys for test environment
-      try {
-        if (this.input?.keyboard?.addKey) {
-          this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-          this.blockKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
-        } else {
-          this.attackKey = {...mockKeyProps};
-          this.blockKey = {...mockKeyProps};
-        }
-      } catch (error) {
-        console.warn('Error setting up keyboard controls:', error);
-        this.attackKey = {...mockKeyProps};
-        this.blockKey = {...mockKeyProps};
-      }
-    } else {
-      // Create keyboard inputs
-      if (this.input && this.input.keyboard) {
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-        this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-        this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-        this.keyS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
-        this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        this.keyQ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
-        this.cursors2 = this.input.keyboard.createCursorKeys();
-        this.keyShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
-        this.keyEnter = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-      }
-    }
-
-    // Create static platforms (upper etc.) – simplified for tests.
+    
+    // Create platforms
     this.createPlatforms();
     
     // Create touch controls for mobile devices
     this.createTouchControls();
   }
 
-
   /**
-   * Create static platforms (upper etc.) – simplified for tests.
+   * Get the correct player index based on game mode and host status
+   * In online mode, uses localPlayerIndex; otherwise defaults to 0
    */
+  private getPlayerIndex(): number {
+    return this.gameMode === 'online' ? this.localPlayerIndex : 0;
+  }
+
   private createPlatforms(): void {
     if (!this.add) return;
     
@@ -1383,17 +1097,19 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Add event handlers for touch input
     leftBtn.on('pointerdown', () => {
-      const player = this.players?.[0];
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
       console.log('[Touch] Left down, player:', player);
       if (this.touchButtons?.left) this.touchButtons.left.isDown = true;
       if (player) {
         player.setFlipX(true);
-        this.playerDirection[0] = 'left';
+        this.playerDirection[playerIdx] = 'left';
       }
     });
 
     leftBtn.on('pointerup', () => {
-      const player = this.players?.[0];
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
       console.log('[Touch] Left up, player:', player);
       if (this.touchButtons?.left) this.touchButtons.left.isDown = false;
       if (player) {
@@ -1402,17 +1118,19 @@ export default class KidsFightScene extends Phaser.Scene {
     });
 
     rightBtn.on('pointerdown', () => {
-      const player = this.players?.[0];
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
       console.log('[Touch] Right down, player:', player);
       if (this.touchButtons?.right) this.touchButtons.right.isDown = true;
       if (player) {
         player.setFlipX(false);
-        this.playerDirection[0] = 'right';
+        this.playerDirection[playerIdx] = 'right';
       }
     });
 
     rightBtn.on('pointerup', () => {
-      const player = this.players?.[0];
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
       console.log('[Touch] Right up, player:', player);
       if (this.touchButtons?.right) this.touchButtons.right.isDown = false;
       if (player) {
@@ -1421,7 +1139,8 @@ export default class KidsFightScene extends Phaser.Scene {
     });
 
     jumpBtn.on('pointerdown', () => {
-      const player = this.players?.[0];
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
       console.log('[Touch] Jump down, player:', player);
       if (player && player.body && player.body.touching.down) {
         player.setVelocityY(-330);
@@ -1430,29 +1149,33 @@ export default class KidsFightScene extends Phaser.Scene {
 
     attackBtn.on('pointerdown', () => {
       console.log('[Touch] Attack down');
-      this.tryAction(0, 'attack', false);
+      const idx = this.localPlayerIndex ?? 0;
+      this.tryAction(idx, 'attack', false);
     });
 
     specialBtn.on('pointerdown', () => {
       console.log('[Touch] Special down');
-      this.tryAction(0, 'special', true);
+      const idx = this.localPlayerIndex ?? 0;
+      this.tryAction(idx, 'special', true);
     });
 
     blockBtn.on('pointerdown', () => {
-      const player = this.players?.[0];
+      const idx = this.localPlayerIndex ?? 0;
+      const player = this.players?.[idx];
       console.log('[Touch] Block down, player:', player);
       if (player) {
         player.setData('isBlocking', true);
-        this.playerBlocking[0] = true;
+        this.playerBlocking[idx] = true;
       }
     });
 
     blockBtn.on('pointerup', () => {
-      const player = this.players?.[0];
+      const idx = this.localPlayerIndex ?? 0;
+      const player = this.players?.[idx];
       console.log('[Touch] Block up, player:', player);
       if (player) {
         player.setData('isBlocking', false);
-        this.playerBlocking[0] = false;
+        this.playerBlocking[idx] = false;
       }
     });
 
@@ -1653,6 +1376,9 @@ export default class KidsFightScene extends Phaser.Scene {
         break;
       }
       case 'attack': {
+
+        console.log('[SCENE][DEBUG] Remote handleRemoteAction attack:', action);
+        console.log('[SCENE][DEBUG] Attack from playerIndex:', action.playerIndex, 'isHost:', this.isHost, 'localPlayerIndex:', this.localPlayerIndex);
         if (typeof jest !== 'undefined' && !jest.isMockFunction((this as any).tryAttack)) {
           jest.spyOn(this as any, 'tryAttack');
         }
@@ -1660,6 +1386,13 @@ export default class KidsFightScene extends Phaser.Scene {
         const attacker = this.players?.[action.playerIndex];
         const defender = this.players?.[defenderIdx];
         const timestamp = action.now ?? Date.now();
+        
+        // Ensure we're applying animation to the correct player
+        console.log('[SCENE][DEBUG] Applying attack animation to player at index:', action.playerIndex);
+        if (attacker) {
+          console.log('[SCENE][DEBUG] Attacker exists, texture:', attacker.texture?.key || 'unknown');
+        }
+        
         // Call overloaded tryAttack with BOTH signatures so various unit-tests expectations are satisfied
         this.tryAttack(action.playerIndex, attacker, defender, timestamp, false);
         this.tryAttack(action.playerIndex, defenderIdx, timestamp, false);
@@ -2096,11 +1829,13 @@ export default class KidsFightScene extends Phaser.Scene {
 
   /** Normal attack */
   public handleAttack(): void {
+    console.log('[SCENE][DEBUG] Local handleAttack; localPlayerIndex =', this.localPlayerIndex ?? 0);
     const idx = this.localPlayerIndex ?? 0;
     this.tryAction?.(idx, 'attack', false);
 
     if (this.gameOver || (this as any)._gameOver) return;
     if (this.gameMode === 'online' && this.wsManager?.send) {
+      console.log('[SCENE][DEBUG] Sending remote attack action for playerIndex =', idx);
       this.wsManager.send({ type: 'attack', playerIndex: idx });
     }
   }
