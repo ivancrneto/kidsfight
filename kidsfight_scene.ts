@@ -1149,18 +1149,18 @@ export default class KidsFightScene extends Phaser.Scene {
 
     attackBtn.on('pointerdown', () => {
       console.log('[Touch] Attack down');
-      const idx = this.localPlayerIndex ?? 0;
+      const idx = this.getPlayerIndex();
       this.tryAction(idx, 'attack', false);
     });
 
     specialBtn.on('pointerdown', () => {
       console.log('[Touch] Special down');
-      const idx = this.localPlayerIndex ?? 0;
+      const idx = this.getPlayerIndex();
       this.tryAction(idx, 'special', true);
     });
 
     blockBtn.on('pointerdown', () => {
-      const idx = this.localPlayerIndex ?? 0;
+      const idx = this.getPlayerIndex();
       const player = this.players?.[idx];
       console.log('[Touch] Block down, player:', player);
       if (player) {
@@ -1170,7 +1170,7 @@ export default class KidsFightScene extends Phaser.Scene {
     });
 
     blockBtn.on('pointerup', () => {
-      const idx = this.localPlayerIndex ?? 0;
+      const idx = this.getPlayerIndex();
       const player = this.players?.[idx];
       console.log('[Touch] Block up, player:', player);
       if (player) {
@@ -1732,8 +1732,8 @@ export default class KidsFightScene extends Phaser.Scene {
     // Skip if we're in a test environment without proper input setup
     if (typeof jest !== 'undefined') return;
     
-    // Get local player index (default to 0)
-    const idx = this.localPlayerIndex ?? 0;
+    // Get local player index using consistent method
+    const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     if (!player) return;
 
@@ -1816,7 +1816,7 @@ export default class KidsFightScene extends Phaser.Scene {
   public handleJumpDown(): void {
     if (this.touchButtons?.up) this.touchButtons.up.isDown = true;
 
-    const idx = this.localPlayerIndex ?? 0;
+    const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     if (player) {
       player.setVelocityY?.(-330);
@@ -1829,8 +1829,8 @@ export default class KidsFightScene extends Phaser.Scene {
 
   /** Normal attack */
   public handleAttack(): void {
-    console.log('[SCENE][DEBUG] Local handleAttack; localPlayerIndex =', this.localPlayerIndex ?? 0);
-    const idx = this.localPlayerIndex ?? 0;
+    console.log('[SCENE][DEBUG] Local handleAttack; playerIndex =', this.getPlayerIndex());
+    const idx = this.getPlayerIndex();
     this.tryAction?.(idx, 'attack', false);
 
     if (this.gameOver || (this as any)._gameOver) return;
@@ -1842,7 +1842,7 @@ export default class KidsFightScene extends Phaser.Scene {
   
   /** Block action */
   public handleBlock(): void {
-    const idx = this.localPlayerIndex ?? 0;
+    const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     if (!player) return;
     
@@ -1857,7 +1857,7 @@ export default class KidsFightScene extends Phaser.Scene {
 
   /** Special attack (costs pips) */
   public handleSpecial(): void {
-    const idx = this.localPlayerIndex ?? 0;
+    const idx = this.getPlayerIndex();
     this.tryAction?.(idx, 'special', true);
 
     if (this.gameOver || (this as any)._gameOver) return;
@@ -1870,7 +1870,7 @@ export default class KidsFightScene extends Phaser.Scene {
     // send position update on left press
 
     if (this.touchButtons?.left) this.touchButtons.left.isDown = true;
-    const idx = this.localPlayerIndex ?? 0;
+    const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     player?.setVelocityX?.(-160);
     player?.setFlipX?.(true);
@@ -1895,7 +1895,7 @@ export default class KidsFightScene extends Phaser.Scene {
     // send position update on right press
 
     if (this.touchButtons?.right) this.touchButtons.right.isDown = true;
-    const idx = this.localPlayerIndex ?? 0;
+    const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     player?.setVelocityX?.(160);
     player?.setFlipX?.(false);
@@ -1920,7 +1920,7 @@ export default class KidsFightScene extends Phaser.Scene {
     // send position update on left release
 
     if (this.touchButtons?.left) this.touchButtons.left.isDown = false;
-    const idx = this.localPlayerIndex ?? 0;
+    const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     player?.setVelocityX?.(0);
     if (this.gameMode === 'online' && this.wsManager?.send && player) {
@@ -1941,7 +1941,7 @@ export default class KidsFightScene extends Phaser.Scene {
     // send position update on right release
 
     if (this.touchButtons?.right) this.touchButtons.right.isDown = false;
-    const idx = this.localPlayerIndex ?? 0;
+    const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     player?.setVelocityX?.(0);
     if (this.gameMode === 'online' && this.wsManager?.send && player) {
