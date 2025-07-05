@@ -70,6 +70,45 @@ describe('KidsFightScene.handleRemoteAction', () => {
     expect((scene as any).tryAttack).toHaveBeenCalledTimes(2);
   });
 
+  it('sets attack animation on correct player during remote attack', () => {
+    // Mock the tryAttack function to avoid side effects
+    const originalTryAttack = (scene as any).tryAttack;
+    (scene as any).tryAttack = jest.fn();
+    
+    // Handle remote attack from player 0 (guest attacking)
+    scene.handleRemoteAction({ type: 'attack', playerIndex: 0, now: Date.now() });
+    
+    // Verify tryAttack was called with correct attacker index
+    expect((scene as any).tryAttack).toHaveBeenCalledWith(0, player0, player1, expect.any(Number), false);
+    expect((scene as any).tryAttack).toHaveBeenCalledWith(0, 1, expect.any(Number), false);
+    
+    // Restore original function
+    (scene as any).tryAttack = originalTryAttack;
+  });
+
+  it('sets attack flag on correct player object during remote attack', () => {
+    // Remove the mock for tryAttack to allow actual execution
+    (scene as any).tryAttack.mockRestore();
+    
+    // Set up the scene to simulate actual tryAttack behavior
+    scene.playerHealth = [100, 100];
+    scene.playerSpecial = [0, 0];
+    scene.playerBlocking = [false, false];
+    scene.updateSpecialPips = jest.fn();
+    
+    // Clear previous calls to setData
+    player0.setData.mockClear();
+    player1.setData.mockClear();
+    
+    // Handle remote attack from player 1 (guest attacking player 0)
+    scene.handleRemoteAction({ type: 'attack', playerIndex: 1, now: Date.now() });
+    
+    // Verify that player 1 (the attacker) has the attack flag set
+    expect(player1.setData).toHaveBeenCalledWith('isAttacking', true);
+    // Verify that player 0 (the defender) does not have the attack flag set
+    expect(player0.setData).not.toHaveBeenCalledWith('isAttacking', true);
+  });
+
   it('handles special action', () => {
     const now = Date.now();
     (scene as any).tryAttack.mockClear();
