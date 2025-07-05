@@ -413,21 +413,30 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   private showError(message: string): void {
-    if (this.errorText && !(this.errorText as any).destroyed) {
-      this.errorText.setText(message).setVisible(true);
-    } else {
-      console.warn('[OnlineModeScene] Tried to show error but errorText is missing or destroyed');
-    }
-
-    // Defensive: If you have any canvas drawing, guard it:
-    if ((this as any).errorCanvas) {
-      const ctx = (this as any).errorCanvas.getContext && (this as any).errorCanvas.getContext('2d');
-      if (ctx) {
-        // Example: ctx.drawImage(...);
-        // (No-op unless you actually need it)
+    try {
+      if (this.errorText && !(this.errorText as any).destroyed && this.errorText.scene) {
+        this.errorText.setText(message).setVisible(true);
       } else {
-        console.warn('[OnlineModeScene] showError: Canvas context is null!');
+        console.warn('[OnlineModeScene] Tried to show error but errorText is missing or destroyed, recreating...');
+        // Recreate the error text if it's missing
+        const w = this.cameras.main.width;
+        const h = this.cameras.main.height;
+        this.errorText = this.add.text(
+          w/2,
+          h * 0.7,
+          message,
+          {
+            fontSize: `${Math.max(16, Math.round(w * 0.03))}px`,
+            color: '#ff0000',
+            fontFamily: 'monospace',
+            align: 'center'
+          }
+        ).setOrigin(0.5).setVisible(true).setDepth(2);
       }
+    } catch (error) {
+      console.error('[OnlineModeScene] Error showing error message:', error);
+      // Fallback: just log the error message
+      console.error('[OnlineModeScene] Error message:', message);
     }
 
     if (this.showMainButtons) this.showMainButtons();
@@ -436,7 +445,13 @@ export default class OnlineModeScene extends Phaser.Scene {
     if (this.roomCodeDisplay) this.roomCodeDisplay.setVisible(false);
 
     setTimeout(() => {
-      if (this.errorText && !(this.errorText as any).destroyed) this.errorText.setVisible(false);
+      try {
+        if (this.errorText && !(this.errorText as any).destroyed && this.errorText.scene) {
+          this.errorText.setVisible(false);
+        }
+      } catch (error) {
+        console.error('[OnlineModeScene] Error hiding error text:', error);
+      }
     }, 3000);
   }
 

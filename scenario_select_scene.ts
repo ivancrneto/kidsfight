@@ -91,16 +91,37 @@ class ScenarioSelectScene extends Phaser.Scene {
       console.log('[ScenarioSelectScene] No wsManager received from previous scene');
     }
 
-    // --- PATCH: Always re-send selection to server on entry (online mode) ---
+    // --- PATCH: Always re-send both character selections to server on entry (online mode) ---
     if (this.mode === 'online' && this.wsManager && typeof this.wsManager.send === 'function') {
-      const playerKey = this.isHost ? 'p1' : 'p2';
-      const characterKey = this.isHost ? this.selected.p1 : this.selected.p2;
-      console.log('[ScenarioSelectScene] Re-sending character selection to server:', { playerKey, characterKey });
-      this.wsManager.send({
-        type: 'player_selected',
-        player: playerKey,
-        character: characterKey
-      });
+      if (this.isHost) {
+        // Host re-sends both player selections to ensure sync
+        console.log('[ScenarioSelectScene] Host re-sending both character selections:', { 
+          p1: this.selected.p1, 
+          p2: this.selected.p2 
+        });
+        this.wsManager.send({
+          type: 'player_selected',
+          player: 'p1',
+          character: this.selected.p1
+        });
+        setTimeout(() => {
+          this.wsManager.send({
+            type: 'player_selected',
+            player: 'p2',
+            character: this.selected.p2
+          });
+        }, 50);
+      } else {
+        // Guest only re-sends their own selection (p2)
+        console.log('[ScenarioSelectScene] Guest re-sending p2 character selection:', { 
+          p2: this.selected.p2 
+        });
+        this.wsManager.send({
+          type: 'player_selected',
+          player: 'p2',
+          character: this.selected.p2
+        });
+      }
     }
   }
 
@@ -175,6 +196,19 @@ class ScenarioSelectScene extends Phaser.Scene {
 
     // Responsive layout update on resize
     this.scale.on('resize', this.updateLayout, this);
+
+    // Send initial scenario selection to guest if host (with delay to ensure handlers are set up)
+    if (this.mode === 'online' && this.isHost && this.wsManager && typeof this.wsManager.send === 'function') {
+      setTimeout(() => {
+        const scenarioMsg = {
+          type: 'scenario_selected',
+          scenario: SCENARIOS[this.selectedScenario].key,
+          roomCode: this.roomCode
+        };
+        console.debug('[ScenarioSelectScene] Host sending initial scenario selection to guest:', scenarioMsg);
+        this.wsManager.send(scenarioMsg);
+      }, 100);
+    }
 
     // Listen for ready and game_start messages if online
     if (this.mode === 'online' && this.wsManager && this.wsManager.setMessageCallback) {

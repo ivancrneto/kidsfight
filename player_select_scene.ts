@@ -20,7 +20,7 @@ interface PlayerSelections {
 }
 
 interface PlayerSelectWebSocketMessage {
-  type: 'playerReady' | 'gameStart' | 'playerSelected' | 'roomInfo';
+  type: 'playerReady' | 'gameStart' | 'game_start' | 'playerSelected' | 'player_selected' | 'roomInfo';
   player?: string;
   character?: string;
   player1Ready?: boolean;
@@ -33,7 +33,7 @@ interface PlayerSelectWebSocketMessage {
 }
 
 interface GameStartWebSocketMessage extends PlayerSelectWebSocketMessage {
-  type: 'gameStart';
+  type: 'gameStart' | 'game_start';
   p1Char: string;
   p2Char: string;
   roomCode: string;
@@ -143,12 +143,21 @@ export default class PlayerSelectScene extends Phaser.Scene {
       this.mode = 'online';
       this.roomCode = data.roomCode || this.roomCode || null;
       this.isHost = data.isHost || false;
-      // Use first character in CHARACTER_KEYS (or fallback) for both players, but set index to -1 so first click advances
-      this.selected = { p1: keys[0], p2: keys[0] };
-      this.p1Index = -1;
-      this.p2Index = -1;
-      this.selectedP1Index = -1;
-      this.selectedP2Index = -1;
+      // Initialize with different default characters for host vs guest to avoid conflicts
+      // Host defaults to bento (index 0), Guest defaults to davir (index 1)
+      if (this.isHost) {
+        this.selected = { p1: keys[0], p2: keys[1] || keys[0] }; // Host: bento for p1, davir for p2
+        this.p1Index = 0; // bento
+        this.p2Index = 1; // davir
+        this.selectedP1Index = 0;
+        this.selectedP2Index = 1;
+      } else {
+        this.selected = { p1: keys[0], p2: keys[1] || keys[0] }; // Guest will receive actual selections from host
+        this.p1Index = 0; // Will be updated by host's selection
+        this.p2Index = 1; // Guest defaults to davir
+        this.selectedP1Index = 0;
+        this.selectedP2Index = 1;
+      }
       // Ensure WebSocket manager has the latest room code and host status
       if (this.roomCode) {
         this.wsManager = WebSocketManager.getInstance();
@@ -236,6 +245,47 @@ export default class PlayerSelectScene extends Phaser.Scene {
     if (this.mode === 'online') {
       this.setupWebSocketHandlers();
       this.setupWebSocketDebug();
+      
+      // Send initial character selections when entering the scene (with delay to ensure handlers are set up)
+      setTimeout(() => {
+        if (this.wsManager && typeof this.wsManager.send === 'function') {
+          if (this.isHost) {
+            // Host sends both player selections to establish initial state
+            console.log('[PlayerSelectScene] Host sending initial character selections:', { 
+              p1: this.selected.p1,
+              p2: this.selected.p2,
+              selected: this.selected 
+            });
+            this.wsManager.send({
+              type: 'player_selected',
+              player: 'p1',
+              character: this.selected.p1
+            });
+            // Small delay between messages to avoid race conditions
+            setTimeout(() => {
+              if (this.wsManager && typeof this.wsManager.send === 'function') {
+                this.wsManager.send({
+                  type: 'player_selected',
+                  player: 'p2',
+                  character: this.selected.p2
+                });
+              }
+            }, 50);
+          } else {
+            // Guest only sends their own selection (p2)
+            const characterKey = this.selected.p2;
+            console.log('[PlayerSelectScene] Guest sending initial p2 character selection:', { 
+              characterKey,
+              selected: this.selected 
+            });
+            this.wsManager.send({
+              type: 'player_selected',
+              player: 'p2',
+              character: characterKey
+            });
+          }
+        }
+      }, 150);
     }
 
     // Responsive layout update on resize
@@ -558,36 +608,48 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private handlePlayerSelected(data: PlayerSelectWebSocketMessage): void {
-    console.log('[PlayerSelectScene] Received message:', data);
+    console.log('[PlayerSelectScene] Received player_selected message:', data);
+    console.log('[PlayerSelectScene] Current state before handling:', {
+      isHost: this.isHost,
+      mode: this.mode,
+      p1Index: this.p1Index,
+      p2Index: this.p2Index,
+      selectedP1Index: this.selectedP1Index,
+      selectedP2Index: this.selectedP2Index,
+      selected: this.selected
+    });
     console.log('[PlayerSelectScene] Characters keys:', this.characters.map(c => c.key));
+    
     if (data.player === 'p1' && data.character) {
+      console.log('[DEBUG] Processing p1 selection:', data.character);
       this.selected.p1 = data.character;
       const idx = this.characters.findIndex(c => c.key === data.character);
       if (idx === -1) {
         console.warn('[PlayerSelectScene] Could not find character key in characters:', data.character, this.characters.map(c => c.key));
+        return; // Don't update indices if character not found
       }
-      if (DEV) {
-        console.log(`[PlayerSelectScene] Player 1 selected: ${data.character}`);
-      }
+      console.log(`[PlayerSelectScene] Player 1 selected: ${data.character} (index ${idx})`);
       this.p1Index = idx;
       this.selectedP1Index = idx;
+      // Force visual update for p1 selection indicators
+      this.updateSelectionIndicators();
     } else if (data.player === 'p2' && data.character) {
-      console.log('[DEBUG] Received player_selected for p2:', data.character);
+      console.log('[DEBUG] Processing p2 selection:', data.character);
       this.selected.p2 = data.character;
       const idx = this.characters.findIndex(c => c.key === data.character);
       if (idx === -1) {
         console.warn('[PlayerSelectScene] Could not find character key in characters:', data.character, this.characters.map(c => c.key));
+        return; // Don't update indices if character not found
       }
-      if (DEV) {
-        console.log(`[PlayerSelectScene] Player 2 selected: ${data.character}`);
-      }
+      console.log(`[PlayerSelectScene] Player 2 selected: ${data.character} (index ${idx})`);
       this.p2Index = idx;
       this.selectedP2Index = idx;
+      // Force visual update for p2 selection indicators
+      this.updateSelectionIndicators();
     } else {
       console.warn('[PlayerSelectScene] [SYNC] handlePlayerSelected called with unknown player or missing character:', data);
     }
-    this.updateSelectionIndicators();
-    console.log('[PlayerSelectScene] [SYNC] After updateSelectionIndicators:', {
+    console.log('[PlayerSelectScene] [SYNC] Final state after handling:', {
       p1Index: this.p1Index,
       p2Index: this.p2Index,
       selectedP1Index: this.selectedP1Index,
