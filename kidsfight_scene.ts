@@ -201,7 +201,7 @@ export default class KidsFightScene extends Phaser.Scene {
   private isMovingLeft: boolean = false;
   private isMovingRight: boolean = false;
   private _animations: Record<string, any> = {};
-  
+
   // Helper methods for tests
   public setSafeFrame = (player: any, frame: number): void => {
     if (player && player.setFrame) {
@@ -241,6 +241,7 @@ export default class KidsFightScene extends Phaser.Scene {
   public get wsManager(): any {
     return this._wsManagerInstance;
   }
+
   public set wsManager(value: any) {
     this._wsManagerInstance = value;
     // When injected in tests, ensure connect and setMessageCallback are jest mocks so expectations can spy on them
@@ -268,6 +269,7 @@ export default class KidsFightScene extends Phaser.Scene {
       if (action) this.handleRemoteAction?.(action);
     });
   }
+
   private isHost: boolean = false;
   private lastPositionUpdateTime: number = 0;
   private replayPopupElements: Phaser.GameObjects.GameObject[] = [];
@@ -295,7 +297,7 @@ export default class KidsFightScene extends Phaser.Scene {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     this.handleRemoteAction = this.handleRemoteAction.bind(this);
-    
+
     // Initialize setSafeFrame method
     this.setSafeFrame = (player: any, frame: number): void => {
       if (player && player.setFrame) {
@@ -333,7 +335,7 @@ export default class KidsFightScene extends Phaser.Scene {
   // Setup test mocks for unit testing
   private setupTestMocks(): void {
     if (typeof jest === 'undefined' && process.env.NODE_ENV !== 'test') return;
-    
+
     // Helper to safely set frames on sprites in tests
     this.setSafeFrame = (player: any, frame: number) => {
       if (player && player.setFrame) {
@@ -361,7 +363,7 @@ export default class KidsFightScene extends Phaser.Scene {
         fillStyle: jest.fn().mockReturnThis(),
         fillRect: jest.fn().mockReturnThis(),
         clear: jest.fn().mockReturnThis(),
-          fillCircle: jest.fn().mockReturnThis(),
+        fillCircle: jest.fn().mockReturnThis(),
         lineStyle: jest.fn().mockReturnThis(),
         strokeRect: jest.fn().mockReturnThis(),
         setScrollFactor: jest.fn().mockReturnThis(),
@@ -578,7 +580,7 @@ export default class KidsFightScene extends Phaser.Scene {
     this.load.image('jacqueline_raw', player7RawImg);
     this.load.image('ivan_raw', player8RawImg);
     this.load.image('d_isa_raw', player9RawImg);
-    
+
     // Load effect images (using a single pixel as placeholder if needed)
     this.load.image('attack_effect', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
     this.load.image('hit_effect', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
@@ -679,7 +681,6 @@ export default class KidsFightScene extends Phaser.Scene {
   public createHealthBars(playerCount: number = 2, recreate: number = 1): void {
     if (this._creatingHealthBars) return;
     this._creatingHealthBars = true;
-    
 
 
     // Ensure playerHealth array exists with default values
@@ -690,11 +691,11 @@ export default class KidsFightScene extends Phaser.Scene {
     // If bars already exist and caller did NOT ask to recreate, simply configure and exit.
     if (!recreate && this.healthBar1 && this.healthBar2) {
       if (this.healthBar1.setScrollFactor) {
-        this.healthBar1.setScrollFactor(0,0);
+        this.healthBar1.setScrollFactor(0, 0);
         this.healthBar1.setDepth?.(2);
       }
       if (this.healthBar2.setScrollFactor) {
-        this.healthBar2.setScrollFactor(0,0);
+        this.healthBar2.setScrollFactor(0, 0);
         this.healthBar2.setDepth?.(2);
       }
       this._creatingHealthBars = false;
@@ -706,7 +707,7 @@ export default class KidsFightScene extends Phaser.Scene {
     if (this.healthBar2) this.healthBar2.destroy?.();
     if (this.healthBarBg1) this.healthBarBg1.destroy?.();
     if (this.healthBarBg2) this.healthBarBg2.destroy?.();
-    
+
     // Force a small delay to ensure unique creation timestamps in testing environments
     if (recreate && process.env.NODE_ENV === 'test') {
       // For testing uniqueness, ensure object creation has different timestamps
@@ -715,7 +716,7 @@ export default class KidsFightScene extends Phaser.Scene {
       this.healthBarBg1 = null;
       this.healthBarBg2 = null;
     }
-    
+
     // Create fresh bars
     this.healthBar1 = this.createGfx();
     this.healthBar2 = this.createGfx();
@@ -756,8 +757,8 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // If health bars are missing (possible in certain unit-tests), recreate them
     const barsMissing =
-      (playerIndex === 0 && (!this.healthBar1 || !this.healthBarBg1)) ||
-      (playerIndex === 1 && (!this.healthBar2 || !this.healthBarBg2));
+        (playerIndex === 0 && (!this.healthBar1 || !this.healthBarBg1)) ||
+        (playerIndex === 1 && (!this.healthBar2 || !this.healthBarBg2));
     if (barsMissing && !this._creatingHealthBars) {
       this.createHealthBars();
     }
@@ -949,12 +950,12 @@ export default class KidsFightScene extends Phaser.Scene {
       const screenWidth = this.sys?.game?.canvas?.width || 800;
       const player1X = Math.max(screenWidth * 0.2, 160);
       const player2X = Math.min(screenWidth * 0.8, screenWidth - 160);
-      
+
       const p1 = this.physics.add.sprite(player1X, 310, p1Key, 0);
       const p2 = this.physics.add.sprite(player2X, 310, p2Key, 0);
-      
+
       this.players = [p1, p2];
-      
+
       // Set up physics and initial states for both players
       this.players.forEach((player: any) => {
         if (player) {
@@ -974,12 +975,18 @@ export default class KidsFightScene extends Phaser.Scene {
     this.playerHealth = [100, 100];
     this.playerSpecial = [0, 0];
     this.playerDirection = ['right', 'left'];
-    
+
     // Create platforms
     this.createPlatforms();
-    
+
     // Create touch controls for mobile devices
     this.createTouchControls();
+
+    // Create special pips UI
+    this.createSpecialPips();
+
+    // Initialize pip display
+    this.updateSpecialPips();
   }
 
   /**
@@ -992,19 +999,19 @@ export default class KidsFightScene extends Phaser.Scene {
 
   private createPlatforms(): void {
     if (!this.add) return;
-    
+
     // Get screen dimensions for responsive platform sizing
     const screenWidth = this.sys?.game?.canvas?.width || 800;
     const screenHeight = this.sys?.game?.canvas?.height || 480;
-    
+
     // Create upper platform
     const upperY = 200;
     this.upperPlatform = this.add.rectangle?.(400, upperY, 300, 20, 0xffffff, 0.0);
-    
+
     // Create main platform that spans the width of the screen
     const mainPlatformY = 360; // This should match the platformHeight used for player positioning
     this.mainPlatform = this.add.rectangle?.(screenWidth / 2, mainPlatformY, screenWidth, 20, 0xffffff, 0.0);
-    
+
     // Add physics to platforms
     if (this.physics?.add) {
       // Setup physics for upper platform
@@ -1015,11 +1022,12 @@ export default class KidsFightScene extends Phaser.Scene {
           // stub existing for tests
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
-          this.physics.add.existing = (typeof jest !== 'undefined') ? jest.fn() : (() => {});
+          this.physics.add.existing = (typeof jest !== 'undefined') ? jest.fn() : (() => {
+          });
           this.physics.add.existing(this.upperPlatform, true);
         }
       }
-      
+
       // Setup physics for main platform
       if (this.mainPlatform) {
         if (typeof this.physics.add.existing === 'function') {
@@ -1028,14 +1036,15 @@ export default class KidsFightScene extends Phaser.Scene {
           // Already stubbed above
         }
       }
-      
+
       // Ensure collider exists (tests spy on it)
       if (!this.physics.add.collider) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
-        this.physics.add.collider = (typeof jest !== 'undefined') ? jest.fn() : (() => {});
+        this.physics.add.collider = (typeof jest !== 'undefined') ? jest.fn() : (() => {
+        });
       }
-      
+
       // Add colliders for both platforms
       this.physics.add.collider(this.players as any, this.upperPlatform);
       this.physics.add.collider(this.players as any, this.mainPlatform);
@@ -1073,9 +1082,12 @@ export default class KidsFightScene extends Phaser.Scene {
     const rightBtn = this.add.circle(baseX + radius, baseY, radius, 0x4444ff);
     const jumpBtn = this.add.circle(baseX, baseY - radius * 2, radius, 0x44ff44);
 
-    this.add.text(leftBtn.x - radius / 4, leftBtn.y - radius / 2, '◀', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
-    this.add.text(rightBtn.x, rightBtn.y - radius / 2, '▶', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
-    this.add.text(jumpBtn.x, jumpBtn.y - radius / 2, '⭡', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
+    this.add.text(leftBtn.x - radius / 4, leftBtn.y - radius / 2, '◀', {
+      fontSize: `${radius}px`,
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    this.add.text(rightBtn.x, rightBtn.y - radius / 2, '▶', {fontSize: `${radius}px`, color: '#ffffff'}).setOrigin(0.5);
+    this.add.text(jumpBtn.x, jumpBtn.y - radius / 2, '⭡', {fontSize: `${radius}px`, color: '#ffffff'}).setOrigin(0.5);
 
     // Right bottom corner (arc of action buttons)
     const baseXR = width - padding;
@@ -1083,9 +1095,15 @@ export default class KidsFightScene extends Phaser.Scene {
     const specialBtn = this.add.circle(baseXR + radius, baseY - radius, radius, 0xff44ff);
     const blockBtn = this.add.circle(baseXR, baseY - radius * 2, radius, 0xffff44);
 
-    this.add.text(attackBtn.x, attackBtn.y - radius / 2, 'A', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
-    this.add.text(specialBtn.x, specialBtn.y - radius / 2, 'S', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
-    this.add.text(blockBtn.x, blockBtn.y - radius / 2, 'B', { fontSize: `${radius}px`, color: '#ffffff' }).setOrigin(0.5);
+    this.add.text(attackBtn.x, attackBtn.y - radius / 2, 'A', {
+      fontSize: `${radius}px`,
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    this.add.text(specialBtn.x, specialBtn.y - radius / 2, 'S', {
+      fontSize: `${radius}px`,
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    this.add.text(blockBtn.x, blockBtn.y - radius / 2, 'B', {fontSize: `${radius}px`, color: '#ffffff'}).setOrigin(0.5);
 
     // Make buttons interactive
     leftBtn.setInteractive();
@@ -1260,12 +1278,12 @@ export default class KidsFightScene extends Phaser.Scene {
       this.playerSpecial = [0, 0];
     }
     // defenderIdx has been set if we were called with signature (idx, defenderIdx,...)
-  let defenderIdxComputed: number;
-  if (typeof arg2 === 'number') {
-    defenderIdxComputed = arg2;
-  } else {
-    defenderIdxComputed = attackerIdx === 0 ? 1 : 0;
-  }
+    let defenderIdxComputed: number;
+    if (typeof arg2 === 'number') {
+      defenderIdxComputed = arg2;
+    } else {
+      defenderIdxComputed = attackerIdx === 0 ? 1 : 0;
+    }
     let damage = special ? 10 : 5;
     const targetBlocking = this.playerBlocking?.[defenderIdxComputed] || defender.getData?.('isBlocking');
     if (targetBlocking) damage = Math.floor(damage / 2);
@@ -1274,20 +1292,20 @@ export default class KidsFightScene extends Phaser.Scene {
     defender.health = this.playerHealth[defenderIdxComputed];
 
     if (special) {
-       // Flag special attacking state for animation/tests
-       attacker.setData?.('isSpecialAttacking', true);
-       if (typeof setTimeout === 'function') {
-         setTimeout(() => {
-           attacker.setData?.('isSpecialAttacking', false);
-         }, 300);
-       } else {
-         // Environment without timers – immediately reset flag
-         attacker.setData?.('isSpecialAttacking', false);
-       }
+      // Flag special attacking state for animation/tests
+      attacker.setData?.('isSpecialAttacking', true);
+      if (typeof setTimeout === 'function') {
+        setTimeout(() => {
+          attacker.setData?.('isSpecialAttacking', false);
+        }, 300);
+      } else {
+        // Environment without timers – immediately reset flag
+        attacker.setData?.('isSpecialAttacking', false);
+      }
 
-       // Consume 3 pips for special attack
-       this.playerSpecial[attackerIdx] = Math.max(0, (this.playerSpecial[attackerIdx] || 0) - 3);
-       this.updateSpecialPips?.();
+      // Consume 3 pips for special attack
+      this.playerSpecial[attackerIdx] = Math.max(0, (this.playerSpecial[attackerIdx] || 0) - 3);
+      this.updateSpecialPips?.();
     } else {
       // Gain 1 pip on normal attack, capped at 3
       this.playerSpecial[attackerIdx] = Math.min(3, (this.playerSpecial[attackerIdx] || 0) + 1);
@@ -1317,15 +1335,15 @@ export default class KidsFightScene extends Phaser.Scene {
       this.createHitEffect(defender);
     } else if (typeof this.showHitEffect === 'function') {
       const hitX = defender.x + (defenderIdxComputed === 0 ? 20 : -20);
-      this.showHitEffect({ x: hitX, y: defender.y - 30 });
+      this.showHitEffect({x: hitX, y: defender.y - 30});
     }
 
     this.updateHealthBar?.(defenderIdxComputed);
     this.updateHealthBar?.(attackerIdx);
-        // Send health update to remote
-        if (this.gameMode === 'online' && attackerIdx === this.localPlayerIndex && this.wsManager && typeof this.wsManager.sendHealthUpdate === 'function') {
-          this.wsManager.sendHealthUpdate(defenderIdxComputed, this.playerHealth[defenderIdxComputed]);
-        }
+    // Send health update to remote
+    if (this.gameMode === 'online' && attackerIdx === this.localPlayerIndex && this.wsManager && typeof this.wsManager.sendHealthUpdate === 'function') {
+      this.wsManager.sendHealthUpdate(defenderIdxComputed, this.playerHealth[defenderIdxComputed]);
+    }
 
     const winner = this.checkWinner?.();
     if (winner !== undefined && winner !== -1) {
@@ -1341,9 +1359,18 @@ export default class KidsFightScene extends Phaser.Scene {
   public handleRemoteAction(action: any): void {
     // Parse raw JSON string if needed
     if (typeof action === 'string') {
-      try { action = JSON.parse(action); } catch (e) { console.warn('[SCENE][DEBUG] Failed to parse action JSON', action); return; }
+      try {
+        action = JSON.parse(action);
+      } catch (e) {
+        console.warn('[SCENE][DEBUG] Failed to parse action JSON', action);
+        return;
+      }
     } else if (action.data && typeof action.data === 'string') {
-      try { action = JSON.parse(action.data); } catch (e) { console.warn('[SCENE][DEBUG] Failed to parse action.data JSON', action.data); }
+      try {
+        action = JSON.parse(action.data);
+      } catch (e) {
+        console.warn('[SCENE][DEBUG] Failed to parse action.data JSON', action.data);
+      }
     }
     // unwrap game_action envelope
     if (action.type === 'game_action') {
@@ -1386,13 +1413,13 @@ export default class KidsFightScene extends Phaser.Scene {
         const attacker = this.players?.[action.playerIndex];
         const defender = this.players?.[defenderIdx];
         const timestamp = action.now ?? Date.now();
-        
+
         // Ensure we're applying animation to the correct player
         console.log('[SCENE][DEBUG] Applying attack animation to player at index:', action.playerIndex);
         if (attacker) {
           console.log('[SCENE][DEBUG] Attacker exists, texture:', attacker.texture?.key || 'unknown');
         }
-        
+
         // Call overloaded tryAttack with BOTH signatures so various unit-tests expectations are satisfied
         this.tryAttack(action.playerIndex, attacker, defender, timestamp, false);
         this.tryAttack(action.playerIndex, defenderIdx, timestamp, false);
@@ -1411,12 +1438,12 @@ export default class KidsFightScene extends Phaser.Scene {
         break;
       }
       case 'position_update': {
-          console.log('[SCENE][DEBUG] Received position_update', action);
+        console.log('[SCENE][DEBUG] Received position_update', action);
         if (typeof player.setPosition === 'function') {
-            player.setPosition(action.x, action.y);
+          player.setPosition(action.x, action.y);
         } else {
-            player.x = action.x;
-            player.y = action.y;
+          player.x = action.x;
+          player.y = action.y;
         }
         player.setVelocityX?.(action.velocityX ?? 0);
         player.setVelocityY?.(action.velocityY ?? 0);
@@ -1425,8 +1452,8 @@ export default class KidsFightScene extends Phaser.Scene {
         if (player.body && typeof player.body.reset === 'function') {
           player.body.reset(action.x, action.y);
         }
-          // Refresh remote animation
-          if (typeof this.updatePlayerAnimation === 'function') this.updatePlayerAnimation(action.playerIndex);
+        // Refresh remote animation
+        if (typeof this.updatePlayerAnimation === 'function') this.updatePlayerAnimation(action.playerIndex);
         break;
       }
       case 'health_update': {
@@ -1465,35 +1492,35 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Create semi-transparent background
     const bg = this.add.rectangle(
-      this.cameras.main.width / 2,
-      this.cameras.main.height / 2,
-      400,
-      200,
-      0x000000,
-      0.7
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2,
+        400,
+        200,
+        0x000000,
+        0.7
     );
 
     // Add text
     const text = this.add.text(
-      this.cameras.main.width / 2,
-      this.cameras.main.height / 2 - 40,
-      'Opponent wants to play again',
-      { fontSize: '24px', color: '#ffffff' }
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2 - 40,
+        'Opponent wants to play again',
+        {fontSize: '24px', color: '#ffffff'}
     ).setOrigin(0.5);
 
     // Add buttons
     const acceptButton = this.add.text(
-      this.cameras.main.width / 2 - 60,
-      this.cameras.main.height / 2 + 20,
-      'Accept',
-      { fontSize: '20px', color: '#00ff00', backgroundColor: '#333333', padding: { x: 10, y: 5 } }
+        this.cameras.main.width / 2 - 60,
+        this.cameras.main.height / 2 + 20,
+        'Accept',
+        {fontSize: '20px', color: '#00ff00', backgroundColor: '#333333', padding: {x: 10, y: 5}}
     ).setOrigin(0.5).setInteractive();
 
     const declineButton = this.add.text(
-      this.cameras.main.width / 2 + 60,
-      this.cameras.main.height / 2 + 20,
-      'Decline',
-      { fontSize: '20px', color: '#ff0000', backgroundColor: '#333333', padding: { x: 10, y: 5 } }
+        this.cameras.main.width / 2 + 60,
+        this.cameras.main.height / 2 + 20,
+        'Decline',
+        {fontSize: '20px', color: '#ff0000', backgroundColor: '#333333', padding: {x: 10, y: 5}}
     ).setOrigin(0.5).setInteractive();
 
     // Event listeners
@@ -1520,34 +1547,34 @@ export default class KidsFightScene extends Phaser.Scene {
     try {
       // Check if we're in a test environment
       const isTest = typeof jest !== 'undefined';
-      
+
       // Calculate position
       const x = defender.x - (attacker.x < defender.x ? -30 : 30);
       const y = defender.y - 50;
-      
+
       // Create graphics object - always use the graphics object returned by this.add.graphics()
       const graphicsObj = this.add.graphics();
-      
+
       // Draw the effect
       graphicsObj.fillStyle(0xff0000, 0.7); // Red color for regular attack
       graphicsObj.fillCircle(x, y, 24);
-      
+
       // Add second circle for better visibility
       graphicsObj.fillStyle(0xff6600, 0.4); // Orange glow
       graphicsObj.fillCircle(x, y, 30);
-      
+
       // Set depth to ensure visibility
       graphicsObj.setDepth(100);
-      
+
       // Log for debugging (only in real environment)
       if (!isTest) {
         console.log('Attack effect created at', x, y);
       }
-      
+
       // Add to effects array for tracking
       if (!this.hitEffects) this.hitEffects = [];
       this.hitEffects.push(graphicsObj);
-      
+
       // Remove and destroy after a delay
       if (this.time && typeof this.time.delayedCall === 'function') {
         this.time.delayedCall(200, () => {
@@ -1569,34 +1596,34 @@ export default class KidsFightScene extends Phaser.Scene {
     try {
       // Check if we're in a test environment
       const isTest = typeof jest !== 'undefined';
-      
+
       // Calculate position
       const x = target.x;
       const y = target.y - 30;
-      
+
       // Create graphics object - always use the graphics object returned by this.add.graphics()
       const graphicsObj = this.add.graphics();
-      
+
       // Draw the effect
       graphicsObj.fillStyle(0xffff00, 0.7); // Yellow color for hit effect
       graphicsObj.fillCircle(x, y, 18);
-      
+
       // Add second circle for better visibility
       graphicsObj.fillStyle(0xffffaa, 0.4); // Light yellow glow
       graphicsObj.fillCircle(x, y, 24);
-      
+
       // Set depth to ensure visibility
       graphicsObj.setDepth(100);
-      
+
       // Log for debugging (only in real environment)
       if (!isTest) {
         console.log('Hit effect created at', x, y);
       }
-      
+
       // Add to effects array for tracking
       if (!this.hitEffects) this.hitEffects = [];
       this.hitEffects.push(graphicsObj);
-      
+
       // Remove and destroy after a delay
       if (this.time && typeof this.time.delayedCall === 'function') {
         this.time.delayedCall(200, () => {
@@ -1621,9 +1648,9 @@ export default class KidsFightScene extends Phaser.Scene {
         this.showHitEffectAtCoordinates(player.x, player.y);
       }
     } else if (
-      location &&
-      typeof (location as { x: number; y: number }).x === 'number' &&
-      typeof (location as { x: number; y: number }).y === 'number'
+        location &&
+        typeof (location as { x: number; y: number }).x === 'number' &&
+        typeof (location as { x: number; y: number }).y === 'number'
     ) {
       const loc = location as { x: number; y: number };
       this.showHitEffectAtCoordinates(loc.x, loc.y);
@@ -1634,30 +1661,30 @@ export default class KidsFightScene extends Phaser.Scene {
     try {
       // Check if we're in a test environment
       const isTest = typeof jest !== 'undefined';
-      
+
       // Create graphics object - always use the graphics object returned by this.add.graphics()
       const graphicsObj = this.add.graphics();
-      
+
       // Draw the effect
       graphicsObj.fillStyle(0xffff00, 0.7); // Yellow color for hit effect
       graphicsObj.fillCircle(x, y, 18);
-      
+
       // Add second circle for better visibility
       graphicsObj.fillStyle(0xffffaa, 0.4); // Light yellow glow
       graphicsObj.fillCircle(x, y, 24);
-      
+
       // Set depth to ensure visibility
       graphicsObj.setDepth(100);
-      
+
       // Log for debugging
       if (!isTest) {
         console.log('Hit effect created at coordinates', x, y);
       }
-      
+
       // Add to effects array for tracking
       if (!this.hitEffects) this.hitEffects = [];
       this.hitEffects.push(graphicsObj);
-      
+
       // Remove and destroy after a delay
       if (this.time && typeof this.time.delayedCall === 'function') {
         this.time.delayedCall(200, () => {
@@ -1666,7 +1693,7 @@ export default class KidsFightScene extends Phaser.Scene {
           if (typeof graphicsObj.destroy === 'function') graphicsObj.destroy();
         });
       }
-      
+
       // For tests, manually trigger the animation complete event
       if (isTest) {
         setTimeout(() => {
@@ -1688,11 +1715,11 @@ export default class KidsFightScene extends Phaser.Scene {
     if (!this.gameOver && typeof this.checkWinner === 'function') {
       this.checkWinner();
     }
-    
+
     if (!this.players || this.players.length < 2) return;
     const [p1, p2] = this.players;
     if (!p1 || !p2 || typeof p1.setFlipX !== 'function' || typeof p2.setFlipX !== 'function') return;
-    
+
     // Process keyboard input
     this.processKeyboardInput();
 
@@ -1731,7 +1758,7 @@ export default class KidsFightScene extends Phaser.Scene {
   private processKeyboardInput(): void {
     // Skip if we're in a test environment without proper input setup
     if (typeof jest !== 'undefined') return;
-    
+
     // Get local player index using consistent method
     const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
@@ -1745,15 +1772,19 @@ export default class KidsFightScene extends Phaser.Scene {
       player.setVelocityX?.(-160);
       player.setFlipX?.(true);
       direction = -1;
+      this.updateWalkingAnimation(player);
     } else if (rightDown) {
       player.setVelocityX?.(160);
       player.setFlipX?.(false);
       direction = 1;
+      this.updateWalkingAnimation(player);
     } else {
       player.setVelocityX?.(0);
       direction = 0;
+      // Stop walking animation and return to idle frame
+      this.stopWalkingAnimation(player);
     }
-        // Send position update in online mode
+    // Send position update in online mode
     if (this.gameMode === 'online' && this.wsManager?.sendPositionUpdate) {
       const vx = player.body?.velocity?.x ?? 0;
       const vy = player.body?.velocity?.y ?? 0;
@@ -1790,7 +1821,7 @@ export default class KidsFightScene extends Phaser.Scene {
   private createGfx(): any {
     // Check if we're in a test environment
     const isTestEnv = typeof jest !== 'undefined';
-    
+
     if (isTestEnv) {
       // In test environment, return a mock object with jest spy functions
       return {
@@ -1823,7 +1854,7 @@ export default class KidsFightScene extends Phaser.Scene {
     }
 
     if (this.gameMode === 'online' && this.wsManager?.send) {
-      this.wsManager.send({ type: 'jump', playerIndex: idx });
+      this.wsManager.send({type: 'jump', playerIndex: idx});
     }
   }
 
@@ -1836,22 +1867,22 @@ export default class KidsFightScene extends Phaser.Scene {
     if (this.gameOver || (this as any)._gameOver) return;
     if (this.gameMode === 'online' && this.wsManager?.send) {
       console.log('[SCENE][DEBUG] Sending remote attack action for playerIndex =', idx);
-      this.wsManager.send({ type: 'attack', playerIndex: idx });
+      this.wsManager.send({type: 'attack', playerIndex: idx});
     }
   }
-  
+
   /** Block action */
   public handleBlock(): void {
     const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     if (!player) return;
-    
+
     // Set player state to blocking
     (player as any).isBlocking = true;
-    
+
     // Send block message in online mode
     if (this.gameMode === 'online' && this.wsManager?.send) {
-      this.wsManager.send({ type: 'block', playerIndex: idx });
+      this.wsManager.send({type: 'block', playerIndex: idx});
     }
   }
 
@@ -1862,7 +1893,7 @@ export default class KidsFightScene extends Phaser.Scene {
 
     if (this.gameOver || (this as any)._gameOver) return;
     if (this.gameMode === 'online' && this.wsManager?.send) {
-      this.wsManager.send({ type: 'special', playerIndex: idx });
+      this.wsManager.send({type: 'special', playerIndex: idx});
     }
   }
 
@@ -1964,14 +1995,14 @@ export default class KidsFightScene extends Phaser.Scene {
    */
   public checkWinner(): number {
     // Prefer explicitly set _playerHealth used by a number of jest tests
-  // (these tests patch the private field directly instead of playerHealth)
-  if ((this as any)._playerHealth) {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    this.playerHealth = [...(this as any)._playerHealth];
-  }
+    // (these tests patch the private field directly instead of playerHealth)
+    if ((this as any)._playerHealth) {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      this.playerHealth = [...(this as any)._playerHealth];
+    }
 
-  // Ensure health array exists
+    // Ensure health array exists
     // If internal array missing, but players array exists, build health list from players
     // Always keep playerHealth in sync with the live player sprites so that tests
     // manipulating sprite.health directly are reflected immediately.
@@ -2018,9 +2049,9 @@ export default class KidsFightScene extends Phaser.Scene {
     if (Array.isArray(this.players)) {
       this.players.forEach((p: any, idx: number) => {
         if (
-          (this.playerHealth[idx] === undefined || this.playerHealth[idx] === null) &&
-          p &&
-          typeof p.health === 'number'
+            (this.playerHealth[idx] === undefined || this.playerHealth[idx] === null) &&
+            p &&
+            typeof p.health === 'number'
         ) {
           this.playerHealth[idx] = p.health;
         }
@@ -2096,7 +2127,10 @@ export default class KidsFightScene extends Phaser.Scene {
     // Show 'S' in the last pip when fully charged
     if (count1 >= 3) {
       if (!this.specialReadyText1) {
-        this.specialReadyText1 = this.add.text(OFFSET1 + 2 * STEP, Y, 'S', { fontSize: '16px', color: '#000' }).setOrigin(0.5).setDepth(11);
+        this.specialReadyText1 = this.add.text(OFFSET1 + 2 * STEP, Y, 'S', {
+          fontSize: '16px',
+          color: '#000'
+        }).setOrigin(0.5).setDepth(11);
       } else {
         this.specialReadyText1.setVisible(true);
       }
@@ -2105,7 +2139,10 @@ export default class KidsFightScene extends Phaser.Scene {
     }
     if (count2 >= 3) {
       if (!this.specialReadyText2) {
-        this.specialReadyText2 = this.add.text(OFFSET2 + 2 * STEP, Y, 'S', { fontSize: '16px', color: '#000' }).setOrigin(0.5).setDepth(11);
+        this.specialReadyText2 = this.add.text(OFFSET2 + 2 * STEP, Y, 'S', {
+          fontSize: '16px',
+          color: '#000'
+        }).setOrigin(0.5).setDepth(11);
       } else {
         this.specialReadyText2.setVisible(true);
       }
@@ -2161,16 +2198,35 @@ export default class KidsFightScene extends Phaser.Scene {
       const centerX = this.cameras.main.width / 2;
       const centerY = this.cameras.main.height / 2;
       if (this.gameMode === 'online') {
-        const replayButton = this.add?.text?.(centerX, centerY + 30, 'Request Rematch', { fontSize: '24px', backgroundColor: '#222222', color: '#ffffff', padding: { left: 10, right: 10, top: 5, bottom: 5 } })?.setOrigin?.(0.5)?.setInteractive?.();
+        const replayButton = this.add?.text?.(centerX, centerY + 30, 'Request Rematch', {
+          fontSize: '24px',
+          backgroundColor: '#222222',
+          color: '#ffffff',
+          padding: {left: 10, right: 10, top: 5, bottom: 5}
+        })?.setOrigin?.(0.5)?.setInteractive?.();
         replayButton?.on?.('pointerdown', () => {
           this.wsManager?.sendReplayRequest?.('game', 'player', {});
         });
       } else {
-        const replayButton = this.add?.text?.(centerX, centerY + 30, 'Play Again', { fontSize: '24px', backgroundColor: '#222222', color: '#ffffff', padding: { left: 10, right: 10, top: 5, bottom: 5 } })?.setOrigin?.(0.5)?.setInteractive?.();
+        const replayButton = this.add?.text?.(centerX, centerY + 30, 'Play Again', {
+          fontSize: '24px',
+          backgroundColor: '#222222',
+          color: '#ffffff',
+          padding: {left: 10, right: 10, top: 5, bottom: 5}
+        })?.setOrigin?.(0.5)?.setInteractive?.();
         replayButton?.on?.('pointerdown', () => {
           this.scene?.restart?.();
         });
       }
+      const menuButton = this.add?.text?.(centerX, centerY + 70, 'Main Menu', {
+        fontSize: '24px',
+        backgroundColor: '#222222',
+        color: '#ffffff',
+        padding: {left: 10, right: 10, top: 5, bottom: 5}
+      })?.setOrigin?.(0.5)?.setInteractive?.();
+      menuButton?.on?.('pointerdown', () => {
+        this.scene?.start?.('GameModeScene');
+      });
     }
   }
 
@@ -2182,22 +2238,22 @@ export default class KidsFightScene extends Phaser.Scene {
       // Check if we're in a test environment
       const isTest = typeof jest !== 'undefined';
       if (isTest) return; // Skip in tests, but spy still counted
-      
+
       // Draw a special effect (blue circle with larger radius)
       const x = defender.x - (attacker.x < defender.x ? -40 : 40);
       const y = defender.y - 60;
-      
+
       const gfx = this.add.graphics();
       gfx.fillStyle(0x0088ff, 0.8); // Blue color for special attack
       gfx.fillCircle(x, y, 32); // Larger radius for special attack
-      
+
       // Add glow effect (second circle)
       gfx.fillStyle(0x00ffff, 0.4);
       gfx.fillCircle(x, y, 40);
-      
+
       // Set depth to ensure visibility
       gfx.setDepth(100);
-      
+
       // Remove and destroy after a delay
       this.time.delayedCall(300, () => gfx.destroy());
     } catch (error) {
@@ -2219,11 +2275,11 @@ export default class KidsFightScene extends Phaser.Scene {
   /**
    * Basic animation scaler for tests. Uses constants the tests expect.
    */
-    /**
+  /**
    * Update animation & scale for a player. Keeps this implementation minimal yet consistent
    * with what unit-tests assert (see kidsfight_scene_player_scale.test.ts).
    */
-    public updatePlayerAnimation(playerIndex: number): void {
+  public updatePlayerAnimation(playerIndex: number): void {
     const player: any = this.players?.[playerIndex];
     if (!player) return;
     const origY = player.y;
@@ -2239,54 +2295,76 @@ export default class KidsFightScene extends Phaser.Scene {
     const textureKey = player.texture?.key || '';
 
     if (isAttack) {
-      // Flash attack frame then return to idle
-      player.setFrame(4);
-      const isTestEnv = typeof jest !== 'undefined';
-      if (isTestEnv) {
-        // Immediate revert for tests
-        player.setFrame(0);
+      this.setSafeFrame(player, 4);
+      this.time.delayedCall(200, () => {
+        this.setSafeFrame(player, 0);
         player.isAttacking = false;
         if (player.getData && typeof player.setData === 'function') player.setData('isAttacking', false);
         player.anims?.stop?.();
-      } else if (this.time && typeof this.time.delayedCall === 'function') {
-        this.time.delayedCall(200, () => {
-          player.setFrame(0);
-          player.isAttacking = false;
-          if (player.getData && typeof player.setData === 'function') player.setData('isAttacking', false);
-          player.anims?.stop?.();
-        });
-      } else {
-        setTimeout(() => {
-          player.setFrame(0);
-          player.isAttacking = false;
-          if (player.getData && typeof player.setData === 'function') player.setData('isAttacking', false);
-          player.anims?.stop?.();
-        }, 200);
-      }
+      });
     } else if (isSpecial) {
       this.setSafeFrame(player, 6);
     } else if (isBlocking) {
-      this.setSafeFrame(player, 2);
+      this.setSafeFrame(player, 5);
     } else if (isMoving) {
-      const walkKey = `${textureKey}_walk`;
-      if (this.anims.exists(walkKey)) {
-        player.play?.(walkKey, true);
-      } else {
-        this.setSafeFrame(player, 1);
-      }
+      this.updateWalkingAnimation(player);
     } else {
-      this.setSafeFrame(player, 0);
-      player.anims?.stop?.();
+      this.stopWalkingAnimation(player);
     }
 
     player.y = origY;
   }
 
   /**
+   * Update walking animation for a player
+   * Cycles between frames 1 and 2 during movement
+   */
+  private updateWalkingAnimation(player: any): void {
+    if (!player) return;
+
+    // Initialize walking animation data if needed
+    if (!player.walkAnimData) {
+      player.walkAnimData = {
+        frameTime: 0,
+        currentFrame: 1,
+        frameDelay: 200 // 200ms between frame changes
+      };
+      this.setSafeFrame(player, 1);
+    }
+
+    const now = this.getTime();
+
+    // Check if enough time has passed to change frame
+    if (now - player.walkAnimData.frameTime >= player.walkAnimData.frameDelay) {
+      // Cycle between frames 1 and 2
+      player.walkAnimData.currentFrame = player.walkAnimData.currentFrame === 1 ? 2 : 1;
+      player.walkAnimData.frameTime = now;
+
+      // Set the frame
+      this.setSafeFrame(player, player.walkAnimData.currentFrame);
+    }
+  }
+
+  /**
+   * Stop walking animation and return to idle frame
+   */
+  private stopWalkingAnimation(player: any): void {
+    if (!player) return;
+
+    // Reset to idle frame (frame 0)
+    this.setSafeFrame(player, 0);
+
+    // Reset walking animation data
+    if (player.walkAnimData) {
+      player.walkAnimData.currentFrame = 1;
+      player.walkAnimData.frameTime = 0;
+    }
+  }
+
+
+  /**
    * (Re)creates the 3 special-attack pips for both players.
-   * Unit-tests rely on: (1) previous pips being destroyed, (2) new pips drawn
-   * with graphics.fillCircle, and (3) exactly 3 pips per player.
-   * @param _playerIndex Unused but kept for compatibility with tests signature
+   * @param _playerIndex Unused for compatibility
    * @param recreate Whether to destroy existing pips before recreating
    */
   public createSpecialPips(_playerIndex: number = 0, recreate: number = 1): void {
@@ -2295,7 +2373,6 @@ export default class KidsFightScene extends Phaser.Scene {
       this.specialPips2 = [];
       return;
     }
-    // Destroy existing pips if requested
     if (recreate) {
       [this.specialPips1, this.specialPips2].forEach(arr => {
         if (Array.isArray(arr)) arr.forEach(p => p?.destroy?.());
@@ -2307,20 +2384,21 @@ export default class KidsFightScene extends Phaser.Scene {
       const x1 = 140 + i * 36;
       const x2 = 660 + i * 36;
       const y = 60;
-      // Player 1 pip
       const g1 = this.add.graphics();
       const pip1 = (g1 && typeof (g1 as any).fillStyle === 'function') ? g1 : this.safeAddGraphics();
       pip1.fillStyle(0x888888, 0.3);
       pip1.fillCircle?.(x1, y, 16);
       pip1.setDepth(10);
+      pip1.setScrollFactor?.(0, 0);
       this.specialPips1.push(pip1);
-      // Player 2 pip
       const g2 = this.add.graphics();
       const pip2 = (g2 && typeof (g2 as any).fillStyle === 'function') ? g2 : this.safeAddGraphics();
       pip2.fillStyle(0x888888, 0.3);
       pip2.fillCircle?.(x2, y, 16);
       pip2.setDepth(10);
+      pip2.setScrollFactor?.(0, 0);
       this.specialPips2.push(pip2);
     }
   }
 }
+export default KidsFightScene;

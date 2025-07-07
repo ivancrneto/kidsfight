@@ -37,6 +37,7 @@ export default class OnlineModeScene extends Phaser.Scene {
   private titleText!: Phaser.GameObjects.Text;
   private wsManager: WebSocketManager;
   private roomCode: string | null = null;
+  private errorCanvas!: HTMLCanvasElement;
 
   constructor() {
     super('OnlineModeScene');
@@ -413,25 +414,18 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   private showError(message: string): void {
+    if (this.errorCanvas) {
+      const ctx = this.errorCanvas.getContext('2d');
+      if (!ctx) {
+        console.warn('[OnlineModeScene] showError: Canvas context is null!');
+      }
+    }
     try {
-      if (this.errorText && !(this.errorText as any).destroyed && this.errorText.scene) {
+      if (this.errorText && !(this.errorText as any).destroyed) {
         this.errorText.setText(message).setVisible(true);
       } else {
-        console.warn('[OnlineModeScene] Tried to show error but errorText is missing or destroyed, recreating...');
-        // Recreate the error text if it's missing
-        const w = this.cameras.main.width;
-        const h = this.cameras.main.height;
-        this.errorText = this.add.text(
-          w/2,
-          h * 0.7,
-          message,
-          {
-            fontSize: `${Math.max(16, Math.round(w * 0.03))}px`,
-            color: '#ff0000',
-            fontFamily: 'monospace',
-            align: 'center'
-          }
-        ).setOrigin(0.5).setVisible(true).setDepth(2);
+        console.warn('[OnlineModeScene] Tried to show error but errorText is missing or destroyed');
+        return;
       }
     } catch (error) {
       console.error('[OnlineModeScene] Error showing error message:', error);
@@ -446,7 +440,7 @@ export default class OnlineModeScene extends Phaser.Scene {
 
     setTimeout(() => {
       try {
-        if (this.errorText && !(this.errorText as any).destroyed && this.errorText.scene) {
+        if (this.errorText && !(this.errorText as any).destroyed) {
           this.errorText.setVisible(false);
         }
       } catch (error) {

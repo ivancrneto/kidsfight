@@ -52,7 +52,7 @@ class ScenarioSelectScene extends Phaser.Scene {
    */
   constructor(wsManagerInstance: any = null) {
     super({ key: 'ScenarioSelectScene' });
-    this.selectedScenario = 0; // Always reset to 0 on constructor
+    this.selectedScenario = 0; // Default to 0, will be updated in init() for guests
     this.mode = 'local';
     this.selected = { p1: 'player1', p2: 'player2' };
     this.roomCode = null;
@@ -68,6 +68,16 @@ class ScenarioSelectScene extends Phaser.Scene {
     this.selected = data.selected || { p1: 'player1', p2: 'player2' };
     this.roomCode = data.roomCode || null;
     this.isHost = data.isHost || false;
+    
+    // For guests in online mode, don't reset selectedScenario - wait for host's selection
+    if (this.mode === 'online' && !this.isHost) {
+      // Keep current selectedScenario value, don't reset it
+      console.debug('[ScenarioSelectScene] Guest mode - keeping current selectedScenario:', this.selectedScenario);
+    } else {
+      // For hosts and local mode, selectedScenario can be reset to 0 if needed
+      this.selectedScenario = 0;
+      console.debug('[ScenarioSelectScene] Host/Local mode - reset selectedScenario to 0');
+    }
     
     // CRITICAL: Always initialize gameStarted to false when the scene starts
     this.gameStarted = false;
@@ -112,15 +122,21 @@ class ScenarioSelectScene extends Phaser.Scene {
           });
         }, 50);
       } else {
-        // Guest only re-sends their own selection (p2)
-        console.log('[ScenarioSelectScene] Guest re-sending p2 character selection:', { 
-          p2: this.selected.p2 
-        });
-        this.wsManager.send({
-          type: 'player_selected',
-          player: 'p2',
-          character: this.selected.p2
-        });
+        // Guest only re-sends their own selection (p2) if it's not a default/invalid value
+        if (this.selected.p2 && this.selected.p2 !== 'davir' && this.selected.p2 !== 'player2') {
+          console.log('[ScenarioSelectScene] Guest re-sending p2 character selection:', { 
+            p2: this.selected.p2 
+          });
+          this.wsManager.send({
+            type: 'player_selected',
+            player: 'p2',
+            character: this.selected.p2
+          });
+        } else {
+          console.log('[ScenarioSelectScene] Guest skipping p2 re-send - has default/invalid value:', { 
+            p2: this.selected.p2 
+          });
+        }
       }
     }
   }
@@ -530,9 +546,6 @@ class ScenarioSelectScene extends Phaser.Scene {
           
           console.debug('[ScenarioSelectScene][startGame] Host sending game_start message:', msg);
           this.wsManager.send(msg);
-          
-          // Also transition to game scene directly for host
-          // This ensures the host doesn't get stuck waiting for their own message
           setTimeout(() => {
             this._transitionToGame(msg, this.selected.p1, this.selected.p2);
           }, 100);

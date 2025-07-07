@@ -17,6 +17,7 @@ export const createMockPlayer = () => ({
   setBounce: jest.fn().mockReturnThis(),
   setCollideWorldBounds: jest.fn().mockReturnThis(),
   setInteractive: jest.fn().mockReturnThis(),
+  setSize: jest.fn().mockReturnThis(),
   on: jest.fn().mockReturnThis(),
   play: jest.fn().mockReturnThis(),
   body: {
@@ -29,6 +30,7 @@ export const createMockPlayer = () => ({
     setVelocityX: jest.fn(),
     setVelocityY: jest.fn(),
     setCollideWorldBounds: jest.fn(),
+    setGravityY: jest.fn(),
     touching: { down: true },
     onFloor: jest.fn().mockReturnValue(true)
   },

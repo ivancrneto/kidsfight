@@ -103,7 +103,9 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
   constructor(wsManager?: WebSocketManager | null) {
     super({ key: 'PlayerSelectScene' });
-    this.selected = { p1: 'bento', p2: 'davir' };
+    // Don't set 'davir' as default since it can cause issues with guest synchronization
+    // These will be properly initialized in the init() method based on host/guest status
+    this.selected = { p1: '', p2: '' };
     this.wsManager = wsManager ?? null;
   }
 
@@ -152,11 +154,13 @@ export default class PlayerSelectScene extends Phaser.Scene {
         this.selectedP1Index = 0;
         this.selectedP2Index = 1;
       } else {
-        this.selected = { p1: keys[0], p2: keys[1] || keys[0] }; // Guest will receive actual selections from host
-        this.p1Index = 0; // Will be updated by host's selection
-        this.p2Index = 1; // Guest defaults to davir
-        this.selectedP1Index = 0;
-        this.selectedP2Index = 1;
+        // Guest should wait for host's selections, don't set defaults that will override them
+        // Initialize with placeholder values that will be overridden by WebSocket messages
+        this.selected = { p1: '', p2: '' }; // Will be updated by host's messages
+        this.p1Index = -1; // Will be updated by host's selection
+        this.p2Index = -1; // Will be updated by host's selection or guest's own choice
+        this.selectedP1Index = -1; // Will be updated by host
+        this.selectedP2Index = -1; // Will be updated by host or guest
       }
       // Ensure WebSocket manager has the latest room code and host status
       if (this.roomCode) {
@@ -272,17 +276,9 @@ export default class PlayerSelectScene extends Phaser.Scene {
               }
             }, 50);
           } else {
-            // Guest only sends their own selection (p2)
-            const characterKey = this.selected.p2;
-            console.log('[PlayerSelectScene] Guest sending initial p2 character selection:', { 
-              characterKey,
-              selected: this.selected 
-            });
-            this.wsManager.send({
-              type: 'player_selected',
-              player: 'p2',
-              character: characterKey
-            });
+            // Guest should not send initial character selection, wait for host's selections first
+            // and only send when guest actually makes a selection via setSelectorToCharacter
+            console.log('[PlayerSelectScene] Guest waiting for host selections, not sending initial p2 selection');
           }
         }
       }, 150);
@@ -567,19 +563,39 @@ export default class PlayerSelectScene extends Phaser.Scene {
 
     let currentPlayer: 1 | 2;
     if (this.mode === 'online') {
-      // Ensure guest sets up WebSocket handlers before transition
+      // For guests, ensure they have received both character selections before proceeding
       if (!this.isHost) {
+        if (!this.selected.p1 || !this.selected.p2) {
+          console.log('[PlayerSelectScene] Guest attempting to launch game without complete character selections:', this.selected);
+          console.log('[PlayerSelectScene] Waiting for host selections before proceeding...');
+          // Show a waiting message or disable the ready button temporarily
+          if (this.readyButton) {
+            this.readyButton.setText('AGUARDANDO...');
+            this.readyButton.setBackgroundColor('#888888');
+            this.readyButton.disableInteractive();
+          }
+          return;
+        }
         this.setupWebSocketHandlers();
       }
       
-      // Make sure to use the final selected character keys from CHARACTER_KEYS
-      const p1CharKey = this.CHARACTER_KEYS[this.selectedP1Index];
-      const p2CharKey = this.CHARACTER_KEYS[this.selectedP2Index];
+      // Make sure to use the final selected character keys, handling invalid indices
+      const p1CharKey = this.selectedP1Index >= 0 && this.selectedP1Index < this.CHARACTER_KEYS.length 
+        ? this.CHARACTER_KEYS[this.selectedP1Index] 
+        : this.selected.p1;
+      const p2CharKey = this.selectedP2Index >= 0 && this.selectedP2Index < this.CHARACTER_KEYS.length 
+        ? this.CHARACTER_KEYS[this.selectedP2Index] 
+        : this.selected.p2;
       
-      console.log('[PlayerSelectScene] Final selected characters:', { p1: p1CharKey, p2: p2CharKey });
+      // Validate that we have valid character keys before proceeding
+      const validKeys = ['bento', 'davir', 'jose', 'davis', 'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'];
+      const finalP1 = validKeys.includes(p1CharKey) ? p1CharKey : (this.CHARACTER_KEYS[0] || 'bento');
+      const finalP2 = validKeys.includes(p2CharKey) ? p2CharKey : (this.CHARACTER_KEYS[1] || 'davir');
+      
+      console.log('[PlayerSelectScene] Final selected characters:', { p1: finalP1, p2: finalP2 });
       
       // Update the selected object to ensure it has the correct keys
-      this.selected = { p1: p1CharKey, p2: p2CharKey };
+      this.selected = { p1: finalP1, p2: finalP2 };
       
       // Host and guest: always pass wsManager, roomCode, isHost to ScenarioSelectScene in online mode
       this.scene.start('ScenarioSelectScene', {
@@ -626,7 +642,9 @@ export default class PlayerSelectScene extends Phaser.Scene {
       const idx = this.characters.findIndex(c => c.key === data.character);
       if (idx === -1) {
         console.warn('[PlayerSelectScene] Could not find character key in characters:', data.character, this.characters.map(c => c.key));
-        return; // Don't update indices if character not found
+        this.p1Index = -1;
+        this.selectedP1Index = -1;
+        return; // Don't update visual indicators if character not found
       }
       console.log(`[PlayerSelectScene] Player 1 selected: ${data.character} (index ${idx})`);
       this.p1Index = idx;
@@ -639,7 +657,9 @@ export default class PlayerSelectScene extends Phaser.Scene {
       const idx = this.characters.findIndex(c => c.key === data.character);
       if (idx === -1) {
         console.warn('[PlayerSelectScene] Could not find character key in characters:', data.character, this.characters.map(c => c.key));
-        return; // Don't update indices if character not found
+        this.p2Index = -1;
+        this.selectedP2Index = -1;
+        return; // Don't update visual indicators if character not found
       }
       console.log(`[PlayerSelectScene] Player 2 selected: ${data.character} (index ${idx})`);
       this.p2Index = idx;
@@ -649,6 +669,15 @@ export default class PlayerSelectScene extends Phaser.Scene {
     } else {
       console.warn('[PlayerSelectScene] [SYNC] handlePlayerSelected called with unknown player or missing character:', data);
     }
+    
+    // For guests: check if all character selections are complete and re-enable ready button if needed
+    if (!this.isHost && this.mode === 'online' && this.selected.p1 && this.selected.p2 && this.readyButton) {
+      console.log('[PlayerSelectScene] Guest has received all character selections, enabling ready button');
+      this.readyButton.setText('COMEÇAR');
+      this.readyButton.setBackgroundColor('#00AA00');
+      this.readyButton.setInteractive({ useHandCursor: true });
+    }
+    
     console.log('[PlayerSelectScene] [SYNC] Final state after handling:', {
       p1Index: this.p1Index,
       p2Index: this.p2Index,
@@ -751,19 +780,33 @@ export default class PlayerSelectScene extends Phaser.Scene {
     if (!this.characters.length) return;
     
     // Update P1 indicator
-    const p1Char = this.characters[this.selectedP1Index];
-    if (p1Char && this.p1SelectorCircle) {
-      const yOffset = p1Char.bgCircleOffsetY || 0;
-      this.p1SelectorCircle.setPosition(p1Char.x, p1Char.y + yOffset);
-      this.p1SelectorCircle.setVisible(true);
+    if (this.selectedP1Index >= 0 && this.selectedP1Index < this.characters.length) {
+      const p1Char = this.characters[this.selectedP1Index];
+      if (p1Char && this.p1SelectorCircle) {
+        const yOffset = p1Char.bgCircleOffsetY || 0;
+        this.p1SelectorCircle.setPosition(p1Char.x, p1Char.y + yOffset);
+        this.p1SelectorCircle.setVisible(true);
+      }
+    } else {
+      // Hide indicator when index is invalid
+      if (this.p1SelectorCircle) {
+        this.p1SelectorCircle.setVisible(false);
+      }
     }
 
     // Update P2 indicator
-    const p2Char = this.characters[this.selectedP2Index];
-    if (p2Char && this.p2SelectorCircle) {
-      const yOffset = p2Char.bgCircleOffsetY || 0;
-      this.p2SelectorCircle.setPosition(p2Char.x, p2Char.y + yOffset);
-      this.p2SelectorCircle.setVisible(true);
+    if (this.selectedP2Index >= 0 && this.selectedP2Index < this.characters.length) {
+      const p2Char = this.characters[this.selectedP2Index];
+      if (p2Char && this.p2SelectorCircle) {
+        const yOffset = p2Char.bgCircleOffsetY || 0;
+        this.p2SelectorCircle.setPosition(p2Char.x, p2Char.y + yOffset);
+        this.p2SelectorCircle.setVisible(true);
+      }
+    } else {
+      // Hide indicator when index is invalid
+      if (this.p2SelectorCircle) {
+        this.p2SelectorCircle.setVisible(false);
+      }
     }
   }
 

@@ -33,9 +33,9 @@ describe('PlayerSelectScene', () => {
   });
 
   describe('initialization', () => {
-    it('should initialize with default character selections', () => {
-      expect(scene.selected.p1).toBe('bento');
-      expect(scene.selected.p2).toBe('davir');
+    it('should initialize with empty character selections', () => {
+      expect(scene.selected.p1).toBe('');
+      expect(scene.selected.p2).toBe('');
     });
 
     it('should have all character keys defined', () => {

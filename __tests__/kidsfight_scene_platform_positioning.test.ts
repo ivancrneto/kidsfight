@@ -30,6 +30,10 @@ describe('KidsFightScene - Platform & Player Positioning', () => {
           setAlpha: jest.fn().mockReturnThis(),
           setDepth: jest.fn().mockReturnThis(),
           setVisible: jest.fn().mockReturnThis(),
+          setBounce: jest.fn().mockReturnThis(),
+          setCollideWorldBounds: jest.fn().mockReturnThis(),
+          setSize: jest.fn().mockReturnThis(),
+          body: { setGravityY: jest.fn().mockReturnThis() },
         }),
         staticGroup: jest.fn(() => {
           const chain = {

@@ -224,7 +224,7 @@ describe('Block Functionality', () => {
         }
       ];
       scene.updatePlayerAnimation(0);
-      expect(scene.players[0].setFrame).toHaveBeenCalledWith(2); // fallback to last frame
+      expect(scene.players[0].setFrame).toHaveBeenCalledWith(5); // blocking frame
     });
   });
 });

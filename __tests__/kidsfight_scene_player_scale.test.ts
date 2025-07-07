@@ -8,6 +8,7 @@ describe('KidsFightScene player scale', () => {
   let player2: Phaser.Physics.Arcade.Sprite;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     scene = new KidsFightScene();
     // Mock AnimationManager to make attack animation available
     scene.anims = {
@@ -57,6 +58,18 @@ describe('KidsFightScene player scale', () => {
     scene.playerBlocking = [false, false];
     // Mock setSafeFrame to call setFrame directly for testability
     scene.setSafeFrame = (player: any, frame: number) => player.setFrame(frame);
+    
+    // Mock time for delayedCall
+    scene.time = {
+      delayedCall: jest.fn((delay, callback) => {
+        setTimeout(callback, delay);
+        return { remove: jest.fn() };
+      })
+    } as any;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('should use BASE_PLAYER_SCALE for idle', () => {
@@ -93,10 +106,17 @@ describe('KidsFightScene player scale', () => {
     player1.special = 0;
     player1.direction = 'right';
     player1.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 0 };
+    
     (scene as any)['updatePlayerAnimation'](0);
-    expect(player1.setFrame).toHaveBeenCalledTimes(2);
-    expect(player1.setFrame).toHaveBeenNthCalledWith(1, 4);
-    expect(player1.setFrame).toHaveBeenNthCalledWith(2, 0);
+    
+    // Verify initial attack frame
+    expect(player1.setFrame).toHaveBeenCalledWith(4);
+    
+    // Advance timers to trigger the delayed callback (200ms delay)
+    jest.advanceTimersByTime(200);
+    
+    // Verify revert to idle frame
+    expect(player1.setFrame).toHaveBeenCalledWith(0);
     expect(player1.play).not.toHaveBeenCalled();
   });
 

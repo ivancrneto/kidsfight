@@ -45,12 +45,18 @@ function createMockPlayer() {
     setFlipX: jest.fn(),
     setData: jest.fn(),
     getData: jest.fn(),
+    setOrigin: jest.fn(),
+    setScale: jest.fn(),
+    setBounce: jest.fn(),
+    setCollideWorldBounds: jest.fn(),
+    setSize: jest.fn(),
     body: {
       setVelocityX: jest.fn(),
       setVelocityY: jest.fn(),
       setSize: jest.fn(),
       setOffset: jest.fn(),
       setAllowGravity: jest.fn(),
+      setGravityY: jest.fn(),
       touching: { down: true },
       onFloor: jest.fn(() => true)
     }
@@ -408,7 +414,8 @@ class MockSprite {
     setImmovable: jest.fn(),
     setSize: jest.fn(),
     setOffset: jest.fn(),
-    setCollideWorldBounds: jest.fn()
+    setCollideWorldBounds: jest.fn(),
+    setGravityY: jest.fn()
   };
   anims = { play: jest.fn() };
   destroy = jest.fn();
@@ -601,8 +608,10 @@ describe('KidsFightScene', () => {
       
       if (scene.init) scene.init({});
       if (scene.create) scene.create({});
-      player1 = scene.players?.[0] || createMockPlayer();
-      player2 = scene.players?.[1] || createMockPlayer();
+      // Ensure we use properly mocked players
+      player1 = createMockPlayer();
+      player2 = createMockPlayer();
+      scene.players = [player1, player2];
     });
 
     it('should handle player movement', () => {

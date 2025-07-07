@@ -1239,6 +1239,8 @@ describe('Character and Scenario Selection', () => {
       // Create mock sprite instances with proper methods
       const mockPlayer1Sprite = {
         ...mockPlayer1,
+        setOrigin: jest.fn().mockReturnThis(),
+        setScale: jest.fn().mockReturnThis(),
         setBounce: jest.fn().mockReturnThis(),
         setCollideWorldBounds: jest.fn().mockReturnThis(),
         setGravityY: jest.fn().mockReturnThis(),
@@ -1256,11 +1258,14 @@ describe('Character and Scenario Selection', () => {
           setImmovable: jest.fn(),
           setSize: jest.fn(),
           setOffset: jest.fn(),
+          setGravityY: jest.fn(),
         },
       };
       
       const mockPlayer2Sprite = {
         ...mockPlayer2,
+        setOrigin: jest.fn().mockReturnThis(),
+        setScale: jest.fn().mockReturnThis(),
         setBounce: jest.fn().mockReturnThis(),
         setCollideWorldBounds: jest.fn().mockReturnThis(),
         setGravityY: jest.fn().mockReturnThis(),
@@ -1278,6 +1283,7 @@ describe('Character and Scenario Selection', () => {
           setImmovable: jest.fn(),
           setSize: jest.fn(),
           setOffset: jest.fn(),
+          setGravityY: jest.fn(),
         },
       };
       

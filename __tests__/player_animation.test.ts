@@ -21,6 +21,8 @@ describe('Player Animation Tests', () => {
   let mockPlayers: any[];
 
   beforeEach(() => {
+    jest.useFakeTimers();
+    
     // Create a new scene instance for each test
     scene = new TestableKidsFightScene();
     
@@ -71,6 +73,18 @@ describe('Player Animation Tests', () => {
       create: jest.fn(),
       get: jest.fn()
     } as any;
+    
+    // Mock time for delayedCall
+    scene.time = {
+      delayedCall: jest.fn((delay, callback) => {
+        setTimeout(callback, delay);
+        return { remove: jest.fn() };
+      })
+    } as any;
+  });
+  
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   test('player should remain in idle state (frame 0) when not moving', () => {
@@ -80,13 +94,11 @@ describe('Player Animation Tests', () => {
     // Call the update animation method
     scene.updatePlayerAnimation(0);
     
-    // Verify player is set to idle frame and animations are stopped
+    // Verify player is set to idle frame (stopWalkingAnimation is called for idle)
     expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(0);
-    expect(mockPlayers[0].anims.stop).toHaveBeenCalled();
-    expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
 
-  test('player should play run animation when moving', () => {
+  test('player should start walking animation when moving', () => {
     // Set up player state - moving right
     mockPlayers[0].body.velocity.x = 160;
     
@@ -96,14 +108,16 @@ describe('Player Animation Tests', () => {
     mockPlayers[0].isBlocking = false;
     mockPlayers[0].getData.mockImplementation(() => false);
     
-    // Mock the anims.exists to return true for the run animation
-    scene.anims.exists.mockImplementation((key: string) => key === 'player1_walk');
+    // Mock getTime for walking animation timing - use a small time to prevent immediate cycling
+    scene.getTime = jest.fn().mockReturnValue(100);
     
     // Call the update animation method
     scene.updatePlayerAnimation(0);
     
-    // Verify run animation is played
-    expect(mockPlayers[0].play).toHaveBeenCalledWith('player1_walk', true);
+    // Verify walking frame is set (should be frame 1 for initial walking)
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+    expect(mockPlayers[0].walkAnimData).toBeDefined();
+    expect(mockPlayers[0].walkAnimData.currentFrame).toBe(1);
   });
 
   test('player should flash attack frame then return to idle', () => {
@@ -113,12 +127,16 @@ describe('Player Animation Tests', () => {
     // Call the update animation method
     scene.updatePlayerAnimation(0);
 
-    // Verify flash of attack frame then revert to idle
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledTimes(2);
-    expect(mockPlayers[0].setFrame).toHaveBeenNthCalledWith(1, 4);
-    expect(mockPlayers[0].setFrame).toHaveBeenNthCalledWith(2, 0);
-    expect(mockPlayers[0].play).not.toHaveBeenCalled();
-    expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
+    // Verify initial attack frame is set
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(4);
+    
+    // Advance timers to trigger the delayed callback (200ms delay)
+    jest.advanceTimersByTime(200);
+    
+    // Verify revert to idle frame
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(0);
+    expect(mockPlayers[0].isAttacking).toBe(false);
+    expect(mockPlayers[0].anims.stop).toHaveBeenCalled();
   });
 
   test('player should use block frame when blocking', () => {
@@ -129,7 +147,7 @@ describe('Player Animation Tests', () => {
     scene.updatePlayerAnimation(0);
     
     // Verify block frame is set and scale is BASE_SCALE (0.4)
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(2);
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(5);
     expect(mockPlayers[0].setScale).toHaveBeenCalledWith(0.4);
     expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
   });
@@ -157,24 +175,10 @@ describe('Player Animation Tests', () => {
     scene.updatePlayerAnimation(0);
     
     // Verify block frame is set based on getData value
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(2);
+    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(5);
     expect(mockPlayers[0].setScale).toHaveBeenCalledWith(0.4);
   });
 
-  test('player should use fallback frame if animation does not exist', () => {
-    // Set up player state - moving
-    mockPlayers[0].body.velocity.x = 160;
-    
-    // Mock anims.exists to return false
-    (scene.anims.exists as jest.Mock).mockReturnValue(false);
-    
-    // Call the update animation method
-    scene.updatePlayerAnimation(0);
-    
-    // Verify fallback frame is used
-    expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
-    expect(mockPlayers[0].anims.play).not.toHaveBeenCalled();
-  });
 
   test('update method should call updatePlayerAnimation for both players', () => {
     // Spy on updatePlayerAnimation method

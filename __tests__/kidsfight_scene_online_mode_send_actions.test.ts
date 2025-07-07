@@ -17,7 +17,16 @@ describe('KidsFightScene - Online Mode Action Sending', () => {
     scene.players = [
       {} as any, // dummy for index 0
       {
-        body: { touching: { down: true }, blocked: { down: true } }
+        body: {
+          touching: { down: true },
+          blocked: { down: true },
+          setGravityY: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          setCollideWorldBounds: jest.fn(),
+          on: jest.fn(),
+          velocity: { x: 0, y: 0 }
+        }
       } as any,
     ];
     scene.player1 = {

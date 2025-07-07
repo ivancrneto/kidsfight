@@ -20,7 +20,7 @@ jest.mock('phaser', () => {
           getData() { return false; }
           play() { return this; }
           anims = { stop: jest.fn() };
-          body = { velocity: { x: 0, y: 0 } };
+          body = { velocity: { x: 0, y: 0 }, setGravityY: jest.fn().mockReturnThis() };
         }
       }
     },

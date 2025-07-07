@@ -28,6 +28,13 @@ describe('Attack animation timing', () => {
       create: jest.fn(),
       get: jest.fn()
     } as any;
+    // Mock time for delayedCall
+    scene.time = {
+      delayedCall: jest.fn((delay, callback) => {
+        setTimeout(callback, delay);
+        return { remove: jest.fn() };
+      })
+    } as any;
   });
 
   afterEach(() => {

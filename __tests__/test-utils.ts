@@ -23,6 +23,8 @@ export class MockText implements Partial<GameObjects.Text> {
   once = jest.fn().mockReturnThis();
   x = 0;
   y = 0;
+  setX = jest.fn().mockReturnThis();
+  setY = jest.fn().mockReturnThis();
   scene = {} as Phaser.Scene;
   type = 'Text';
   name = '';

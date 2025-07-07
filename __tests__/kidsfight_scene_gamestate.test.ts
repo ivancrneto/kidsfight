@@ -1148,6 +1148,30 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     });
 
     it('should handle player 1 win correctly', () => {
+      kidsFightScene.players = [
+        {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn(),
+            velocity: { x: 0, y: 0 }
+          }
+        },
+        {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn(),
+            velocity: { x: 0, y: 0 }
+          }
+        }
+      ];
       testEndGame(kidsFightScene, 0, 'Bento Venceu!');
       expect(kidsFightScene.players[0].setFrame).toHaveBeenCalledWith(3);
       expect(kidsFightScene.players[1].setAngle).toHaveBeenCalledWith(90);
@@ -1155,6 +1179,30 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     });
 
     it('should handle player 2 win correctly', () => {
+      kidsFightScene.players = [
+        {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn(),
+            velocity: { x: 0, y: 0 }
+          }
+        },
+        {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn(),
+            velocity: { x: 0, y: 0 }
+          }
+        }
+      ];
       testEndGame(kidsFightScene, 1, 'Davi R Venceu!');
       expect(kidsFightScene.players[1].setFrame).toHaveBeenCalledWith(3);
       expect(kidsFightScene.players[0].setAngle).toHaveBeenCalledWith(90);
@@ -1162,6 +1210,30 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     });
 
     it('should handle draw correctly', () => {
+      kidsFightScene.players = [
+        {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn(),
+            velocity: { x: 0, y: 0 }
+          }
+        },
+        {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn(),
+            velocity: { x: 0, y: 0 }
+          }
+        }
+      ];
       testEndGame(kidsFightScene, -1, 'Empate!');
       expect(kidsFightScene.players[0].setFrame).not.toHaveBeenCalled();
       expect(kidsFightScene.players[1].setFrame).not.toHaveBeenCalled();
@@ -1171,8 +1243,30 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
     });
 
     it('should reset player velocities on game over', () => {
-      kidsFightScene.players[0].body.velocity = {x: 100, y: 0};
-      kidsFightScene.players[1].body.velocity = {x: -50, y: 10};
+      kidsFightScene.players = [
+        {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn(),
+            velocity: { x: 100, y: 0 }
+          }
+        },
+        {
+          setFrame: jest.fn(),
+          setAngle: jest.fn(),
+          setVelocityX: jest.fn(),
+          setVelocityY: jest.fn(),
+          body: {
+            setVelocityX: jest.fn(),
+            setVelocityY: jest.fn(),
+            velocity: { x: -50, y: 10 }
+          }
+        }
+      ];
       testEndGame(kidsFightScene, 0, 'Bento Venceu!');
       expect(kidsFightScene.players[0].setVelocityX).toHaveBeenCalledWith(0);
       expect(kidsFightScene.players[0].setVelocityY).toHaveBeenCalledWith(0);

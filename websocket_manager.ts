@@ -348,6 +348,25 @@ class WebSocketManager {
     this._onConnectionCallback = callback;
   }
 
+  /**
+   * Send arbitrary JSON message over the WebSocket
+   */
+  public send(message: WebSocketMessage): boolean {
+    if (!this.isConnected()) {
+      console.error('[WSM] Cannot send message - not connected');
+      return false;
+    }
+    try {
+      const messageString = JSON.stringify(message);
+      this._ws!.send(messageString);
+      console.log('[WSM] Sent message:', message);
+      return true;
+    } catch (error) {
+      console.error('[WSM] Error sending message:', error);
+      return false;
+    }
+  }
+
   public sendHealthUpdate(playerIndex: number, health: number): boolean {
     if (!this.isConnected()) {
       console.error('[WSM] Cannot send health update - not connected');
