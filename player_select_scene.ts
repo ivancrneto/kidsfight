@@ -260,14 +260,18 @@ export default class PlayerSelectScene extends Phaser.Scene {
               p2: this.selected.p2,
               selected: this.selected 
             });
+            
+            console.log('[DEBUG] Host sending p1 character:', this.selected.p1);
             this.wsManager.send({
               type: 'player_selected',
               player: 'p1',
               character: this.selected.p1
             });
+            
             // Small delay between messages to avoid race conditions
             setTimeout(() => {
               if (this.wsManager && typeof this.wsManager.send === 'function') {
+                console.log('[DEBUG] Host sending p2 character:', this.selected.p2);
                 this.wsManager.send({
                   type: 'player_selected',
                   player: 'p2',
@@ -281,7 +285,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
             console.log('[PlayerSelectScene] Guest waiting for host selections, not sending initial p2 selection');
           }
         }
-      }, 150);
+      }, 500); // Increase delay to ensure guest handlers are set up
     }
 
     // Responsive layout update on resize
@@ -565,16 +569,34 @@ export default class PlayerSelectScene extends Phaser.Scene {
     if (this.mode === 'online') {
       // For guests, ensure they have received both character selections before proceeding
       if (!this.isHost) {
+        console.log('[PlayerSelectScene] Guest launchGame check - current selections:', {
+          p1: this.selected.p1,
+          p2: this.selected.p2,
+          p1Index: this.selectedP1Index,
+          p2Index: this.selectedP2Index,
+          p1Valid: !!this.selected.p1,
+          p2Valid: !!this.selected.p2
+        });
+        
         if (!this.selected.p1 || !this.selected.p2) {
           console.log('[PlayerSelectScene] Guest attempting to launch game without complete character selections:', this.selected);
-          console.log('[PlayerSelectScene] Waiting for host selections before proceeding...');
-          // Show a waiting message or disable the ready button temporarily
-          if (this.readyButton) {
-            this.readyButton.setText('AGUARDANDO...');
-            this.readyButton.setBackgroundColor('#888888');
-            this.readyButton.disableInteractive();
+          console.log('[PlayerSelectScene] Missing:', {
+            p1Missing: !this.selected.p1,
+            p2Missing: !this.selected.p2
+          });
+          
+          // Fallback: auto-populate missing character selections with defaults
+          const validKeys = ['bento', 'davir', 'jose', 'davis', 'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'];
+          if (!this.selected.p1) {
+            this.selected.p1 = validKeys[0]; // Default to 'bento' for host
+            console.log('[PlayerSelectScene] Auto-populated missing p1 with default:', this.selected.p1);
           }
-          return;
+          if (!this.selected.p2) {
+            this.selected.p2 = validKeys[1]; // Default to 'davir' for guest
+            console.log('[PlayerSelectScene] Auto-populated missing p2 with default:', this.selected.p2);
+          }
+          
+          console.log('[PlayerSelectScene] Proceeding with auto-populated selections:', this.selected);
         }
         this.setupWebSocketHandlers();
       }

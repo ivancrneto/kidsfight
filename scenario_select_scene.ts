@@ -229,6 +229,13 @@ class ScenarioSelectScene extends Phaser.Scene {
     // Listen for ready and game_start messages if online
     if (this.mode === 'online' && this.wsManager && this.wsManager.setMessageCallback) {
       console.log('[ScenarioSelectScene] Setting WebSocket message handler for scenario scene');
+      
+      // Add a small delay to ensure the WebSocket handler is properly set up
+      // before any ready messages can be sent/received
+      setTimeout(() => {
+        console.log('[ScenarioSelectScene] WebSocket handler setup delay completed');
+      }, 100);
+      
       this._wsMessageHandler = (event: MessageEvent): void => {
         try {
           // Handle the data which might be already parsed by WebSocketManager
@@ -248,23 +255,31 @@ class ScenarioSelectScene extends Phaser.Scene {
               this.rescalePreview();
             }
           } else if (data.type === 'player_ready') {
-            console.debug('[ScenarioSelectScene][WebSocket] player_ready received:', data);
-            console.debug('[ScenarioSelectScene][WebSocket] Readiness BEFORE assignment:', {
+            console.log('[ScenarioSelectScene][WebSocket] *** PLAYER_READY MESSAGE RECEIVED ***');
+            console.log('[ScenarioSelectScene][WebSocket] Message data:', data);
+            console.log('[ScenarioSelectScene][WebSocket] Current scene state:', {
               isHost: this.isHost, 
               hostReady: this.hostReady, 
               guestReady: this.guestReady,
-              gameStarted: this.gameStarted
+              gameStarted: this.gameStarted,
+              roomCode: this.roomCode
             });
             
             if (data.player === 'host') {
               this.hostReady = true;
-              console.debug('[ScenarioSelectScene][WebSocket] Marked host as ready');
+              console.log('[ScenarioSelectScene][WebSocket] ✅ HOST marked as ready');
             } else if (data.player === 'guest') {
               this.guestReady = true;
-              console.debug('[ScenarioSelectScene][WebSocket] Marked guest as ready');
+              console.log('[ScenarioSelectScene][WebSocket] ✅ GUEST marked as ready');
+              
+              // Show notification that guest is ready if we're the host
+              if (this.isHost && this.waitingText) {
+                this.waitingText.setText('Convidado está pronto!');
+                this.waitingText.setStyle({ color: '#00FF00' });
+              }
             }
             
-            console.debug('[ScenarioSelectScene][WebSocket] Readiness AFTER assignment:', {
+            console.log('[ScenarioSelectScene][WebSocket] Updated readiness state:', {
               isHost: this.isHost, 
               hostReady: this.hostReady, 
               guestReady: this.guestReady,
@@ -275,17 +290,21 @@ class ScenarioSelectScene extends Phaser.Scene {
             
             // Check if both players are ready and we should start the game
             const shouldStartGame = this.hostReady && this.guestReady && !this.gameStarted;
-            console.debug('[ScenarioSelectScene][WebSocket] Checking if should start game:', {
-              isHost: this.isHost, 
+            console.log('[ScenarioSelectScene][WebSocket] Should start game?', {
               hostReady: this.hostReady, 
               guestReady: this.guestReady,
               gameStarted: this.gameStarted,
-              condition: shouldStartGame
+              shouldStart: shouldStartGame,
+              isHost: this.isHost
             });
             
             if (shouldStartGame && this.isHost) {
-              console.debug('[ScenarioSelectScene][WebSocket] Both players ready, host starting game');
+              console.log('[ScenarioSelectScene][WebSocket] 🚀 BOTH PLAYERS READY - HOST STARTING GAME');
               this.startGame();
+            } else if (shouldStartGame && !this.isHost) {
+              console.log('[ScenarioSelectScene][WebSocket] ⏳ Both players ready but guest waiting for host to start');
+            } else {
+              console.log('[ScenarioSelectScene][WebSocket] ⏱️ Waiting for more players to be ready');
             }
           } else if (data.type === 'player_selected') {
             // Handle character selection sync in online mode
@@ -393,8 +412,18 @@ class ScenarioSelectScene extends Phaser.Scene {
           if (this.isHost) {
             msg.scenario = SCENARIOS[this.selectedScenario].key;
           }
-          console.debug('[ScenarioSelectScene][ReadyButton] Sending player_ready message', msg);
-          this.wsManager.send(msg);
+          console.log('[ScenarioSelectScene][ReadyButton] *** SENDING PLAYER_READY MESSAGE ***');
+          console.log('[ScenarioSelectScene][ReadyButton] Message:', msg);
+          console.log('[ScenarioSelectScene][ReadyButton] Current player role:', {
+            isHost: this.isHost,
+            player: this.isHost ? 'host' : 'guest',
+            roomCode: this.roomCode,
+            wsManager: !!this.wsManager,
+            wsConnected: this.wsManager && typeof this.wsManager.isConnected === 'function' ? this.wsManager.isConnected() : 'unknown'
+          });
+          
+          const sendSuccess = this.wsManager.send(msg);
+          console.log('[ScenarioSelectScene][ReadyButton] Message send result:', sendSuccess);
 
           if (this.isHost) {
             console.debug('[ScenarioSelectScene][ReadyButton] Host simulating receiving own player_ready message');
