@@ -19,6 +19,7 @@ const getCharacterName = 'getCharacterName';
 interface PlayerProps {
   isAttacking: boolean;
   isBlocking: boolean;
+  isSpecialAttacking: boolean;
   health: number;
   special: number;
   direction: 'left' | 'right';
@@ -37,6 +38,7 @@ interface Player extends Phaser.Physics.Arcade.Sprite, PlayerProps {
   special: number;
   isBlocking: boolean;
   isAttacking: boolean;
+  isSpecialAttacking: boolean;
   direction: 'left' | 'right';
   walkAnimData?: {
     frameTime: number;
@@ -1226,14 +1228,6 @@ export default class KidsFightScene extends Phaser.Scene {
     const defender = this.players?.[defenderIdx];
     if (!attacker || !defender) return; // players not ready
 
-    // Check attack distance - players must be close enough to attack
-    const attackDistance = Math.abs(attacker.x - defender.x);
-    const maxAttackDistance = isSpecial ? 200 : 150; // Increased range for better gameplay
-    if (attackDistance > maxAttackDistance) {
-      console.log('[SCENE][DEBUG] Attack blocked - too far away:', attackDistance, 'max:', maxAttackDistance);
-      return; // Too far away to attack
-    }
-
     // Special action requires at least 3 pips
     if (isSpecial) {
       const currentPips = this.playerSpecial?.[playerIndex] ?? 0;
@@ -1245,8 +1239,31 @@ export default class KidsFightScene extends Phaser.Scene {
       }
     }
 
+    // Always play attack animation regardless of distance
+    attacker.isAttacking = true;
+    if (attacker.setData && typeof attacker.setData === 'function') {
+      attacker.setData('isAttacking', true);
+    }
+    if (isSpecial) {
+      attacker.isSpecialAttacking = true;
+      if (attacker.setData && typeof attacker.setData === 'function') {
+        attacker.setData('isSpecialAttacking', true);
+      }
+    }
+
+    // Check attack distance - damage only applies within short range
+    const attackDistance = Math.abs(attacker.x - defender.x);
+    const maxAttackDistance = isSpecial ? 120 : 80; // Short range for actual damage
     const now = Date.now();
-    this.tryAttack(playerIndex, defenderIdx, now, isSpecial);
+    
+    if (attackDistance <= maxAttackDistance) {
+      // Close enough for damage
+      console.log('[SCENE][DEBUG] Attack hit - within range:', attackDistance, 'max:', maxAttackDistance);
+      this.tryAttack(playerIndex, defenderIdx, now, isSpecial);
+    } else {
+      // Too far for damage, but animation still plays
+      console.log('[SCENE][DEBUG] Attack animation only - too far for damage:', attackDistance, 'max:', maxAttackDistance);
+    }
   }
 
   /**
@@ -2395,6 +2412,12 @@ export default class KidsFightScene extends Phaser.Scene {
       });
     } else if (isSpecial) {
       this.setSafeFrame(player, 6);
+      this.time.delayedCall(300, () => {
+        this.setSafeFrame(player, 0);
+        player.isSpecialAttacking = false;
+        if (player.getData && typeof player.setData === 'function') player.setData('isSpecialAttacking', false);
+        player.anims?.stop?.();
+      });
     } else if (isBlocking) {
       this.setSafeFrame(player, 5);
     } else if (isMoving) {

@@ -175,14 +175,16 @@ describe('KidsFightScene - Special Attack', () => {
         setData: jest.fn(),
         body: { blocked: { down: true } },
         setVelocityX: jest.fn(),
-        setVelocityY: jest.fn()
+        setVelocityY: jest.fn(),
+        x: 100
       };
       const mockPlayer2 = { 
         health: 100, 
         setData: jest.fn(),
         body: { blocked: { down: true } },
         setVelocityX: jest.fn(),
-        setVelocityY: jest.fn()
+        setVelocityY: jest.fn(),
+        x: 150 // 50px apart, within special attack range
       };
       
       // Set up scene state

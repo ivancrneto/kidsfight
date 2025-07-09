@@ -45,6 +45,9 @@ describe('KidsFightScene Comprehensive', () => {
     });
     it('consumes all pips and updates UI on special', () => {
       scene.playerSpecial[0] = 3;
+      // Position players within special attack range (120px)
+      scene.players[0].x = 100;
+      scene.players[1].x = 150; // 50px apart, within range
       const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
   // @ts-ignore
   return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
@@ -94,8 +97,8 @@ describe('KidsFightScene Comprehensive', () => {
     it('does not apply negative or excessive damage', () => {
       // Set up test with initial health and proper player objects
       scene.players = [
-        { health: 100, setData: jest.fn(), body: { blocked: { down: false } } },
-        { health: 100, setData: jest.fn(), body: { blocked: { down: false } } }
+        { health: 100, setData: jest.fn(), body: { blocked: { down: false } }, x: 100 },
+        { health: 100, setData: jest.fn(), body: { blocked: { down: false } }, x: 140 } // 40px apart, within range
       ];
       scene.playerHealth = [100, 100];
       (scene as any).playerSpecial = [3, 0]; // Full special meter

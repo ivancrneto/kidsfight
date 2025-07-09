@@ -97,8 +97,8 @@ describe('KidsFightScene Health & Damage Logic', () => {
     
     // Set up players and game state
     scene.players = [
-      { health: 100, setData: jest.fn(), body: { blocked: { down: false } } },
-      { health: 100, setData: jest.fn(), body: { blocked: { down: false } } }
+      { health: 100, setData: jest.fn(), body: { blocked: { down: false } }, x: 100 },
+      { health: 100, setData: jest.fn(), body: { blocked: { down: false } }, x: 140 } // 40px apart, within range
     ];
     scene.playerHealth = [100, 100];
     (scene as any).playerSpecial = [3, 0]; // Full special meter

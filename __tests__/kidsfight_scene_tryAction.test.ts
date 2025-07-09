@@ -50,6 +50,9 @@ describe('KidsFightScene.tryAction', () => {
 
   it('should consume all pips and call tryAttack for special', () => {
     scene.playerSpecial[0] = 3;
+    // Position players within special attack range (120px)
+    scene.players[0].x = 100;
+    scene.players[1].x = 150; // 50px apart, within range
     const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
   // @ts-ignore
   return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
@@ -62,6 +65,9 @@ describe('KidsFightScene.tryAction', () => {
   });
 
   it('should call tryAttack for normal attack', () => {
+    // Position players within normal attack range (80px)
+    scene.players[0].x = 100;
+    scene.players[1].x = 140; // 40px apart, within range
     const spy = jest.spyOn(scene, 'tryAttack').mockImplementation(function (...args) {
   // @ts-ignore
   return Object.getPrototypeOf(scene).tryAttack.apply(this, args);
