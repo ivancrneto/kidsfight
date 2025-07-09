@@ -1226,6 +1226,14 @@ export default class KidsFightScene extends Phaser.Scene {
     const defender = this.players?.[defenderIdx];
     if (!attacker || !defender) return; // players not ready
 
+    // Check attack distance - players must be close enough to attack
+    const attackDistance = Math.abs(attacker.x - defender.x);
+    const maxAttackDistance = isSpecial ? 200 : 150; // Increased range for better gameplay
+    if (attackDistance > maxAttackDistance) {
+      console.log('[SCENE][DEBUG] Attack blocked - too far away:', attackDistance, 'max:', maxAttackDistance);
+      return; // Too far away to attack
+    }
+
     // Special action requires at least 3 pips
     if (isSpecial) {
       const currentPips = this.playerSpecial?.[playerIndex] ?? 0;
@@ -1294,13 +1302,21 @@ export default class KidsFightScene extends Phaser.Scene {
     if (special) {
       // Flag special attacking state for animation/tests
       attacker.setData?.('isSpecialAttacking', true);
+      
+      // Increase z-index temporarily for special attack visual priority
+      const originalDepth = attacker.depth || 1;
+      attacker.setDepth?.(10); // High depth to appear above other players
+      
       if (typeof setTimeout === 'function') {
         setTimeout(() => {
           attacker.setData?.('isSpecialAttacking', false);
+          // Restore original depth
+          attacker.setDepth?.(originalDepth);
         }, 300);
       } else {
         // Environment without timers – immediately reset flag
         attacker.setData?.('isSpecialAttacking', false);
+        attacker.setDepth?.(originalDepth);
       }
 
       // Consume 3 pips for special attack
@@ -1478,6 +1494,12 @@ export default class KidsFightScene extends Phaser.Scene {
         }
         break;
       }
+      case 'game_restart': {
+        // Hide any existing popups and restart the game
+        this.hideReplayPopup();
+        this.scene.restart();
+        break;
+      }
     }
   }
 
@@ -1525,13 +1547,36 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Event listeners
     acceptButton.on('pointerdown', () => {
-      this.wsManager?.sendReplayResponse('rematch', true);
-      this.scene.restart();
+      if (this.roomCode && this.wsManager) {
+        const success = this.wsManager.sendReplayResponse(this.roomCode, true, {
+          gameMode: this.gameMode,
+          isHost: this.isHost,
+          selectedScenario: this.selectedScenario,
+          selected: this.selected
+        });
+        if (success) {
+          this.hideReplayPopup();
+          // Restart the scene with the current configuration
+          this.scene.restart();
+        } else {
+          console.error('[KidsFightScene] Failed to send rematch response');
+        }
+      } else {
+        console.error('[KidsFightScene] Cannot send rematch response: missing roomCode or wsManager');
+      }
     });
 
     declineButton.on('pointerdown', () => {
-      this.wsManager?.sendReplayResponse('rematch', false);
-      this.hideReplayPopup();
+      if (this.roomCode && this.wsManager) {
+        const success = this.wsManager.sendReplayResponse(this.roomCode, false);
+        if (success) {
+          this.hideReplayPopup();
+        } else {
+          console.error('[KidsFightScene] Failed to send rematch decline');
+        }
+      } else {
+        console.error('[KidsFightScene] Cannot send rematch decline: missing roomCode or wsManager');
+      }
     });
 
     this.replayPopupElements = [bg, text, acceptButton, declineButton];
@@ -2169,11 +2214,45 @@ export default class KidsFightScene extends Phaser.Scene {
     if (this.players?.length >= 2) {
       const [p1, p2] = this.players;
       if (winnerIndex === 0) {
+        // Player 1 wins - celebrate with animation and scale effect
         p1?.setFrame?.(3);
+        p1?.setScale?.(0.5); // Make winner bigger
+        p1?.setDepth?.(10); // Bring winner to front
+        // Add celebration animation loop
+        if (p1 && typeof this.time?.addEvent === 'function') {
+          this.time.addEvent({
+            delay: 500,
+            callback: () => {
+              if (p1?.setFrame) {
+                p1.setFrame(Math.random() > 0.5 ? 0 : 3); // Alternate between idle and celebration frames
+              }
+            },
+            repeat: 5
+          });
+        }
+        // Loser falls down
         p2?.setAngle?.(90);
+        p2?.setDepth?.(1); // Send loser to back
       } else if (winnerIndex === 1) {
+        // Player 2 wins - celebrate with animation and scale effect
         p2?.setFrame?.(3);
+        p2?.setScale?.(0.5); // Make winner bigger
+        p2?.setDepth?.(10); // Bring winner to front
+        // Add celebration animation loop
+        if (p2 && typeof this.time?.addEvent === 'function') {
+          this.time.addEvent({
+            delay: 500,
+            callback: () => {
+              if (p2?.setFrame) {
+                p2.setFrame(Math.random() > 0.5 ? 0 : 3); // Alternate between idle and celebration frames
+              }
+            },
+            repeat: 5
+          });
+        }
+        // Loser falls down
         p1?.setAngle?.(90);
+        p1?.setDepth?.(1); // Send loser to back
       }
     }
 
@@ -2205,7 +2284,19 @@ export default class KidsFightScene extends Phaser.Scene {
           padding: {left: 10, right: 10, top: 5, bottom: 5}
         })?.setOrigin?.(0.5)?.setInteractive?.();
         replayButton?.on?.('pointerdown', () => {
-          this.wsManager?.sendReplayRequest?.('game', 'player', {});
+          if (this.roomCode && this.wsManager) {
+            const success = this.wsManager.sendReplayRequest(this.roomCode, this.localPlayerIndex.toString(), {
+              gameMode: this.gameMode,
+              isHost: this.isHost,
+              selectedScenario: this.selectedScenario,
+              selected: this.selected
+            });
+            if (!success) {
+              console.error('[KidsFightScene] Failed to send rematch request');
+            }
+          } else {
+            console.error('[KidsFightScene] Cannot send rematch request: missing roomCode or wsManager');
+          }
         });
       } else {
         const replayButton = this.add?.text?.(centerX, centerY + 30, 'Play Again', {

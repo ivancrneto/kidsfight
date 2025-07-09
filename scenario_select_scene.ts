@@ -244,15 +244,26 @@ class ScenarioSelectScene extends Phaser.Scene {
           
           if (data.type === 'scenario_selected' && !this.isHost) {
             // Update the preview to match the host's selection
-            console.debug('[ScenarioSelectScene][WebSocket] Guest received scenario selection from host:', data.scenario);
+            console.log('[ScenarioSelectScene][WebSocket] *** GUEST RECEIVED SCENARIO SELECTION ***');
+            console.log('[ScenarioSelectScene][WebSocket] Current selectedScenario:', this.selectedScenario);
+            console.log('[ScenarioSelectScene][WebSocket] Host selected scenario:', data.scenario);
             
             // Find the index of the scenario by key
             const scenarioIndex = SCENARIOS.findIndex(s => s.key === data.scenario);
             if (scenarioIndex !== -1) {
               this.selectedScenario = scenarioIndex;
-              console.debug('[ScenarioSelectScene][WebSocket] Guest updated scenario preview to:', data.scenario);
+              console.log('[ScenarioSelectScene][WebSocket] ✅ Guest updated scenario preview to:', data.scenario, 'index:', scenarioIndex);
               this.preview.setTexture(data.scenario);
               this.rescalePreview();
+              
+              // Update waiting text to show which scenario was selected
+              if (this.waitingText) {
+                const scenarioName = SCENARIOS[scenarioIndex].name;
+                this.waitingText.setText(`Cenário selecionado: ${scenarioName}`);
+                this.waitingText.setStyle({ color: '#00FF00' });
+              }
+            } else {
+              console.error('[ScenarioSelectScene][WebSocket] ❌ Invalid scenario key received:', data.scenario);
             }
           } else if (data.type === 'player_ready') {
             console.log('[ScenarioSelectScene][WebSocket] *** PLAYER_READY MESSAGE RECEIVED ***');
@@ -613,8 +624,8 @@ class ScenarioSelectScene extends Phaser.Scene {
         p1: finalP1,
         p2: finalP2,
         selected: { p1: finalP1, p2: finalP2 },
-        scenario: data.scenario || 'scenario1',
-        selectedScenario: data.scenario || 'scenario1',
+        scenario: data.scenario || SCENARIOS[this.selectedScenario].key,
+        selectedScenario: data.scenario || SCENARIOS[this.selectedScenario].key,
         wsManager: this.wsManager
       });
     } catch (e) {

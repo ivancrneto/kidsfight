@@ -179,14 +179,9 @@ server.on('connection', (ws) => {
         case 'scenario_selected':
           const scRoom = gameRooms.get(roomCode);
           if (!scRoom) return;
-          // Forward scenario selection to both players
-          if (scRoom.host) {
-            scRoom.host.send(JSON.stringify({
-              type: 'scenario_selected',
-              scenario: data.scenario,
-              roomCode: data.roomCode
-            }));
-          }
+          // Store scenario in game state
+          scRoom.gameState.scenario = data.scenario;
+          // Forward scenario selection to client only (not back to host)
           if (scRoom.client) {
             scRoom.client.send(JSON.stringify({
               type: 'scenario_selected',
@@ -275,6 +270,61 @@ server.on('connection', (ws) => {
           }
           break;
       
+        case 'replay_request': {
+          const replayRoom = gameRooms.get(roomCode);
+          if (!replayRoom) return;
+          // Forward replay request to the other player
+          const target = isHost ? replayRoom.client : replayRoom.host;
+          if (target) {
+            target.send(JSON.stringify({
+              type: 'replay_request',
+              matchId: data.matchId,
+              playerId: data.playerId,
+              roomCode: roomCode
+            }));
+          }
+          break;
+        }
+        
+        case 'replay_response': {
+          const replayRoom = gameRooms.get(roomCode);
+          if (!replayRoom) return;
+          // Forward replay response to the other player
+          const target = isHost ? replayRoom.client : replayRoom.host;
+          if (target) {
+            target.send(JSON.stringify({
+              type: 'replay_response',
+              matchId: data.matchId,
+              accepted: data.accepted,
+              roomCode: roomCode
+            }));
+          }
+          // If accepted, both players should restart the game
+          if (data.accepted) {
+            // Reset game state
+            replayRoom.gameState.p1.ready = false;
+            replayRoom.gameState.p2.ready = false;
+            replayRoom.gameState.p1.hits = 0;
+            replayRoom.gameState.p2.hits = 0;
+            replayRoom.gameState.p1.specialEnabled = false;
+            replayRoom.gameState.p2.specialEnabled = false;
+            // Send restart signal to both players
+            if (replayRoom.host) {
+              replayRoom.host.send(JSON.stringify({
+                type: 'game_restart',
+                roomCode: roomCode
+              }));
+            }
+            if (replayRoom.client) {
+              replayRoom.client.send(JSON.stringify({
+                type: 'game_restart',
+                roomCode: roomCode
+              }));
+            }
+          }
+          break;
+        }
+        
         // --- RELAY ALL OTHER GAMEPLAY MESSAGES ---
         default: {
           const relayRoom = gameRooms.get(roomCode);
