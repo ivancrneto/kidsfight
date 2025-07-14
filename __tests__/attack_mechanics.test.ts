@@ -76,9 +76,9 @@ describe('Attack Mechanics', () => {
 
   describe('Damage Application Based on Distance', () => {
     test('should apply damage when players are within normal attack range', () => {
-      // Set players within normal attack range (80px)
+      // Set players within normal attack range (40px)
       mockPlayer1.x = 100;
-      mockPlayer2.x = 150; // 50px apart, within 80px range
+      mockPlayer2.x = 130; // 30px apart, within 40px range
       
       const initialHealth = scene.playerHealth[1];
       
@@ -90,9 +90,9 @@ describe('Attack Mechanics', () => {
     });
 
     test('should apply damage when players are within special attack range', () => {
-      // Set players within special attack range (120px)
+      // Set players within special attack range (60px)
       mockPlayer1.x = 100;
-      mockPlayer2.x = 200; // 100px apart, within 120px range
+      mockPlayer2.x = 150; // 50px apart, within 60px range
       scene.playerSpecial[0] = 3; // Set special pips to 3
       
       const initialHealth = scene.playerHealth[1];

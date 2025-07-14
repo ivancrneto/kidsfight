@@ -211,6 +211,19 @@ const createTestScene = () => {
     on: jest.fn()
   };
 
+  // Mock the add property with text support
+  sceneAny.add = sceneAny.add || {};
+  sceneAny.add.text = jest.fn(() => ({
+    setOrigin: jest.fn().mockReturnThis(),
+    setInteractive: jest.fn().mockReturnThis(),
+    setStyle: jest.fn().mockReturnThis(),
+    setText: jest.fn().mockReturnThis(),
+    setDepth: jest.fn().mockReturnThis(),
+    setScrollFactor: jest.fn().mockReturnThis(),
+    on: jest.fn().mockReturnThis(),
+    destroy: jest.fn().mockReturnThis()
+  }));
+
   return {scene: testScene, sceneAny};
 }
 

@@ -63,7 +63,7 @@ describe('KidsFightScene Touch Controls Layout', () => {
     expect(createdShapes[2].color).toBe(0x44ff44); // jump
     // Action colors
     expect(createdShapes[3].color).toBe(0xff4444); // attack
-    expect(createdShapes[4].color).toBe(0xff44ff); // special
-    expect(createdShapes[5].color).toBe(0xffff44); // block
+    expect(createdShapes[4].color).toBe(0xffff44); // block
+    expect(createdShapes[5].color).toBe(0xff44ff); // special
   });
 });

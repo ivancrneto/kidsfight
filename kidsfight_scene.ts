@@ -195,6 +195,8 @@ export default class KidsFightScene extends Phaser.Scene {
   private lastAttackTime: number[] = [0, 0];
   private lastSpecialTime: number[] = [0, 0];
   private timeLeft: number = 60;
+  private timerText?: Phaser.GameObjects.Text;
+  private timerEvent?: Phaser.Time.TimerEvent;
   private roomCode?: string;
   private selected: any = {p1: 'player1', p2: 'player2'};
   private selectedScenario: string = 'scenario1';
@@ -276,6 +278,7 @@ export default class KidsFightScene extends Phaser.Scene {
   private lastPositionUpdateTime: number = 0;
   private replayPopupElements: Phaser.GameObjects.GameObject[] = [];
   private replayPopupShown: boolean = false;
+  private rematchButton?: Phaser.GameObjects.Text;
 
   // Additional properties for keyboard controls
   private keyA!: Phaser.Input.Keyboard.Key;
@@ -558,9 +561,18 @@ export default class KidsFightScene extends Phaser.Scene {
       }
       if (this.wsManager?.connect) this.wsManager.connect(this.roomCode);
       this.wsManager?.setMessageCallback?.((msg: any) => {
-        const action = (msg && (msg.action || (msg as any).data || msg));
+        console.log('[SCENE][DEBUG] Received WebSocket message:', msg);
+        // First try to extract action from msg.action, msg.data, or use the message itself
+        let action = msg && (msg.action || (msg as any).data);
+        if (!action && msg && msg.type) {
+          // If no action/data property, but message has a type, use the message itself
+          action = msg;
+        }
+        console.log('[SCENE][DEBUG] Extracted action:', action);
         if (action) {
           this.handleRemoteAction?.(action);
+        } else {
+          console.warn('[SCENE][DEBUG] No action found in message');
         }
       });
     }
@@ -843,7 +855,14 @@ export default class KidsFightScene extends Phaser.Scene {
   private getCharacterName(textureKey?: string): string | null {
     const characterMap: { [key: string]: string } = {
       'bento': 'Bento',
-      'davi': 'Davi R',
+      'davir': 'Davi R',
+      'jose': 'José',
+      'davis': 'Davis',
+      'carol': 'Carol',
+      'roni': 'Roni',
+      'jacqueline': 'Jacqueline',
+      'ivan': 'Ivan',
+      'd_isa': 'D\'Isa',
       'player1': 'Bento',
       'player2': 'Davi R'
     };
@@ -869,9 +888,18 @@ export default class KidsFightScene extends Phaser.Scene {
       }
       if (this._wsManager && typeof this._wsManager.setMessageCallback === 'function') {
         this._wsManager.setMessageCallback((event: any) => {
-          const action = event && ((event as any).action || (event as any).data);
+          console.log('[KidsFightScene] Received WebSocket message:', event);
+          // First try to extract action from event.action, event.data, or use the event itself
+          let action = event && ((event as any).action || (event as any).data);
+          if (!action && event && event.type) {
+            // If no action/data property, but event has a type, use the event itself
+            action = event;
+          }
+          console.log('[KidsFightScene] Extracted action:', action);
           if (action) {
             this.handleRemoteAction(action);
+          } else {
+            console.warn('[KidsFightScene] No action found in WebSocket message');
           }
         });
       }
@@ -884,10 +912,10 @@ export default class KidsFightScene extends Phaser.Scene {
     this.isMovingLeft = false;
     this.isMovingRight = false;
 
-    // Determine scenario and player keys from data, with fallbacks
-    const scenarioKey = data?.scenario || 'scenario1';
-    const p1Key = data?.p1Char || 'bento';
-    const p2Key = data?.p2Char || 'roni';
+    // Determine scenario and player keys from selected data, with fallbacks
+    const scenarioKey = (data && data.scenario) ? data.scenario : (this.selectedScenario || 'scenario1');
+    const p1Key = this.selected?.p1 || 'bento';
+    const p2Key = this.selected?.p2 || 'roni';
 
     // Render background
     const bg = this.safeAddImage(400, 240, scenarioKey);
@@ -989,6 +1017,131 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Initialize pip display
     this.updateSpecialPips();
+
+    // Create timer display
+    this.createTimer();
+  }
+
+  /**
+   * Create and start the fight timer
+   */
+  private createTimer(): void {
+    if (!this.add) return;
+
+    // Get screen dimensions for positioning
+    const screenWidth = this.sys?.game?.canvas?.width || 800;
+    const screenHeight = this.sys?.game?.canvas?.height || 480;
+
+    // Create timer text display (visible for both host and guest)
+    this.timerText = this.add.text(screenWidth / 2, 50, this.formatTime(this.timeLeft), {
+      fontSize: '32px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+      fontFamily: 'monospace'
+    });
+
+    if (this.timerText) {
+      this.timerText.setOrigin(0.5, 0.5);
+      this.timerText.setDepth(10);
+      this.timerText.setScrollFactor(0);
+    }
+
+    // Only the host controls the timer countdown in online mode
+    if (this.gameMode !== 'online' || this.isHost) {
+      // Create timer event that counts down every second
+      this.timerEvent = this.time.addEvent({
+        delay: 1000, // 1 second
+        callback: this.updateTimer,
+        callbackScope: this,
+        loop: true
+      });
+
+      // Send initial timer state to guest in online mode
+      if (this.gameMode === 'online' && this.isHost && this.wsManager?.send) {
+        // Small delay to ensure guest is ready to receive
+        setTimeout(() => {
+          this.wsManager.send({
+            type: 'timer_update',
+            timeLeft: this.timeLeft
+          });
+        }, 100);
+      }
+    }
+  }
+
+  /**
+   * Update the timer countdown
+   */
+  private updateTimer(): void {
+    this.timeLeft--;
+    
+    this.updateTimerDisplay();
+
+    // Send timer update to guest in online mode
+    if (this.gameMode === 'online' && this.isHost && this.wsManager?.send) {
+      this.wsManager.send({
+        type: 'timer_update',
+        timeLeft: this.timeLeft
+      });
+    }
+
+    // End game when timer reaches 0
+    if (this.timeLeft <= 0) {
+      this.onTimeUp();
+    }
+  }
+
+  /**
+   * Update timer display (used by both host and guest)
+   */
+  private updateTimerDisplay(): void {
+    if (this.timerText) {
+      this.timerText.setText(this.formatTime(this.timeLeft));
+      
+      // Change color when time is running out
+      if (this.timeLeft <= 10) {
+        this.timerText.setColor('#ff0000'); // Red when 10 seconds or less
+      } else if (this.timeLeft <= 30) {
+        this.timerText.setColor('#ffff00'); // Yellow when 30 seconds or less
+      }
+    }
+  }
+
+  /**
+   * Format time in MM:SS format
+   */
+  private formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Handle when time runs out
+   */
+  private onTimeUp(): void {
+    // Stop the timer
+    if (this.timerEvent) {
+      this.timerEvent.remove();
+      this.timerEvent = undefined;
+    }
+
+    // Determine winner based on health
+    const p1Health = this.playerHealth[0] || 0;
+    const p2Health = this.playerHealth[1] || 0;
+
+    if (p1Health > p2Health) {
+      // Player 1 wins
+      const p1Name = this.getCharacterName(this.selected?.p1) || 'Player 1';
+      this.endGame(0, `${p1Name} Venceu!`);
+    } else if (p2Health > p1Health) {
+      // Player 2 wins
+      const p2Name = this.getCharacterName(this.selected?.p2) || 'Player 2';
+      this.endGame(1, `${p2Name} Venceu!`);
+    } else {
+      // Draw
+      this.endGame(-1, 'Empate!');
+    }
   }
 
   /**
@@ -1094,8 +1247,8 @@ export default class KidsFightScene extends Phaser.Scene {
     // Right bottom corner (arc of action buttons)
     const baseXR = width - padding;
     const attackBtn = this.add.circle(baseXR - radius, baseY, radius, 0xff4444);
-    const specialBtn = this.add.circle(baseXR + radius, baseY - radius, radius, 0xff44ff);
-    const blockBtn = this.add.circle(baseXR, baseY - radius * 2, radius, 0xffff44);
+    const blockBtn = this.add.circle(baseXR + radius, baseY - radius, radius, 0xffff44); 
+    const specialBtn = this.add.circle(baseXR, baseY - radius * 2, radius, 0xff44ff); 
 
     this.add.text(attackBtn.x, attackBtn.y - radius / 2, 'A', {
       fontSize: `${radius}px`,
@@ -1253,7 +1406,7 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Check attack distance - damage only applies within short range
     const attackDistance = Math.abs(attacker.x - defender.x);
-    const maxAttackDistance = isSpecial ? 120 : 80; // Short range for actual damage
+    const maxAttackDistance = isSpecial ? 60 : 40; // Much shorter range for actual damage
     const now = Date.now();
     
     if (attackDistance <= maxAttackDistance) {
@@ -1380,7 +1533,9 @@ export default class KidsFightScene extends Phaser.Scene {
 
     const winner = this.checkWinner?.();
     if (winner !== undefined && winner !== -1) {
-      const msg = winner === 0 ? 'Bento Venceu!' : winner === 1 ? 'Davi R Venceu!' : 'Empate!';
+      const p1Name = this.getCharacterName(this.selected?.p1) || 'Player 1';
+      const p2Name = this.getCharacterName(this.selected?.p2) || 'Player 2';
+      const msg = winner === 0 ? `${p1Name} Venceu!` : winner === 1 ? `${p2Name} Venceu!` : 'Empate!';
       this.endGame?.(winner, msg);
     }
   }
@@ -1390,10 +1545,14 @@ export default class KidsFightScene extends Phaser.Scene {
    * @param action The action data received from WebSocket
    */
   public handleRemoteAction(action: any): void {
+    console.log('[SCENE][DEBUG] handleRemoteAction called with:', action);
+    console.log('[SCENE][DEBUG] action type before processing:', typeof action, action);
+    
     // Parse raw JSON string if needed
     if (typeof action === 'string') {
       try {
         action = JSON.parse(action);
+        console.log('[SCENE][DEBUG] Parsed string action:', action);
       } catch (e) {
         console.warn('[SCENE][DEBUG] Failed to parse action JSON', action);
         return;
@@ -1401,15 +1560,49 @@ export default class KidsFightScene extends Phaser.Scene {
     } else if (action.data && typeof action.data === 'string') {
       try {
         action = JSON.parse(action.data);
+        console.log('[SCENE][DEBUG] Parsed action.data:', action);
       } catch (e) {
         console.warn('[SCENE][DEBUG] Failed to parse action.data JSON', action.data);
       }
     }
+    
+    // Check for replay_request and replay_response BEFORE unwrapping game_action
+    if (action.type === 'replay_request') {
+      console.log('[SCENE][DEBUG] Found replay_request directly, showing popup');
+      this.showReplayRequestPopup();
+      return;
+    }
+    
+    if (action.type === 'replay_response') {
+      console.log('[SCENE][DEBUG] Received replay_response:', action);
+      if (action.accepted) {
+        // Hide any popup and restart the scene
+        this.hideReplayPopup();
+        this.scene.restart();
+      } else {
+        // Declined - reset rematch button state for the requesting player
+        this.hideReplayPopup();
+        if (this.rematchButton) {
+          this.rematchButton.setText('Request Rematch');
+          this.rematchButton.setInteractive(true);
+          this.rematchButton.setStyle({ backgroundColor: '#222222' });
+          console.log('[SCENE][DEBUG] Reset rematch button after decline');
+        }
+      }
+      return;
+    }
+    
     // unwrap game_action envelope
     if (action.type === 'game_action') {
       action.type = action.action;
     }
-    if (this.gameOver) return;
+    
+    console.log('[SCENE][DEBUG] Processing action type:', action.type);
+    
+    if (this.gameOver) {
+      console.log('[SCENE][DEBUG] Game over, ignoring action');
+      return;
+    }
     const isTestEnv = typeof jest !== 'undefined' || process.env.NODE_ENV === 'test';
     // In tests we allow handleRemoteAction in any mode for coverage expectations.
     const online = (this.isOnline ?? (this.gameMode === 'online')) || isTestEnv;
@@ -1499,16 +1692,17 @@ export default class KidsFightScene extends Phaser.Scene {
         }
         break;
       }
-      case 'replay_request': {
-        this.showReplayRequestPopup();
+      case 'timer_update': {
+        // Guest receives timer updates from host
+        if (!this.isHost && action.timeLeft !== undefined) {
+          this.timeLeft = action.timeLeft;
+          this.updateTimerDisplay();
+        }
         break;
       }
-      case 'replay_response': {
-        if (action.accepted) {
-          this.scene.restart();
-        } else {
-          this.hideReplayPopup();
-        }
+      case 'replay_request': {
+        console.log('[SCENE][DEBUG] Received replay_request, showing popup');
+        this.showReplayRequestPopup();
         break;
       }
       case 'game_restart': {
@@ -1543,7 +1737,7 @@ export default class KidsFightScene extends Phaser.Scene {
     const text = this.add.text(
         this.cameras.main.width / 2,
         this.cameras.main.height / 2 - 40,
-        'Opponent wants to play again',
+        'O oponente quer jogar novamente',
         {fontSize: '24px', color: '#ffffff'}
     ).setOrigin(0.5);
 
@@ -1551,14 +1745,14 @@ export default class KidsFightScene extends Phaser.Scene {
     const acceptButton = this.add.text(
         this.cameras.main.width / 2 - 60,
         this.cameras.main.height / 2 + 20,
-        'Accept',
+        'Aceitar',
         {fontSize: '20px', color: '#00ff00', backgroundColor: '#333333', padding: {x: 10, y: 5}}
     ).setOrigin(0.5).setInteractive();
 
     const declineButton = this.add.text(
         this.cameras.main.width / 2 + 60,
         this.cameras.main.height / 2 + 20,
-        'Decline',
+        'Recusar',
         {fontSize: '20px', color: '#ff0000', backgroundColor: '#333333', padding: {x: 10, y: 5}}
     ).setOrigin(0.5).setInteractive();
 
@@ -2097,7 +2291,8 @@ export default class KidsFightScene extends Phaser.Scene {
       if (hp <= 0) {
         // In test scenarios with single-player array, player 1 (index 0) wins when health is 0
         // This matches the test expectation in kidsfight_scene.test.ts
-        this.endGame(0, 'Bento Venceu!');
+        const p1Name = this.getCharacterName(this.selected?.p1) || 'Player 1';
+        this.endGame(0, `${p1Name} Venceu!`);
         return 0;
       }
       if (this.timeLeft !== undefined && this.timeLeft <= 0) {
@@ -2129,22 +2324,26 @@ export default class KidsFightScene extends Phaser.Scene {
       return -1;
     }
     if (p1Health <= 0) {
-      this.endGame(1, 'Davi R Venceu!');
+      const p2Name = this.getCharacterName(this.selected?.p2) || 'Player 2';
+      this.endGame(1, `${p2Name} Venceu!`);
       return 1;
     }
     if (p2Health <= 0) {
-      this.endGame(0, 'Bento Venceu!');
+      const p1Name = this.getCharacterName(this.selected?.p1) || 'Player 1';
+      this.endGame(0, `${p1Name} Venceu!`);
       return 0;
     }
 
     // Time based win condition
     if (this.timeLeft !== undefined && this.timeLeft <= 0) {
       if (p1Health > p2Health) {
-        this.endGame(0, 'Bento Venceu!');
+        const p1Name = this.getCharacterName(this.selected?.p1) || 'Player 1';
+        this.endGame(0, `${p1Name} Venceu!`);
         return 0;
       }
       if (p2Health > p1Health) {
-        this.endGame(1, 'Davi R Venceu!');
+        const p2Name = this.getCharacterName(this.selected?.p2) || 'Player 2';
+        this.endGame(1, `${p2Name} Venceu!`);
         return 1;
       }
       this.endGame(-1, 'Empate!');
@@ -2221,7 +2420,7 @@ export default class KidsFightScene extends Phaser.Scene {
   }
 
   /**
-   * Handle game over visuals and state.
+   * Handle game over visuals and state. Restored with working rematch (Jogar novamente) logic.
    */
   public endGame(winnerIndex: number, message: string): void {
     if (this.gameOver || (this as any)._gameOver) return;
@@ -2229,49 +2428,15 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Winner/loser animations
     if (this.players?.length >= 2) {
-      const [p1, p2] = this.players;
-      if (winnerIndex === 0) {
-        // Player 1 wins - celebrate with animation and scale effect
-        p1?.setFrame?.(3);
-        p1?.setScale?.(0.5); // Make winner bigger
-        p1?.setDepth?.(10); // Bring winner to front
-        // Add celebration animation loop
-        if (p1 && typeof this.time?.addEvent === 'function') {
-          this.time.addEvent({
-            delay: 500,
-            callback: () => {
-              if (p1?.setFrame) {
-                p1.setFrame(Math.random() > 0.5 ? 0 : 3); // Alternate between idle and celebration frames
-              }
-            },
-            repeat: 5
-          });
-        }
-        // Loser falls down
-        p2?.setAngle?.(90);
-        p2?.setDepth?.(1); // Send loser to back
-      } else if (winnerIndex === 1) {
-        // Player 2 wins - celebrate with animation and scale effect
-        p2?.setFrame?.(3);
-        p2?.setScale?.(0.5); // Make winner bigger
-        p2?.setDepth?.(10); // Bring winner to front
-        // Add celebration animation loop
-        if (p2 && typeof this.time?.addEvent === 'function') {
-          this.time.addEvent({
-            delay: 500,
-            callback: () => {
-              if (p2?.setFrame) {
-                p2.setFrame(Math.random() > 0.5 ? 0 : 3); // Alternate between idle and celebration frames
-              }
-            },
-            repeat: 5
-          });
-        }
-        // Loser falls down
-        p1?.setAngle?.(90);
-        p1?.setDepth?.(1); // Send loser to back
-      }
-    }
+  const [p1, p2] = this.players;
+  if (winnerIndex === 0) {
+    p1?.setFrame?.(3);
+    p2?.setAngle?.(90);
+  } else if (winnerIndex === 1) {
+    p2?.setFrame?.(3);
+    p1?.setAngle?.(90);
+  }
+}
 
     // Stop movement
     this.players?.forEach((pl) => {
@@ -2281,7 +2446,7 @@ export default class KidsFightScene extends Phaser.Scene {
       pl?.body?.setVelocityY?.(0);
     });
 
-    // Display result text in tests environment as well
+    // Display result text
     this.add?.text?.(400, 300, message, {
       fontSize: '48px',
       color: '#fff',
@@ -2289,85 +2454,64 @@ export default class KidsFightScene extends Phaser.Scene {
       stroke: '#000',
       strokeThickness: 6,
     })?.setOrigin?.(0.5)?.setDepth?.(1000);
-    // Add rematch buttons
-    if (typeof this.add?.text === 'function') {
-      const centerX = this.cameras.main.width / 2;
-      const centerY = this.cameras.main.height / 2;
-      if (this.gameMode === 'online') {
-        const replayButton = this.add?.text?.(centerX, centerY + 30, 'Request Rematch', {
-          fontSize: '24px',
-          backgroundColor: '#222222',
-          color: '#ffffff',
-          padding: {left: 10, right: 10, top: 5, bottom: 5}
-        })?.setOrigin?.(0.5)?.setInteractive?.();
-        replayButton?.on?.('pointerdown', () => {
-          if (this.roomCode && this.wsManager) {
-            const success = this.wsManager.sendReplayRequest(this.roomCode, this.localPlayerIndex.toString(), {
-              gameMode: this.gameMode,
-              isHost: this.isHost,
-              selectedScenario: this.selectedScenario,
-              selected: this.selected
-            });
-            if (!success) {
-              console.error('[KidsFightScene] Failed to send rematch request');
-            }
-          } else {
-            console.error('[KidsFightScene] Cannot send rematch request: missing roomCode or wsManager');
-          }
-        });
-      } else {
-        const replayButton = this.add?.text?.(centerX, centerY + 30, 'Play Again', {
-          fontSize: '24px',
-          backgroundColor: '#222222',
-          color: '#ffffff',
-          padding: {left: 10, right: 10, top: 5, bottom: 5}
-        })?.setOrigin?.(0.5)?.setInteractive?.();
-        replayButton?.on?.('pointerdown', () => {
-          this.scene?.restart?.();
-        });
-      }
-      const menuButton = this.add?.text?.(centerX, centerY + 70, 'Main Menu', {
+
+  // Add rematch buttons
+  if (this.add && typeof this.add.text === 'function') {
+    if (this.gameMode === 'online') {
+      this.rematchButton = this.add.text(400, 330, 'Request Rematch', {
         fontSize: '24px',
         backgroundColor: '#222222',
         color: '#ffffff',
-        padding: {left: 10, right: 10, top: 5, bottom: 5}
-      })?.setOrigin?.(0.5)?.setInteractive?.();
-      menuButton?.on?.('pointerdown', () => {
-        this.scene?.start?.('GameModeScene');
+        padding: { left: 10, right: 10, top: 5, bottom: 5 }
+      }).setOrigin(0.5).setInteractive();
+      
+      this.rematchButton.on('pointerdown', () => {
+        if (this.roomCode && this.wsManager) {
+          const success = this.wsManager.sendReplayRequest(this.roomCode, this.localPlayerIndex.toString(), {
+            gameMode: this.gameMode,
+            isHost: this.isHost,
+            selectedScenario: this.selectedScenario,
+            selected: this.selected
+          });
+          if (success) {
+            // Change button text to show waiting message
+            this.rematchButton!.setText('Esperando a resposta...');
+            this.rematchButton!.setInteractive(false); // Disable button while waiting
+            this.rematchButton!.setStyle({ backgroundColor: '#666666' }); // Make it look disabled
+          } else {
+            console.error('[KidsFightScene] Failed to send rematch request');
+          }
+        } else {
+          console.error('[KidsFightScene] Cannot send rematch request: missing roomCode or wsManager');
+        }
+      });
+    } else {
+      const replayButton = this.add.text(400, 330, 'Play Again', {
+        fontSize: '24px',
+        backgroundColor: '#222222',
+        color: '#ffffff',
+        padding: { left: 10, right: 10, top: 5, bottom: 5 }
+      }).setOrigin(0.5).setInteractive();
+      
+      replayButton.on('pointerdown', () => {
+        this.scene.start('PlayerSelectScene');
       });
     }
+    
+    const menuButton = this.add.text(400, 370, 'Main Menu', {
+      fontSize: '24px',
+      backgroundColor: '#222222',
+      color: '#ffffff',
+      padding: { left: 10, right: 10, top: 5, bottom: 5 }
+    }).setOrigin(0.5).setInteractive();
+    
+    menuButton.on('pointerdown', () => {
+      this.scene.start('GameModeScene');
+    });
+  }
   }
 
-  /**
-   * Visual effect for special attack – tests spy on it.
-   */
-  public createSpecialAttackEffect(attacker: any, defender: any): void {
-    try {
-      // Check if we're in a test environment
-      const isTest = typeof jest !== 'undefined';
-      if (isTest) return; // Skip in tests, but spy still counted
 
-      // Draw a special effect (blue circle with larger radius)
-      const x = defender.x - (attacker.x < defender.x ? -40 : 40);
-      const y = defender.y - 60;
-
-      const gfx = this.add.graphics();
-      gfx.fillStyle(0x0088ff, 0.8); // Blue color for special attack
-      gfx.fillCircle(x, y, 32); // Larger radius for special attack
-
-      // Add glow effect (second circle)
-      gfx.fillStyle(0x00ffff, 0.4);
-      gfx.fillCircle(x, y, 40);
-
-      // Set depth to ensure visibility
-      gfx.setDepth(100);
-
-      // Remove and destroy after a delay
-      this.time.delayedCall(300, () => gfx.destroy());
-    } catch (error) {
-      console.error('Error creating special attack effect:', error);
-    }
-  }
 
   // Alias for unit tests
   public testCreateHealthBars(_: number = 2, recreate: number = 1): void {
@@ -2515,4 +2659,3 @@ export default class KidsFightScene extends Phaser.Scene {
     }
   }
 }
-export default KidsFightScene;

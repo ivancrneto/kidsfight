@@ -1114,6 +1114,17 @@ describe('KidsFightScene - Game State, Create, and CheckWinner', () => {
         setOrigin: jest.fn().mockReturnThis(),
         setDepth: jest.fn().mockReturnThis()
       }));
+      // Mock add.text for endGame functionality
+      kidsFightScene.add.text = jest.fn(() => ({
+        setOrigin: jest.fn().mockReturnThis(),
+        setInteractive: jest.fn().mockReturnThis(),
+        setStyle: jest.fn().mockReturnThis(),
+        setText: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
+        setScrollFactor: jest.fn().mockReturnThis(),
+        on: jest.fn().mockReturnThis(),
+        destroy: jest.fn().mockReturnThis()
+      }));
       // Provide minimal init/create data if needed
       kidsFightScene.init({});
       kidsFightScene.create({});

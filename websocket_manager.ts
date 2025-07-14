@@ -204,27 +204,6 @@ class WebSocketManager {
     return !!this._ws && this._ws.readyState === WebSocket.OPEN;
   }
 
-  public send(message: any): boolean {
-    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-      console.log('[WSM] Sending message, type:', typeof message, 'content:', message);
-      const msgToSend = typeof message === 'string' ? message : JSON.stringify(message);
-      console.log('[WSM] Stringified message to send:', msgToSend);
-      this._ws.send(msgToSend);
-      // Log human-readable message
-      if (typeof message === 'string') {
-        try {
-          console.log('[WSM] Message sent:', JSON.parse(message));
-        } catch {
-          console.log('[WSM] Message sent:', message);
-        }
-      } else {
-        console.log('[WSM] Message sent:', message);
-      }
-      return true;
-    }
-    console.log('[WSM] Cannot send message - not connected, readyState:', this._ws?.readyState);
-    return false;
-  }
 
   public sendGameAction(action: string, data: Record<string, any> = {}): boolean {
     if (!this.isConnected()) {
@@ -263,17 +242,16 @@ class WebSocketManager {
 
     try {
       const message: WebSocketMessage = {
-        type: 'replay_request',
+        ...data, // Spread any additional data first
+        type: 'replay_request', // Then override with core fields
         matchId,
         playerId,
-        ...data, // Spread any additional data
+        roomCode: matchId, // Add roomCode for server routing
         timestamp: Date.now()
       };
       
-      const messageString = JSON.stringify(message);
-      this._ws!.send(messageString);
-      console.log('[WSM] Sent replay request:', message);
-      return true;
+      console.log('[WSM] Sending replay request:', message);
+      return this.send(message);
     } catch (error) {
       console.error('[WSM] Error sending replay request:', error);
       return false;
@@ -295,10 +273,8 @@ class WebSocketManager {
         timestamp: Date.now()
       };
       
-      const messageString = JSON.stringify(message);
-      this._ws!.send(messageString);
-      console.log('[WSM] Sent replay response:', message);
-      return true;
+      console.log('[WSM] Sending replay response:', message);
+      return this.send(message);
     } catch (error) {
       console.error('[WSM] Error sending replay response:', error);
       return false;
@@ -359,7 +335,9 @@ class WebSocketManager {
     try {
       const messageString = JSON.stringify(message);
       this._ws!.send(messageString);
-      console.log('[WSM] Sent message:', message);
+      if(message.type !== 'position_update') {
+        console.log('[WSM] Sent message:', message);
+      }
       return true;
     } catch (error) {
       console.error('[WSM] Error sending message:', error);
@@ -381,10 +359,8 @@ class WebSocketManager {
         timestamp: Date.now()
       };
 
-      const messageString = JSON.stringify(message);
-      this._ws!.send(messageString);
-      console.log('[WSM] Sent health update:', message);
-      return true;
+      console.log('[WSM] Sending health update:', message);
+      return this.send(message);
     } catch (error) {
       console.error('[WSM] Error sending health update:', error);
       return false;
