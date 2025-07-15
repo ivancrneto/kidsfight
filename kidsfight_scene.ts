@@ -1878,7 +1878,7 @@ export default class KidsFightScene extends Phaser.Scene {
         200,
         0x000000,
         0.7
-    );
+    ).setDepth(5000);
 
     // Add text
     const text = this.add.text(
@@ -1886,7 +1886,7 @@ export default class KidsFightScene extends Phaser.Scene {
         this.cameras.main.height / 2 - 40,
         'O oponente quer jogar novamente',
         {fontSize: '24px', color: '#ffffff'}
-    ).setOrigin(0.5);
+    ).setOrigin(0.5).setDepth(5001);
 
     // Add buttons
     const acceptButton = this.add.text(
@@ -1894,14 +1894,14 @@ export default class KidsFightScene extends Phaser.Scene {
         this.cameras.main.height / 2 + 20,
         'Aceitar',
         {fontSize: '20px', color: '#00ff00', backgroundColor: '#333333', padding: {x: 10, y: 5}}
-    ).setOrigin(0.5).setInteractive();
+    ).setOrigin(0.5).setInteractive().setDepth(5001);
 
     const declineButton = this.add.text(
         this.cameras.main.width / 2 + 60,
         this.cameras.main.height / 2 + 20,
         'Recusar',
         {fontSize: '20px', color: '#ff0000', backgroundColor: '#333333', padding: {x: 10, y: 5}}
-    ).setOrigin(0.5).setInteractive();
+    ).setOrigin(0.5).setInteractive().setDepth(5001);
 
     // Event listeners
     acceptButton.on('pointerdown', () => {
@@ -2663,7 +2663,7 @@ export default class KidsFightScene extends Phaser.Scene {
         backgroundColor: '#222222',
         color: '#ffffff',
         padding: { left: 10, right: 10, top: 5, bottom: 5 }
-      }).setOrigin(0.5).setInteractive();
+      }).setOrigin(0.5).setInteractive().setDepth(1500);
       
       this.rematchButton.on('pointerdown', () => {
         if (this.roomCode && this.wsManager) {
@@ -2691,7 +2691,7 @@ export default class KidsFightScene extends Phaser.Scene {
         backgroundColor: '#222222',
         color: '#ffffff',
         padding: { left: 10, right: 10, top: 5, bottom: 5 }
-      }).setOrigin(0.5).setInteractive();
+      }).setOrigin(0.5).setInteractive().setDepth(1500);
       
       replayButton.on('pointerdown', () => {
         this.scene.start('PlayerSelectScene');
@@ -2703,7 +2703,7 @@ export default class KidsFightScene extends Phaser.Scene {
       backgroundColor: '#222222',
       color: '#ffffff',
       padding: { left: 10, right: 10, top: 5, bottom: 5 }
-    }).setOrigin(0.5).setInteractive();
+    }).setOrigin(0.5).setInteractive().setDepth(1500);
     
     menuButton.on('pointerdown', () => {
       this.scene.start('GameModeScene');
