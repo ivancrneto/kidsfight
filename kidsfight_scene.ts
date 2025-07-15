@@ -1423,9 +1423,9 @@ export default class KidsFightScene extends Phaser.Scene {
     });
 
     jumpBtn.on('pointerdown', () => {
-      const playerIdx = this.getPlayerIndex();
-      const player = this.players?.[playerIdx];
-      console.log('[Touch] Jump down, player:', player);
+      if (this.gameOver || this.fightEnded) return;
+      const idx = this.getPlayerIndex();
+      const player = this.players?.[idx];
       if (player && player.body && player.body.touching.down) {
         player.setVelocityY(-330);
       }
@@ -1444,6 +1444,7 @@ export default class KidsFightScene extends Phaser.Scene {
     });
 
     blockBtn.on('pointerdown', () => {
+      if (this.gameOver || this.fightEnded) return;
       const idx = this.getPlayerIndex();
       const player = this.players?.[idx];
       console.log('[Touch] Block down, player:', player);
@@ -2162,6 +2163,9 @@ export default class KidsFightScene extends Phaser.Scene {
   private processKeyboardInput(): void {
     // Skip if we're in a test environment without proper input setup
     if (typeof jest !== 'undefined') return;
+    
+    // Skip if game is over or fight ended
+    if (this.gameOver || (this as any)._gameOver || this.fightEnded) return;
 
     // Get local player index using consistent method
     const idx = this.getPlayerIndex();
@@ -2193,16 +2197,7 @@ export default class KidsFightScene extends Phaser.Scene {
       const vx = player.body?.velocity?.x ?? 0;
       const vy = player.body?.velocity?.y ?? 0;
       const frame = (player.frame && (player.frame as any).name) ?? (player as any).frame ?? 0;
-      this.wsManager.send({
-        type: 'position_update',
-        playerIndex: idx,
-        x: player.x,
-        y: player.y,
-        velocityX: vx,
-        velocityY: vy,
-        flipX: !!player.flipX,
-        frame
-      });
+      this.wsManager.sendPositionUpdate(idx, player.x, player.y, vx, vy, !!player.flipX, frame);
     }
 
     // Jump (keyboard only, trigger on JustDown to avoid spam)
@@ -2255,6 +2250,11 @@ export default class KidsFightScene extends Phaser.Scene {
 
   /** Jump button / ↑ press */
   public handleJumpDown(): void {
+    // Skip if game is over
+    if (this.gameOver || (this as any)._gameOver) return;
+    // Prevent jumping after fight ends
+    if (this.fightEnded) return;
+    
     if (this.touchButtons?.up) this.touchButtons.up.isDown = true;
 
     const idx = this.getPlayerIndex();
@@ -2270,11 +2270,15 @@ export default class KidsFightScene extends Phaser.Scene {
 
   /** Normal attack */
   public handleAttack(): void {
+    // Skip if game is over
+    if (this.gameOver || (this as any)._gameOver) return;
+    // Prevent attacking after fight ends
+    if (this.fightEnded) return;
+    
     console.log('[SCENE][DEBUG] Local handleAttack; playerIndex =', this.getPlayerIndex());
     const idx = this.getPlayerIndex();
     this.tryAction?.(idx, 'attack', false);
 
-    if (this.gameOver || (this as any)._gameOver) return;
     if (this.gameMode === 'online' && this.wsManager?.send) {
       console.log('[SCENE][DEBUG] Sending remote attack action for playerIndex =', idx);
       this.wsManager.send({type: 'attack', playerIndex: idx});
@@ -2283,6 +2287,11 @@ export default class KidsFightScene extends Phaser.Scene {
 
   /** Block action */
   public handleBlock(): void {
+    // Skip if game is over
+    if (this.gameOver || (this as any)._gameOver) return;
+    // Prevent blocking after fight ends
+    if (this.fightEnded) return;
+    
     const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     if (!player) return;
@@ -2579,6 +2588,38 @@ export default class KidsFightScene extends Phaser.Scene {
   public endGame(winnerIndex: number, message: string): void {
     if (this.gameOver || (this as any)._gameOver) return;
     this.gameOver = true;
+    this.fightEnded = true;
+
+    // Stop the timer
+    if (this.timerEvent) {
+      this.timerEvent.remove();
+      this.timerEvent = undefined;
+    }
+
+    // Disable keyboard controls
+    if (this.cursors) {
+      this.cursors.left.isDown = false;
+      this.cursors.right.isDown = false;
+      this.cursors.up.isDown = false;
+      this.cursors.down.isDown = false;
+    }
+    if (this.attackKey) this.attackKey.isDown = false;
+    if (this.blockKey) this.blockKey.isDown = false;
+    if (this.keyA) this.keyA.isDown = false;
+    if (this.keyD) this.keyD.isDown = false;
+    if (this.keyW) this.keyW.isDown = false;
+    if (this.keyS) this.keyS.isDown = false;
+    if (this.keySpace) this.keySpace.isDown = false;
+    if (this.keyQ) this.keyQ.isDown = false;
+    if (this.keyShift) this.keyShift.isDown = false;
+    if (this.keyEnter) this.keyEnter.isDown = false;
+
+    // Disable touch controls
+    if (this.touchButtons) {
+      if (this.touchButtons.left) this.touchButtons.left.isDown = false;
+      if (this.touchButtons.right) this.touchButtons.right.isDown = false;
+      if (this.touchButtons.up) this.touchButtons.up.isDown = false;
+    }
 
     // Winner/loser animations
     if (this.players?.length >= 2) {
@@ -2664,8 +2705,6 @@ export default class KidsFightScene extends Phaser.Scene {
     });
   }
   }
-
-
 
   // Alias for unit tests
   public testCreateHealthBars(_: number = 2, recreate: number = 1): void {
