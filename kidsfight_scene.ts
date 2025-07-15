@@ -1094,6 +1094,23 @@ export default class KidsFightScene extends Phaser.Scene {
     // Create touch controls for mobile devices
     this.createTouchControls();
 
+    // Initialize keyboard controls
+    if (this.input?.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.blockKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+      
+      // Additional keys for player 2 or alternative controls
+      this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+      this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+      this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+      this.keyS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+      this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.keyQ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+      this.keyShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+      this.keyEnter = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    }
+
     // Create health bars UI
     this.createHealthBars();
 
@@ -1684,7 +1701,13 @@ export default class KidsFightScene extends Phaser.Scene {
       if (action.accepted) {
         // Hide any popup and restart the scene
         this.hideReplayPopup();
-        this.scene.restart();
+        this.scene.restart({
+          gameMode: this.gameMode,
+          isHost: this.isHost,
+          roomCode: this.roomCode,
+          selectedScenario: this.selectedScenario,
+          selected: this.selected
+        });
       } else {
         // Declined - reset rematch button state for the requesting player
         this.hideReplayPopup();
@@ -1731,7 +1754,13 @@ export default class KidsFightScene extends Phaser.Scene {
       case 'game_restart': {
         console.log('[SCENE][DEBUG] Received game_restart, restarting scene');
         this.hideReplayPopup();
-        this.scene.restart();
+        this.scene.restart({
+          gameMode: this.gameMode,
+          isHost: this.isHost,
+          roomCode: this.roomCode,
+          selectedScenario: this.selectedScenario,
+          selected: this.selected
+        });
         return;
       }
     }
@@ -1881,7 +1910,13 @@ export default class KidsFightScene extends Phaser.Scene {
         if (success) {
           this.hideReplayPopup();
           // Restart the scene with the current configuration
-          this.scene.restart();
+          this.scene.restart({
+            gameMode: this.gameMode,
+            isHost: this.isHost,
+            roomCode: this.roomCode,
+            selectedScenario: this.selectedScenario,
+            selected: this.selected
+          });
         } else {
           console.error('[KidsFightScene] Failed to send rematch response');
         }
@@ -2577,7 +2612,7 @@ export default class KidsFightScene extends Phaser.Scene {
   // Add rematch buttons
   if (this.add && typeof this.add.text === 'function') {
     if (this.gameMode === 'online') {
-      this.rematchButton = this.add.text(400, 330, 'Request Rematch', {
+      this.rematchButton = this.add.text(400, 330, 'Reiniciar Partida', {
         fontSize: '24px',
         backgroundColor: '#222222',
         color: '#ffffff',
@@ -2605,7 +2640,7 @@ export default class KidsFightScene extends Phaser.Scene {
         }
       });
     } else {
-      const replayButton = this.add.text(400, 330, 'Play Again', {
+      const replayButton = this.add.text(400, 330, 'Jogar de Novo', {
         fontSize: '24px',
         backgroundColor: '#222222',
         color: '#ffffff',
@@ -2617,7 +2652,7 @@ export default class KidsFightScene extends Phaser.Scene {
       });
     }
     
-    const menuButton = this.add.text(400, 370, 'Main Menu', {
+    const menuButton = this.add.text(400, 370, 'Menu Inicial', {
       fontSize: '24px',
       backgroundColor: '#222222',
       color: '#ffffff',
