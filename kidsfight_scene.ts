@@ -1035,7 +1035,7 @@ export default class KidsFightScene extends Phaser.Scene {
     addVariableWidthSpritesheet(this, 'roni', 'roni_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'jacqueline', 'jacqueline_raw', [415, 410, 420, 440, 440, 410, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'ivan', 'ivan_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
-    addVariableWidthSpritesheet(this, 'd_isa', 'd_isa_raw', [416, 414, 414, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'd_isa', 'd_isa_raw', [416, 404, 404, 450, 450, 390, 520, 480], 512);
 
     // Register animations for each character
     const characterKeys = [
