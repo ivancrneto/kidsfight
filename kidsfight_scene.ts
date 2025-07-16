@@ -1383,11 +1383,11 @@ export default class KidsFightScene extends Phaser.Scene {
     this.add.text(rightBtn.x, rightBtn.y - radius / 2, '▶', {fontSize: `${radius}px`, color: '#ffffff'}).setOrigin(0.5);
     this.add.text(jumpBtn.x, jumpBtn.y - radius / 2, '⭡', {fontSize: `${radius}px`, color: '#ffffff'}).setOrigin(0.5);
 
-    // Right bottom corner (arc of action buttons)
+    // Right bottom corner (arc of action buttons with better spacing)
     const baseXR = width - padding;
-    const attackBtn = this.add.circle(baseXR - radius, baseY, radius, 0xff4444);
-    const blockBtn = this.add.circle(baseXR + radius, baseY - radius, radius, 0xffff44); 
-    const specialBtn = this.add.circle(baseXR, baseY - radius * 2, radius, 0xff44ff); 
+    const attackBtn = this.add.circle(baseXR - radius * 2, baseY, radius, 0xff4444);
+    const blockBtn = this.add.circle(baseXR + radius, baseY - radius * 2, radius, 0xffff44); 
+    const specialBtn = this.add.circle(baseXR - radius, baseY - radius * 3.5, radius, 0xff44ff); 
 
     this.add.text(attackBtn.x, attackBtn.y - radius / 2, 'A', {
       fontSize: `${radius}px`,
