@@ -1429,6 +1429,26 @@ export default class KidsFightScene extends Phaser.Scene {
       }
     });
 
+    leftBtn.on('pointerout', () => {
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
+      console.log('[Touch] Left out, player:', player);
+      if (this.touchButtons?.left) this.touchButtons.left.isDown = false;
+      if (player) {
+        player.setVelocityX(0);
+      }
+    });
+
+    leftBtn.on('pointercancel', () => {
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
+      console.log('[Touch] Left cancel, player:', player);
+      if (this.touchButtons?.left) this.touchButtons.left.isDown = false;
+      if (player) {
+        player.setVelocityX(0);
+      }
+    });
+
     rightBtn.on('pointerdown', () => {
       const playerIdx = this.getPlayerIndex();
       const player = this.players?.[playerIdx];
@@ -1444,6 +1464,26 @@ export default class KidsFightScene extends Phaser.Scene {
       const playerIdx = this.getPlayerIndex();
       const player = this.players?.[playerIdx];
       console.log('[Touch] Right up, player:', player);
+      if (this.touchButtons?.right) this.touchButtons.right.isDown = false;
+      if (player) {
+        player.setVelocityX(0);
+      }
+    });
+
+    rightBtn.on('pointerout', () => {
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
+      console.log('[Touch] Right out, player:', player);
+      if (this.touchButtons?.right) this.touchButtons.right.isDown = false;
+      if (player) {
+        player.setVelocityX(0);
+      }
+    });
+
+    rightBtn.on('pointercancel', () => {
+      const playerIdx = this.getPlayerIndex();
+      const player = this.players?.[playerIdx];
+      console.log('[Touch] Right cancel, player:', player);
       if (this.touchButtons?.right) this.touchButtons.right.isDown = false;
       if (player) {
         player.setVelocityX(0);
