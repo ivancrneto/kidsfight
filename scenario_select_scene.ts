@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import scenario1Img from './scenario1.png';
 import scenario2Img from './scenario2.png';
+import scenario3Img from './scenario3.png';
 import gameLogoImg from './android-chrome-192x192.png';
 
 interface Scenario {
@@ -23,7 +24,7 @@ interface SceneData {
 export const SCENARIOS: Scenario[] = [
   { key: 'scenario1', name: 'Dona Isa', img: scenario1Img },
   { key: 'scenario2', name: 'Acácia', img: scenario2Img },
-  // Add more scenarios here as needed
+  { key: 'scenario3', name: 'Ronivaldo Pinto', img: scenario3Img },
 ];
 
 class ScenarioSelectScene extends Phaser.Scene {
