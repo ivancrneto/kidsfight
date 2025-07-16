@@ -130,12 +130,12 @@ describe('Attack Mechanics', () => {
       
       scene.tryAction(0, 'special', true);
       
-      // Verify no damage is applied (but special meter should still reset due to animation)
+      // Verify no damage is applied and special meter is NOT reset when out of range
       expect(scene.playerHealth[1]).toBe(initialHealth);
       // Verify animation still plays
       expect(mockPlayer1.isAttacking).toBe(true);
       expect(mockPlayer1.isSpecialAttacking).toBe(true);
-      expect(scene.playerSpecial[0]).toBe(0); // Special meter should reset
+      expect(scene.playerSpecial[0]).toBe(3); // Special meter should NOT reset when out of range
     });
   });
 

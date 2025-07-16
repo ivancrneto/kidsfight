@@ -12,13 +12,13 @@ describe('KidsFightScene - Rematch Popup Integration', () => {
         setDepth: jest.fn().mockReturnThis(),
         destroy: jest.fn()
       }),
-      text: jest.fn().mockReturnValue({
+      text: jest.fn().mockImplementation(() => ({
         setOrigin: jest.fn().mockReturnThis(),
         setInteractive: jest.fn().mockReturnThis(),
         setDepth: jest.fn().mockReturnThis(),
         on: jest.fn().mockReturnThis(),
         destroy: jest.fn()
-      })
+      }))
     } as any;
     
     scene.cameras = {
@@ -40,6 +40,10 @@ describe('KidsFightScene - Rematch Popup Integration', () => {
     scene.isHost = false;
     scene.selectedScenario = 'scenario1';
     scene.selected = { p1: 'bento', p2: 'roni' };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it('should create rematch popup with correct z-index hierarchy', () => {
