@@ -116,8 +116,10 @@ describe('Player Animation Tests', () => {
     
     // Verify walking frame is set (should be frame 1 for initial walking)
     expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
-    expect(mockPlayers[0].walkAnimData).toBeDefined();
-    expect(mockPlayers[0].walkAnimData.currentFrame).toBe(1);
+    
+    // Check that shared walk animation data was initialized
+    expect((scene as any).sharedWalkAnimData).toBeDefined();
+    expect((scene as any).sharedWalkAnimData.currentFrame).toBe(1);
   });
 
   test('player should flash attack frame then return to idle', () => {
@@ -233,6 +235,225 @@ describe('Player Animation Tests', () => {
     mockPlayers[0].isBlocking = true;
     scene.updatePlayerAnimation(0);
     expect(mockPlayers[0].y).toBe(150);
+  });
+
+  describe('Shared Walk Animation Timing', () => {
+    test('should initialize shared walk animation data on first walking player', () => {
+      // Set up player 1 to be walking
+      mockPlayers[0].body.velocity.x = 160;
+      mockPlayers[0].isAttacking = false;
+      mockPlayers[0].isSpecialAttacking = false;
+      mockPlayers[0].isBlocking = false;
+      mockPlayers[0].getData.mockImplementation(() => false);
+
+      // Mock getTime to return a specific time
+      scene.getTime = jest.fn().mockReturnValue(1000);
+
+      // Call updatePlayerAnimation to trigger walking animation
+      scene.updatePlayerAnimation(0);
+
+      // Check that sharedWalkAnimData was initialized
+      expect((scene as any).sharedWalkAnimData).toBeDefined();
+      expect((scene as any).sharedWalkAnimData.currentFrame).toBe(1);
+      expect((scene as any).sharedWalkAnimData.frameTime).toBe(1000);
+      expect((scene as any).sharedWalkAnimData.frameDelay).toBe(200);
+    });
+
+    test('should use shared timing for all walking players', () => {
+      // Set up both players to be walking
+      mockPlayers[0].body.velocity.x = 160;
+      mockPlayers[1].body.velocity.x = -160;
+      mockPlayers.forEach(player => {
+        player.isAttacking = false;
+        player.isSpecialAttacking = false;
+        player.isBlocking = false;
+        player.getData.mockImplementation(() => false);
+      });
+
+      // Mock getTime to return a specific time
+      scene.getTime = jest.fn().mockReturnValue(1000);
+
+      // Update both players
+      scene.updatePlayerAnimation(0);
+      scene.updatePlayerAnimation(1);
+
+      // Both players should be on the same frame
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+      expect(mockPlayers[1].setFrame).toHaveBeenCalledWith(1);
+    });
+
+    test('should cycle between frames 1 and 2 only', () => {
+      // Set up player to be walking
+      mockPlayers[0].body.velocity.x = 160;
+      mockPlayers[0].isAttacking = false;
+      mockPlayers[0].isSpecialAttacking = false;
+      mockPlayers[0].isBlocking = false;
+      mockPlayers[0].getData.mockImplementation(() => false);
+
+      // Mock getTime to return different times
+      scene.getTime = jest.fn()
+        .mockReturnValueOnce(1000)  // Initial time - initialize to frame 1
+        .mockReturnValueOnce(1000)  // Same time - stay on frame 1
+        .mockReturnValueOnce(1200)  // After 200ms - should switch to frame 2
+        .mockReturnValueOnce(1400)  // After another 200ms - should switch back to frame 1
+        .mockReturnValueOnce(1600); // After another 200ms - should switch to frame 2 again
+
+      // First call - should initialize to frame 1
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+
+      // Second call - should stay on frame 1 (same time)
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+
+      // Third call - should switch to frame 2
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(2);
+
+      // Fourth call - should switch back to frame 1
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+
+      // Fifth call - should switch to frame 2 again
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(2);
+    });
+
+    test('should not change frame if not enough time has passed', () => {
+      // Set up player to be walking
+      mockPlayers[0].body.velocity.x = 160;
+      mockPlayers[0].isAttacking = false;
+      mockPlayers[0].isSpecialAttacking = false;
+      mockPlayers[0].isBlocking = false;
+      mockPlayers[0].getData.mockImplementation(() => false);
+
+      // Mock getTime to return times that don't exceed the 200ms delay
+      scene.getTime = jest.fn()
+        .mockReturnValueOnce(1000)  // Initial time
+        .mockReturnValueOnce(1100); // Only 100ms later - should not change frame
+
+      // First call - should initialize to frame 1
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+
+      // Clear the mock to check second call
+      mockPlayers[0].setFrame.mockClear();
+
+      // Second call - should stay on frame 1 (not enough time passed)
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('Player Animation Synchronization', () => {
+    test('should synchronize walking animation between multiple players', () => {
+      // Set up both players to be walking
+      mockPlayers[0].body.velocity.x = 160;
+      mockPlayers[1].body.velocity.x = -160;
+      mockPlayers.forEach(player => {
+        player.isAttacking = false;
+        player.isSpecialAttacking = false;
+        player.isBlocking = false;
+        player.getData.mockImplementation(() => false);
+      });
+
+      // Mock getTime to return a specific time
+      scene.getTime = jest.fn().mockReturnValue(1000);
+
+      // Update both players
+      scene.updatePlayerAnimation(0);
+      scene.updatePlayerAnimation(1);
+
+      // Both players should be on the same frame
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+      expect(mockPlayers[1].setFrame).toHaveBeenCalledWith(1);
+
+      // Advance time and update again
+      scene.getTime = jest.fn().mockReturnValue(1250); // 250ms later
+
+      // Clear previous calls
+      mockPlayers[0].setFrame.mockClear();
+      mockPlayers[1].setFrame.mockClear();
+
+      // Update both players again
+      scene.updatePlayerAnimation(0);
+      scene.updatePlayerAnimation(1);
+
+      // Both should now be on frame 2
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(2);
+      expect(mockPlayers[1].setFrame).toHaveBeenCalledWith(2);
+    });
+
+    test('should maintain synchronization when players start walking at different times', () => {
+      // Set up player 1 to be walking first
+      mockPlayers[0].body.velocity.x = 160;
+      mockPlayers[0].isAttacking = false;
+      mockPlayers[0].isSpecialAttacking = false;
+      mockPlayers[0].isBlocking = false;
+      mockPlayers[0].getData.mockImplementation(() => false);
+
+      // Player 2 is not walking yet
+      mockPlayers[1].body.velocity.x = 0;
+      mockPlayers[1].isAttacking = false;
+      mockPlayers[1].isSpecialAttacking = false;
+      mockPlayers[1].isBlocking = false;
+      mockPlayers[1].getData.mockImplementation(() => false);
+
+      // Mock getTime
+      scene.getTime = jest.fn().mockReturnValue(1000);
+
+      // Update player 1 - should initialize shared timing
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+
+      // Update player 2 - should stay on idle frame
+      scene.updatePlayerAnimation(1);
+      expect(mockPlayers[1].setFrame).toHaveBeenCalledWith(0);
+
+      // Advance time
+      scene.getTime = jest.fn().mockReturnValue(1250);
+
+      // Now make player 2 start walking
+      mockPlayers[1].body.velocity.x = -160;
+
+      // Clear previous calls
+      mockPlayers[0].setFrame.mockClear();
+      mockPlayers[1].setFrame.mockClear();
+
+      // Update both players
+      scene.updatePlayerAnimation(0);
+      scene.updatePlayerAnimation(1);
+
+      // Both should be synchronized on frame 2
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(2);
+      expect(mockPlayers[1].setFrame).toHaveBeenCalledWith(2);
+    });
+
+    test('should reset to idle frame when player stops walking', () => {
+      // Set up player to be walking
+      mockPlayers[0].body.velocity.x = 160;
+      mockPlayers[0].isAttacking = false;
+      mockPlayers[0].isSpecialAttacking = false;
+      mockPlayers[0].isBlocking = false;
+      mockPlayers[0].getData.mockImplementation(() => false);
+
+      // Mock getTime
+      scene.getTime = jest.fn().mockReturnValue(1000);
+
+      // Update player - should be walking
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(1);
+
+      // Stop player movement
+      mockPlayers[0].body.velocity.x = 0;
+
+      // Clear previous calls
+      mockPlayers[0].setFrame.mockClear();
+
+      // Update player - should return to idle frame
+      scene.updatePlayerAnimation(0);
+      expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(0);
+    });
   });
 });
 
