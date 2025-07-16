@@ -13,10 +13,12 @@ describe('Touch Controls', () => {
       circle: jest.fn().mockReturnValue({
         setOrigin: jest.fn().mockReturnThis(),
         setInteractive: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
         on: jest.fn().mockReturnThis(),
       }),
       text: jest.fn().mockReturnValue({
         setOrigin: jest.fn().mockReturnThis(),
+        setDepth: jest.fn().mockReturnThis(),
       }),
     };
     

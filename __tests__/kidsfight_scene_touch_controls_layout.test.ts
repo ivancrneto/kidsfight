@@ -66,4 +66,27 @@ describe('KidsFightScene Touch Controls Layout', () => {
     expect(createdShapes[4].color).toBe(0xffff44); // block
     expect(createdShapes[5].color).toBe(0xff44ff); // special
   });
+
+  it('sets correct z-index (depth) for action buttons to appear above players', () => {
+    scene.createTouchControls();
+    
+    // Action buttons (attack, block, special) should have depth 1000 to appear above players
+    expect(createdShapes[3].setDepth).toHaveBeenCalledWith(1000); // attack button
+    expect(createdShapes[4].setDepth).toHaveBeenCalledWith(1000); // block button  
+    expect(createdShapes[5].setDepth).toHaveBeenCalledWith(1000); // special button
+    
+    // Action button text labels should have depth 1001 to appear above the button circles
+    const attackText = createdTexts.find(t => t.txt === 'A');
+    const blockText = createdTexts.find(t => t.txt === 'B');
+    const specialText = createdTexts.find(t => t.txt === 'S');
+    
+    expect(attackText.setDepth).toHaveBeenCalledWith(1001);
+    expect(blockText.setDepth).toHaveBeenCalledWith(1001);
+    expect(specialText.setDepth).toHaveBeenCalledWith(1001);
+    
+    // D-pad buttons should not have setDepth called (they use default depth)
+    expect(createdShapes[0].setDepth).not.toHaveBeenCalled(); // left
+    expect(createdShapes[1].setDepth).not.toHaveBeenCalled(); // right
+    expect(createdShapes[2].setDepth).not.toHaveBeenCalled(); // jump
+  });
 });

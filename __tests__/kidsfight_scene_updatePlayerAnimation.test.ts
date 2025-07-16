@@ -9,6 +9,7 @@ describe('KidsFightScene updatePlayerAnimation', () => {
     scene = new KidsFightScene();
     scene.setSafeFrame = jest.fn();
     scene.updateWalkingAnimation = jest.fn();
+    scene.updateSharedWalkingAnimation = jest.fn();
     scene.stopWalkingAnimation = jest.fn();
     scene.time = { delayedCall: jest.fn() };
     
@@ -88,12 +89,12 @@ describe('KidsFightScene updatePlayerAnimation', () => {
   });
 
   describe('movement animation integration', () => {
-    it('should call updateWalkingAnimation when player is moving', () => {
+    it('should call updateSharedWalkingAnimation when player is moving', () => {
       mockPlayer.body.velocity.x = 100; // Moving
       
       scene.updatePlayerAnimation(0);
       
-      expect(scene.updateWalkingAnimation).toHaveBeenCalledWith(mockPlayer);
+      expect(scene.updateSharedWalkingAnimation).toHaveBeenCalledWith(mockPlayer);
       expect(scene.stopWalkingAnimation).not.toHaveBeenCalled();
     });
 
@@ -103,7 +104,7 @@ describe('KidsFightScene updatePlayerAnimation', () => {
       scene.updatePlayerAnimation(0);
       
       expect(scene.stopWalkingAnimation).toHaveBeenCalledWith(mockPlayer);
-      expect(scene.updateWalkingAnimation).not.toHaveBeenCalled();
+      expect(scene.updateSharedWalkingAnimation).not.toHaveBeenCalled();
     });
 
     it('should prioritize blocking over movement', () => {
@@ -113,7 +114,7 @@ describe('KidsFightScene updatePlayerAnimation', () => {
       scene.updatePlayerAnimation(0);
       
       expect(scene.setSafeFrame).toHaveBeenCalledWith(mockPlayer, 5);
-      expect(scene.updateWalkingAnimation).not.toHaveBeenCalled();
+      expect(scene.updateSharedWalkingAnimation).not.toHaveBeenCalled();
     });
 
     it('should prioritize blocking over movement when game is over', () => {
@@ -125,7 +126,7 @@ describe('KidsFightScene updatePlayerAnimation', () => {
       scene.updatePlayerAnimation(0);
       
       expect(scene.setSafeFrame).toHaveBeenCalledWith(mockPlayer, 5);
-      expect(scene.updateWalkingAnimation).not.toHaveBeenCalled();
+      expect(scene.updateSharedWalkingAnimation).not.toHaveBeenCalled();
     });
   });
 
@@ -205,7 +206,7 @@ describe('KidsFightScene updatePlayerAnimation', () => {
       scene.updatePlayerAnimation(0);
       
       expect(scene.setSafeFrame).toHaveBeenCalledWith(mockPlayer, 5);
-      expect(scene.updateWalkingAnimation).not.toHaveBeenCalled();
+      expect(scene.updateSharedWalkingAnimation).not.toHaveBeenCalled();
     });
   });
 

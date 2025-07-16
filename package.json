@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "parcel index.html",
-    "build": "parcel build index.html",
+    "build": "NODE_ENV=production parcel build index.html",
     "test": "jest --config jest.config.mjs",
     "type-check": "tsc --noEmit"
   },
