@@ -140,8 +140,18 @@ const SPECIAL_DAMAGE = 10; // Reduced to maintain 2x ratio
 const ATTACK_COOLDOWN = 500; // 500ms between normal attacks
 const SPECIAL_COOLDOWN = 1000; // 1000ms between special attacks
 const SPECIAL_REQUIRED = 3; // Number of special pips required for special attack
+const CONSECUTIVE_ATTACK_PENALTY = 200; // Additional delay per consecutive attack
+const MAX_CONSECUTIVE_ATTACKS = 4; // Maximum consecutive attacks before forced break
 const SPECIAL_ANIMATION_DURATION = 900; // ms
 const REGULAR_ANIMATION_DURATION = 200; // ms
+
+// Enhanced Cadency System Constants
+const PERFECT_TIMING_WINDOW = 50; // ms window for perfect timing bonus
+const GOOD_TIMING_WINDOW = 100; // ms window for good timing bonus
+const RHYTHM_BONUS_DAMAGE = 2; // Extra damage for perfect timing
+const RHYTHM_SPECIAL_GAIN = 0.5; // Extra special meter for good timing
+const COMBO_MULTIPLIER_THRESHOLD = 3; // Attacks needed for combo multiplier
+const MAX_RHYTHM_STREAK = 5; // Maximum rhythm streak for bonuses
 const DEV = true; // Debug mode flag
 
 // Accept Phaser as a constructor parameter for testability
@@ -194,6 +204,16 @@ export default class KidsFightScene extends Phaser.Scene {
   private playerBlocking: boolean[] = [false, false];
   private lastAttackTime: number[] = [0, 0];
   private lastSpecialTime: number[] = [0, 0];
+  private consecutiveAttacks: number[] = [0, 0];
+  private lastConsecutiveResetTime: number[] = [0, 0];
+  
+  // Enhanced Cadency System Properties
+  private rhythmStreak: number[] = [0, 0]; // Current rhythm streak for each player
+  private lastRhythmTime: number[] = [0, 0]; // Time of last rhythmic attack
+  private perfectTimingWindow: number[] = [0, 0]; // Window for perfect timing
+  private rhythmBonus: number[] = [0, 0]; // Current rhythm bonus damage
+  private comboMultiplier: number[] = [1, 1]; // Current combo multiplier
+  private attackSequence: string[] = ['', '']; // Sequence of recent attacks
   private timeLeft: number = 60;
   private timerText?: Phaser.GameObjects.Text;
   private timerEvent?: Phaser.Time.TimerEvent;
@@ -879,6 +899,10 @@ export default class KidsFightScene extends Phaser.Scene {
     this.lastAttackTime = [0, 0];
     this.lastSpecialTime = [0, 0];
     
+    // Reset consecutive attack counters
+    this.consecutiveAttacks = [0, 0];
+    this.lastConsecutiveResetTime = [0, 0];
+    
     // Reset timer
     this.timeLeft = 60;
     
@@ -969,7 +993,7 @@ export default class KidsFightScene extends Phaser.Scene {
           }
           console.log('[KidsFightScene] Extracted action:', action);
           if (action) {
-            this.handleRemoteAction(action);
+            this.handleRemoteAction?.(action);
           } else {
             console.warn('[KidsFightScene] No action found in WebSocket message');
           }
@@ -1011,7 +1035,7 @@ export default class KidsFightScene extends Phaser.Scene {
     addVariableWidthSpritesheet(this, 'roni', 'roni_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'jacqueline', 'jacqueline_raw', [415, 410, 420, 440, 440, 410, 520, 480], 512);
     addVariableWidthSpritesheet(this, 'ivan', 'ivan_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
-    addVariableWidthSpritesheet(this, 'd_isa', 'd_isa_raw', [415, 410, 420, 440, 440, 390, 520, 480], 512);
+    addVariableWidthSpritesheet(this, 'd_isa', 'd_isa_raw', [416, 414, 414, 440, 440, 390, 520, 480], 512);
 
     // Register animations for each character
     const characterKeys = [
@@ -1492,23 +1516,60 @@ export default class KidsFightScene extends Phaser.Scene {
     if (!this.playerSpecial || this.playerSpecial.length < 2) {
       this.playerSpecial = [0, 0];
     }
+    if (!this.consecutiveAttacks || this.consecutiveAttacks.length < 2) {
+      this.consecutiveAttacks = [0, 0];
+    }
+    if (!this.lastAttackTime || this.lastAttackTime.length < 2) {
+      this.lastAttackTime = [0, 0];
+    }
+    if (!this.lastConsecutiveResetTime || this.lastConsecutiveResetTime.length < 2) {
+      this.lastConsecutiveResetTime = [0, 0];
+    }
+    
     const attacker = this.players?.[playerIndex];
     const defenderIdx = playerIndex === 0 ? 1 : 0;
     const defender = this.players?.[defenderIdx];
     if (!attacker || !defender) return; // players not ready
 
-    // Special action requires at least 3 pips
+    const now = Date.now();
+
+    // Special action requires at least 3 pips (check first and return if not enough)
     if (isSpecial) {
       const currentPips = this.playerSpecial?.[playerIndex] ?? 0;
-      if (currentPips < 3) return; // not enough pips – abort
-      // Consume all pips and update UI
-      this.playerSpecial[playerIndex] = 0;
-      if (typeof this.updateSpecialPips === 'function') {
-        this.updateSpecialPips();
+      if (currentPips < 3) return; // not enough pips – abort before any state/animation
+    }
+
+    // Only reset consecutive counter if break is at least 1000ms
+    const timeSinceLastAttack = now - this.lastAttackTime[playerIndex];
+    const timeSinceLastReset = now - this.lastConsecutiveResetTime[playerIndex];
+    if (timeSinceLastReset >= 1000) {
+      this.consecutiveAttacks[playerIndex] = 0;
+      this.lastConsecutiveResetTime[playerIndex] = now;
+    }
+
+    // Only apply max consecutive limit and counter to normal attacks
+    if (!isSpecial) {
+      if (this.consecutiveAttacks[playerIndex] >= MAX_CONSECUTIVE_ATTACKS) {
+        console.log(`[CADENCE] Player ${playerIndex} blocked: max consecutive attacks (${MAX_CONSECUTIVE_ATTACKS}) reached`);
+        return;
       }
     }
 
-    // Always play attack animation regardless of distance
+    // Calculate required cooldown based on consecutive attacks (normal attacks only)
+    const baseDelay = ATTACK_COOLDOWN;
+    const penaltyMultiplier = Math.max(0, this.consecutiveAttacks[playerIndex] - 1);
+    const consecutivePenalty = penaltyMultiplier * CONSECUTIVE_ATTACK_PENALTY;
+    const requiredDelay = baseDelay + consecutivePenalty;
+
+    if (!isSpecial) {
+      if (timeSinceLastAttack < requiredDelay) {
+        const remainingTime = requiredDelay - timeSinceLastAttack;
+        console.log(`[CADENCE] Player ${playerIndex} blocked: ${remainingTime}ms remaining (${this.consecutiveAttacks[playerIndex]} consecutive attacks)`);
+        return;
+      }
+    }
+
+    // Always play attack animation (regardless of distance)
     attacker.isAttacking = true;
     if (attacker.setData && typeof attacker.setData === 'function') {
       attacker.setData('isAttacking', true);
@@ -1520,18 +1581,36 @@ export default class KidsFightScene extends Phaser.Scene {
       }
     }
 
-    // Check attack distance - damage only applies within short range
+    // Check attack distance - only apply damage and consume pips if within range
     const attackDistance = Math.abs(attacker.x - defender.x);
-    const maxAttackDistance = isSpecial ? 60 : 40; // Much shorter range for actual damage
-    const now = Date.now();
-    
-    if (attackDistance <= maxAttackDistance) {
-      // Close enough for damage
-      console.log('[SCENE][DEBUG] Attack hit - within range:', attackDistance, 'max:', maxAttackDistance);
-      this.tryAttack(playerIndex, defenderIdx, now, isSpecial);
-    } else {
-      // Too far for damage, but animation still plays
+    const maxAttackDistance = isSpecial ? 120 : 80; // Attack range - special attacks have longer reach
+    if (attackDistance > maxAttackDistance) {
+      // Too far for damage
       console.log('[SCENE][DEBUG] Attack animation only - too far for damage:', attackDistance, 'max:', maxAttackDistance);
+      return;
+    }
+
+    // Apply damage and consume special pips if within range
+    if (isSpecial) {
+      this.playerSpecial[playerIndex] = 0;
+      if (typeof this.updateSpecialPips === 'function') {
+        this.updateSpecialPips();
+      }
+    }
+    // Close enough for damage
+    console.log('[SCENE][DEBUG] Attack hit - within range:', attackDistance, 'max:', maxAttackDistance);
+    this.tryAttack(playerIndex, defenderIdx, now, isSpecial);
+
+    // Increment consecutive attacks counter
+    if (!isSpecial) {
+      this.consecutiveAttacks[playerIndex]++;
+      this.lastAttackTime[playerIndex] = now;
+      this.lastConsecutiveResetTime[playerIndex] = now;
+      console.log(`[CADENCE] Player ${playerIndex} attack allowed: consecutive=${this.consecutiveAttacks[playerIndex]}, delay was=${requiredDelay}ms`);
+    } else {
+      // For specials, just update lastAttackTime (for shared cooldown)
+      this.lastAttackTime[playerIndex] = now;
+      this.lastConsecutiveResetTime[playerIndex] = now;
     }
   }
 
