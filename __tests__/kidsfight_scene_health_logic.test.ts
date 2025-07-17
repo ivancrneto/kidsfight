@@ -37,14 +37,16 @@ function createTestScene() {
       setData: jest.fn(), 
       getData: jest.fn(), 
       setFrame: jest.fn(),
-      body: { velocity: { x: 0, y: 0 } }
+      body: { velocity: { x: 0, y: 0 } },
+      x: 100 // Within range for attacks
     },
     { 
       health: 100, 
       setData: jest.fn(), 
       getData: jest.fn(), 
       setFrame: jest.fn(),
-      body: { velocity: { x: 0, y: 0 } }
+      body: { velocity: { x: 0, y: 0 } },
+      x: 150 // 50px apart, within range for both normal (80px) and special (120px) attacks
     },
   ];
   

@@ -69,6 +69,10 @@ describe('KidsFightScene Comprehensive', () => {
       scene.playerHealth = [100, 5];
       scene.players[1].health = 5;
       
+      // Position players within normal attack range (80px)
+      scene.players[0].x = 100;
+      scene.players[1].x = 150; // 50px apart, within range
+      
       // Test normal attack (5 damage)
       scene.tryAttack(0, 1, now, false);
       
@@ -85,6 +89,10 @@ describe('KidsFightScene Comprehensive', () => {
       // Set up test with initial health
       scene.playerHealth = [100, 15];
       scene.players[1].health = 15;
+      
+      // Position players within special attack range (120px)
+      scene.players[0].x = 100;
+      scene.players[1].x = 150; // 50px apart, within range
       
       // Test special attack (10 damage)
       scene.tryAttack(0, 1, now, true);

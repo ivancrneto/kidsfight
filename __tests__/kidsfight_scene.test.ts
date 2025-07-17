@@ -692,6 +692,12 @@ describe('KidsFightScene', () => {
       // Initialize test data
       scene.create();
       
+      // Position players within attack range (80px for normal, 120px for special)
+      if (scene.players && scene.players.length >= 2) {
+        scene.players[0].x = 100;
+        scene.players[1].x = 150; // 50px apart, within range
+      }
+      
       // Test normal attack
       scene.tryAttack(0, 1, 100);
       expect(scene.playerHealth[1]).toBe(95); // 100 - 5 damage

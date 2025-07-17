@@ -274,7 +274,7 @@ describe('Attack Cadency System', () => {
       
       // Attack should be blocked due to game over, not cadency
       expect(scene.playerHealth[1]).toBe(100);
-      expect(mockPlayer1.isAttacking).toBeUndefined();
+      expect(mockPlayer1.isAttacking).toBe(false);
     });
 
     test('should work correctly with special attacks', () => {

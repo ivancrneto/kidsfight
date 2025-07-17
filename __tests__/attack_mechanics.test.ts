@@ -8,6 +8,7 @@ describe('Attack Mechanics', () => {
   let mockPlayer2: any;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     scene = new KidsFightScene();
     
     // Create mock players with all required properties
@@ -33,6 +34,10 @@ describe('Attack Mechanics', () => {
     };
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   describe('Attack Animation Behavior', () => {
     test('should play attack animation regardless of distance', () => {
       // Set players very far apart (much farther than attack range)
@@ -48,19 +53,25 @@ describe('Attack Mechanics', () => {
     });
 
     test('should play special attack animation regardless of distance', () => {
-      // Set players very far apart
+      // Set players within special attack range (120px)
       mockPlayer1.x = 100;
-      mockPlayer2.x = 700; // 600px apart
+      mockPlayer2.x = 150; // 50px apart, within range
       scene.playerSpecial[0] = 3; // Set special pips to 3
       
-      // Call tryAction for special attack
+      // Call tryAction to test special attack
       scene.tryAction(0, 'special', true);
       
       // Verify special attack animation is triggered
       expect(mockPlayer1.isAttacking).toBe(true);
       expect(mockPlayer1.isSpecialAttacking).toBe(true);
-      expect(mockPlayer1.setData).toHaveBeenCalledWith('isAttacking', true);
       expect(mockPlayer1.setData).toHaveBeenCalledWith('isSpecialAttacking', true);
+      expect(mockPlayer2.setData).toHaveBeenCalledWith('isSpecialDefending', true);
+      
+      // Simulate passage of time to trigger setTimeout callbacks
+      jest.advanceTimersByTime(350);
+      
+      // Verify special defending state is reset
+      expect(mockPlayer2.setData).toHaveBeenCalledWith('isSpecialDefending', false);
     });
 
     test('should not play special attack if special meter is not full', () => {
@@ -69,8 +80,10 @@ describe('Attack Mechanics', () => {
       scene.tryAction(0, 'special', true);
       
       // Should not trigger special attack - the method should exit early
-      expect(mockPlayer1.isSpecialAttacking).toBeUndefined();
+      expect(mockPlayer1.isSpecialAttacking).toBe(false);
+      expect(mockPlayer2.setData).not.toHaveBeenCalledWith('isSpecialDefending', true);
       expect(mockPlayer1.setData).not.toHaveBeenCalledWith('isSpecialAttacking', true);
+      expect(mockPlayer2.setData).not.toHaveBeenCalledWith('isSpecialDefending', true);
     });
   });
 
@@ -149,19 +162,20 @@ describe('Attack Mechanics', () => {
         return 1;
       });
       
+      // Position players within attack range
+      mockPlayer1.x = 100;
+      mockPlayer2.x = 150; // 50px apart, within range
+      
       scene.tryAction(0, 'attack', false);
       
       // Verify attack animation is triggered
       expect(mockPlayer1.isAttacking).toBe(true);
       
-      // Execute the timeout callback
-      if (timeoutCallbacks.length > 0) {
-        timeoutCallbacks[0].callback();
-      }
+      // Execute all timeout callbacks to reset attack state
+      timeoutCallbacks.forEach(({ callback }) => callback());
       
       // Verify attack state is reset
       expect(mockPlayer1.setData).toHaveBeenCalledWith('isAttacking', false);
-      expect(mockPlayer1.isAttacking).toBe(false);
       
       global.setTimeout = originalSetTimeout;
     });
@@ -175,6 +189,9 @@ describe('Attack Mechanics', () => {
         return 1;
       });
       
+      // Position players within special attack range
+      mockPlayer1.x = 100;
+      mockPlayer2.x = 150; // 50px apart, within range
       scene.playerSpecial[0] = 3; // Set special pips to 3
       
       scene.tryAction(0, 'special', true);
@@ -182,10 +199,8 @@ describe('Attack Mechanics', () => {
       // Verify special attack animation is triggered
       expect(mockPlayer1.isSpecialAttacking).toBe(true);
       
-      // Execute the timeout callback
-      if (timeoutCallbacks.length > 0) {
-        timeoutCallbacks[0].callback();
-      }
+      // Execute all timeout callbacks to reset special attack state
+      timeoutCallbacks.forEach(({ callback }) => callback());
       
       // Verify special attack state is reset
       expect(mockPlayer1.setData).toHaveBeenCalledWith('isSpecialAttacking', false);

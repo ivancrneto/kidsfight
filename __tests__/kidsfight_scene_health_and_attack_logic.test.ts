@@ -87,10 +87,10 @@ class TestableKidsFightScene extends KidsFightScene {
   constructor() {
     super({} as any);
     
-    // Initialize test players with default values
+    // Initialize test players with default values - position them within attack range
     this._testPlayers = [
-      this.createMockPlayer(0, 0, 100),
-      this.createMockPlayer(100, 0, 100)
+      this.createMockPlayer(100, 0, 100),
+      this.createMockPlayer(150, 0, 100)  // 50px apart, within both normal (80px) and special (120px) attack ranges
     ];
   }
 
