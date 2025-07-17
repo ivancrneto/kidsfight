@@ -2890,6 +2890,46 @@ export default class KidsFightScene extends Phaser.Scene {
   }
 
   /**
+   * Update walking animation for a player
+   * Cycles between frames 1 and 2 during movement
+   * Uses per-player walkAnimData implementation for tests
+   */
+  public updateWalkingAnimation(player: any): void {
+    if (!player) return;
+
+    // Stop cycling if game is over or fight ended
+    if (this.gameOver || this.fightEnded) {
+      // Winner: frame 3, Loser: frame 0 (laid down)
+      if (typeof this.winnerIndex === 'number') {
+        const idx = this.players?.indexOf(player);
+        if (idx === this.winnerIndex) {
+          this.setSafeFrame(player, 3);
+        } else {
+          this.setSafeFrame(player, 0);
+        }
+      }
+      return;
+    }
+
+    // Initialize walk animation data if needed
+    if (!player.walkAnimData) {
+      player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
+      // Set initial frame 1 so it gets captured by tests
+      this.setSafeFrame(player, 1);
+    }
+
+    const now = this.getTime();
+
+    // Check if enough time has passed to change frame (per-player timing)
+    if (now - player.walkAnimData.frameTime >= player.walkAnimData.frameDelay) {
+      // Cycle between frames 1 and 2
+      player.walkAnimData.currentFrame = player.walkAnimData.currentFrame === 1 ? 2 : 1;
+      player.walkAnimData.frameTime = now;
+      this.setSafeFrame(player, player.walkAnimData.currentFrame);
+    }
+  }
+
+  /**
    * Update walking animation for a player using shared timing
    * Used by updatePlayerAnimation for synchronized walking between players
    */
@@ -2914,32 +2954,6 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Set the current shared frame
     this.setSafeFrame(player, this.sharedWalkAnimData.currentFrame);
-  }
-
-  /**
-   * Update walking animation for a player
-   * Cycles between frames 1 and 2 during movement
-   * Uses per-player walkAnimData implementation for tests
-   */
-  public updateWalkingAnimation(player: any): void {
-    if (!player) return;
-
-    // Initialize walk animation data if needed
-    if (!player.walkAnimData) {
-      player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
-      // Set initial frame 1 so it gets captured by tests
-      this.setSafeFrame(player, 1);
-    }
-
-    const now = this.getTime();
-
-    // Check if enough time has passed to change frame (per-player timing)
-    if (now - player.walkAnimData.frameTime >= player.walkAnimData.frameDelay) {
-      // Cycle between frames 1 and 2
-      player.walkAnimData.currentFrame = player.walkAnimData.currentFrame === 1 ? 2 : 1;
-      player.walkAnimData.frameTime = now;
-      this.setSafeFrame(player, player.walkAnimData.currentFrame);
-    }
   }
 
   /**
