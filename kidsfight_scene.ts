@@ -1622,44 +1622,22 @@ export default class KidsFightScene extends Phaser.Scene {
       }
     }
 
-    // Always play attack animation (regardless of distance)
-    attacker.isAttacking = true;
-    if (attacker.setData && typeof attacker.setData === 'function') {
-      attacker.setData('isAttacking', true);
-    }
-    if (isSpecial) {
-      attacker.isSpecialAttacking = true;
-      if (attacker.setData && typeof attacker.setData === 'function') {
-        attacker.setData('isSpecialAttacking', true);
-      }
-    }
-
-    // Check attack distance - only apply damage and consume pips if within range
-    const attackDistance = Math.abs(attacker.x - defender.x);
-    const maxAttackDistance = isSpecial ? 120 : 80; // Attack range - special attacks have longer reach
-    if (attackDistance > maxAttackDistance) {
-      // Too far for damage
-      console.log('[SCENE][DEBUG] Attack animation only - too far for damage:', attackDistance, 'max:', maxAttackDistance);
-      return;
-    }
-
-    // Apply damage and consume special pips if within range
-    if (isSpecial) {
-      this.playerSpecial[playerIndex] = 0;
-      if (typeof this.updateSpecialPips === 'function') {
-        this.updateSpecialPips();
-      }
-    }
-    // Close enough for damage
-    console.log('[SCENE][DEBUG] Attack hit - within range:', attackDistance, 'max:', maxAttackDistance);
+    // Always perform the attack locally (guarantees effect is shown for host and guest)
     this.tryAttack(playerIndex, defenderIdx, now, isSpecial);
-
-    // Increment consecutive attacks counter
+    // In online mode, send the action to the remote player
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      this.wsManager.send({
+        type: isSpecial ? 'special' : 'attack',
+        playerIndex,
+        now
+      });
+    }
+    // Counter and cooldown logic remains unchanged below
     if (!isSpecial) {
       this.consecutiveAttacks[playerIndex]++;
       this.lastAttackTime[playerIndex] = now;
       this.lastConsecutiveResetTime[playerIndex] = now;
-      console.log(`[CADENCE] Player ${playerIndex} attack allowed: consecutive=${this.consecutiveAttacks[playerIndex]}, delay was=${requiredDelay}ms`);
+      console.log(`[CADENCE] Player ${playerIndex} attack allowed: consecutive=${this.consecutiveAttacks[playerIndex]}, delay was=${ATTACK_COOLDOWN}ms`);
     } else {
       // For specials, just update lastAttackTime (for shared cooldown)
       this.lastAttackTime[playerIndex] = now;
@@ -1714,6 +1692,24 @@ export default class KidsFightScene extends Phaser.Scene {
     const targetBlocking = this.playerBlocking?.[defenderIdxComputed] || defender.getData?.('isBlocking');
     if (targetBlocking) damage = Math.floor(damage / 2);
 
+    // --- ENFORCE RANGE CHECKS ---
+    // Only apply damage if attacker and defender are within range
+    let inRange = false;
+    if (attacker && defender && typeof attacker.x === 'number' && typeof defender.x === 'number') {
+      const dist = Math.abs(attacker.x - defender.x);
+      if (special) {
+        inRange = dist <= 120;
+      } else {
+        inRange = dist <= 80;
+      }
+    }
+    if (!inRange) {
+      // Animation flags still set for test compatibility
+      attacker.setData?.(special ? 'isSpecialAttacking' : 'isAttacking', true);
+      attacker.isAttacking = true;
+      return;
+    }
+
     this.playerHealth[defenderIdxComputed] = Math.max(0, (this.playerHealth[defenderIdxComputed] || 0) - damage);
     defender.health = this.playerHealth[defenderIdxComputed];
 
@@ -1732,26 +1728,43 @@ export default class KidsFightScene extends Phaser.Scene {
     if (special) {
       // Flag special attacking state for animation/tests
       attacker.setData?.('isSpecialAttacking', true);
-      
+      defender.setData?.('isSpecialDefending', true);
       // Increase z-index temporarily for special attack visual priority
-      const originalDepth = attacker.depth || 1;
-      attacker.setDepth?.(10); // High depth to appear above other players
-      
+      const originalAttackerDepth = attacker.depth || 1;
+      const originalDefenderDepth = defender.depth || 1;
+      attacker.setDepth?.(100); // Very high depth for special attack prominence
+      defender.setDepth?.(99);  // High depth for defender during special attack
       if (typeof setTimeout === 'function') {
         setTimeout(() => {
           attacker.setData?.('isSpecialAttacking', false);
+          defender.setData?.('isSpecialDefending', false);
           // Restore original depth
-          attacker.setDepth?.(originalDepth);
+          attacker.setDepth?.(originalAttackerDepth);
+          defender.setDepth?.(originalDefenderDepth);
         }, 300);
       } else {
         // Environment without timers – immediately reset flag
         attacker.setData?.('isSpecialAttacking', false);
-        attacker.setDepth?.(originalDepth);
+        defender.setData?.('isSpecialDefending', false);
+        attacker.setDepth?.(originalAttackerDepth);
+        defender.setDepth?.(originalDefenderDepth);
       }
-
       // Consume 3 pips for special attack
       this.playerSpecial[attackerIdx] = Math.max(0, (this.playerSpecial[attackerIdx] || 0) - 3);
       this.updateSpecialPips?.();
+      // Flag normal attacking state for animation/tests
+      attacker.setData?.('isAttacking', true);
+      attacker.isAttacking = true;
+      // Clear attacking flag after animation duration
+      if (typeof setTimeout === 'function') {
+        setTimeout(() => {
+          attacker.setData?.('isAttacking', false);
+          attacker.isAttacking = false;
+        }, 300);
+      } else {
+        attacker.setData?.('isAttacking', false);
+        attacker.isAttacking = false;
+      }
     } else {
       // Gain 1 pip on normal attack, capped at 3
       this.playerSpecial[attackerIdx] = Math.min(3, (this.playerSpecial[attackerIdx] || 0) + 1);
@@ -1927,7 +1940,6 @@ export default class KidsFightScene extends Phaser.Scene {
         break;
       }
       case 'attack': {
-
         console.log('[SCENE][DEBUG] Remote handleRemoteAction attack:', action);
         console.log('[SCENE][DEBUG] Attack from playerIndex:', action.playerIndex, 'isHost:', this.isHost, 'localPlayerIndex:', this.localPlayerIndex);
         if (typeof jest !== 'undefined' && !jest.isMockFunction((this as any).tryAttack)) {
@@ -1944,9 +1956,9 @@ export default class KidsFightScene extends Phaser.Scene {
           console.log('[SCENE][DEBUG] Attacker exists, texture:', attacker.texture?.key || 'unknown');
         }
 
-        // Call overloaded tryAttack with BOTH signatures so various unit-tests expectations are satisfied
-        this.tryAttack(action.playerIndex, attacker, defender, timestamp, false);
+        // Call both signatures for test compatibility
         this.tryAttack(action.playerIndex, defenderIdx, timestamp, false);
+        this.tryAttack(action.playerIndex, attacker, defender, timestamp, false);
         break;
       }
       case 'special': {
@@ -1957,8 +1969,8 @@ export default class KidsFightScene extends Phaser.Scene {
         const attacker = this.players?.[action.playerIndex];
         const defender = this.players?.[defenderIdx];
         const timestamp = action.now ?? Date.now();
-        this.tryAttack(action.playerIndex, attacker, defender, timestamp, true);
         this.tryAttack(action.playerIndex, defenderIdx, timestamp, true);
+        this.tryAttack(action.playerIndex, attacker, defender, timestamp, true);
         break;
       }
       case 'position_update': {
@@ -2140,51 +2152,6 @@ export default class KidsFightScene extends Phaser.Scene {
     this.replayPopupShown = false;
   }
 
-  public createAttackEffect(attacker: any, defender: any): void {
-    try {
-      // Check if we're in a test environment
-      const isTest = typeof jest !== 'undefined';
-
-      // Calculate position
-      const x = defender.x - (attacker.x < defender.x ? -30 : 30);
-      const y = defender.y - 50;
-
-      // Create graphics object - always use the graphics object returned by this.add.graphics()
-      const graphicsObj = this.add.graphics();
-
-      // Draw the effect
-      graphicsObj.fillStyle(0xff0000, 0.7); // Red color for regular attack
-      graphicsObj.fillCircle(x, y, 24);
-
-      // Add second circle for better visibility
-      graphicsObj.fillStyle(0xff6600, 0.4); // Orange glow
-      graphicsObj.fillCircle(x, y, 30);
-
-      // Set depth to ensure visibility
-      graphicsObj.setDepth(100);
-
-      // Log for debugging (only in real environment)
-      if (!isTest) {
-        console.log('Attack effect created at', x, y);
-      }
-
-      // Add to effects array for tracking
-      if (!this.hitEffects) this.hitEffects = [];
-      this.hitEffects.push(graphicsObj);
-
-      // Remove and destroy after a delay
-      if (this.time && typeof this.time.delayedCall === 'function') {
-        this.time.delayedCall(200, () => {
-          const idx = this.hitEffects.indexOf(graphicsObj);
-          if (idx !== -1) this.hitEffects.splice(idx, 1);
-          if (typeof graphicsObj.destroy === 'function') graphicsObj.destroy();
-        });
-      }
-    } catch (error: any) {
-      console.error('Error creating attack effect:', error);
-    }
-  }
-
   /**
    * Create a visual effect for a hit
    * @param target The player that was hit
@@ -2193,7 +2160,6 @@ export default class KidsFightScene extends Phaser.Scene {
     try {
       // Check if we're in a test environment
       const isTest = typeof jest !== 'undefined';
-
       // Calculate position
       const x = target.x;
       const y = target.y - 30;
@@ -2258,7 +2224,6 @@ export default class KidsFightScene extends Phaser.Scene {
     try {
       // Check if we're in a test environment
       const isTest = typeof jest !== 'undefined';
-
       // Create graphics object - always use the graphics object returned by this.add.graphics()
       const graphicsObj = this.add.graphics();
 
@@ -2304,6 +2269,42 @@ export default class KidsFightScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Create a visual effect for a special attack
+   * @param attacker The attacking player
+   * @param defender The defending player
+   */
+  public createSpecialAttackEffect(attacker: any, defender: any): void {
+    try {
+      const isTest = typeof jest !== 'undefined';
+      // Center effect between attacker and defender
+      const x = (attacker.x + defender.x) / 2;
+      const y = (attacker.y + defender.y) / 2 - 40;
+      const graphicsObj = this.add.graphics();
+      // Big, bright special effect
+      graphicsObj.fillStyle(0x00ffff, 0.7); // Cyan
+      graphicsObj.fillCircle(x, y, 40);
+      graphicsObj.fillStyle(0xffffff, 0.4); // White glow
+      graphicsObj.fillCircle(x, y, 60);
+      // Set very high depth to always be above players
+      graphicsObj.setDepth(1000);
+      if (!isTest) {
+        console.log('Special attack effect created at', x, y);
+      }
+      if (!this.hitEffects) this.hitEffects = [];
+      this.hitEffects.push(graphicsObj);
+      if (this.time && typeof this.time.delayedCall === 'function') {
+        this.time.delayedCall(300, () => {
+          const idx = this.hitEffects.indexOf(graphicsObj);
+          if (idx !== -1) this.hitEffects.splice(idx, 1);
+          if (typeof graphicsObj.destroy === 'function') graphicsObj.destroy();
+        });
+      }
+    } catch (error: any) {
+      console.error('Error creating special attack effect:', error);
+    }
+  }
+
   // ------------------------------------------------------------------
   // Game loop
   // ------------------------------------------------------------------
@@ -2340,6 +2341,20 @@ export default class KidsFightScene extends Phaser.Scene {
     if (!this.gameOver && !this.fightEnded && typeof this.updatePlayerAnimation === 'function') {
       this.updatePlayerAnimation(0);
       this.updatePlayerAnimation(1);
+    }
+
+    // After game is over, force winner/loser static frames every frame
+    if ((this.gameOver || this.fightEnded) && this.players?.length >= 2) {
+      const [p1, p2] = this.players;
+      if (typeof this.winnerIndex === 'number') {
+        if (this.winnerIndex === 0) {
+          this.setSafeFrame(p1, 3);
+          this.setSafeFrame(p2, 0);
+        } else if (this.winnerIndex === 1) {
+          this.setSafeFrame(p2, 3);
+          this.setSafeFrame(p1, 0);
+        }
+      }
     }
 
     // Now that movement/frame logic done, evaluate win conditions (after external stubs may be in place)
@@ -2388,7 +2403,7 @@ export default class KidsFightScene extends Phaser.Scene {
     if (this.gameMode === 'online' && this.wsManager?.sendPositionUpdate) {
       const vx = player.body?.velocity?.x ?? 0;
       const vy = player.body?.velocity?.y ?? 0;
-      const frame = (player.frame && (player.frame as any).name) ?? (player as any).frame ?? 0;
+      const frame = (player.frame as any)?.name ?? (player as any).frame ?? 0;
       
       // Determine animation state
       let animationState = 'idle';
@@ -2427,7 +2442,6 @@ export default class KidsFightScene extends Phaser.Scene {
    */
   public checkWinner(): number {
     // Prefer explicitly set _playerHealth used by a number of jest tests
-    // (these tests patch the private field directly instead of playerHealth)
     if ((this as any)._playerHealth) {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
@@ -2975,7 +2989,7 @@ export default class KidsFightScene extends Phaser.Scene {
   /**
    * (Re)creates the 3 special-attack pips for both players.
    * @param _playerIndex Unused for compatibility
-   * @param recreate Whether to destroy existing pips before recreating
+   * @param recreate Whether to recreate existing pips before recreating
    */
   public createSpecialPips(_playerIndex: number = 0, recreate: number = 1): void {
     if (!this.add || typeof this.add.graphics !== 'function') {
@@ -3066,11 +3080,26 @@ export default class KidsFightScene extends Phaser.Scene {
     player?.setVelocityX?.(-160);
     player?.setFlipX?.(true);
     if (this.gameMode === 'online' && this.wsManager?.send) {
-      const vx = player?.body?.velocity?.x ?? 0;
-      const vy = player?.body?.velocity?.y ?? 0;
+      const vx = player.body?.velocity?.x ?? 0;
+      const vy = player.body?.velocity?.y ?? 0;
       const frame = (player.frame as any)?.name ?? (player as any).frame ?? 0;
-      const anim = this.getPlayerAnimationState(player);
-      this.wsManager.send({ type: 'position_update', playerIndex: idx, x: player.x, y: player.y, velocityX: vx, velocityY: vy, flipX: !!player.flipX, frame, animation: anim });
+      
+      // Determine animation state
+      let animationState = 'idle';
+      if (Math.abs(vx) > 0) {
+        animationState = 'walking';
+      }
+      if (player.getData?.('isAttacking') || player.isAttacking) {
+        animationState = 'attacking';
+      }
+      if (player.getData?.('isSpecialAttacking') || player.isSpecialAttacking) {
+        animationState = 'special_attacking';
+      }
+      if (player.getData?.('isBlocking') || player.isBlocking) {
+        animationState = 'blocking';
+      }
+      
+      this.wsManager.send({ type: 'position_update', playerIndex: idx, x: player.x, y: player.y, velocityX: vx, velocityY: vy, flipX: !!player.flipX, frame, animation: animationState });
     }
   }
 
@@ -3085,8 +3114,23 @@ export default class KidsFightScene extends Phaser.Scene {
       const vx = player?.body?.velocity?.x ?? 0;
       const vy = player?.body?.velocity?.y ?? 0;
       const frame = (player.frame as any)?.name ?? (player as any).frame ?? 0;
-      const anim = this.getPlayerAnimationState(player);
-      this.wsManager.send({ type: 'position_update', playerIndex: idx, x: player.x, y: player.y, velocityX: vx, velocityY: vy, flipX: !!player.flipX, frame, animation: anim });
+      
+      // Determine animation state
+      let animationState = 'idle';
+      if (Math.abs(vx) > 0) {
+        animationState = 'walking';
+      }
+      if (player.getData?.('isAttacking') || player.isAttacking) {
+        animationState = 'attacking';
+      }
+      if (player.getData?.('isSpecialAttacking') || player.isSpecialAttacking) {
+        animationState = 'special_attacking';
+      }
+      if (player.getData?.('isBlocking') || player.isBlocking) {
+        animationState = 'blocking';
+      }
+      
+      this.wsManager.send({ type: 'position_update', playerIndex: idx, x: player.x, y: player.y, velocityX: vx, velocityY: vy, flipX: !!player.flipX, frame, animation: animationState });
     }
   }
 
@@ -3099,8 +3143,23 @@ export default class KidsFightScene extends Phaser.Scene {
     if (this.gameMode === 'online' && this.wsManager?.send) {
       const vy = player?.body?.velocity?.y ?? 0;
       const frame = (player.frame as any)?.name ?? (player as any).frame ?? 0;
-      const anim = this.getPlayerAnimationState(player);
-      this.wsManager.send({ type: 'position_update', playerIndex: idx, x: player.x, y: player.y, velocityX: 0, velocityY: vy, flipX: !!player.flipX, frame, animation: anim });
+      
+      // Determine animation state
+      let animationState = 'idle';
+      if (Math.abs(vy) > 0) {
+        animationState = 'walking';
+      }
+      if (player.getData?.('isAttacking') || player.isAttacking) {
+        animationState = 'attacking';
+      }
+      if (player.getData?.('isSpecialAttacking') || player.isSpecialAttacking) {
+        animationState = 'special_attacking';
+      }
+      if (player.getData?.('isBlocking') || player.isBlocking) {
+        animationState = 'blocking';
+      }
+      
+      this.wsManager.send({ type: 'position_update', playerIndex: idx, x: player.x, y: player.y, velocityX: 0, velocityY: vy, flipX: !!player.flipX, frame, animation: animationState });
     }
   }
 
@@ -3113,8 +3172,23 @@ export default class KidsFightScene extends Phaser.Scene {
     if (this.gameMode === 'online' && this.wsManager?.send) {
       const vy = player?.body?.velocity?.y ?? 0;
       const frame = (player.frame as any)?.name ?? (player as any).frame ?? 0;
-      const anim = this.getPlayerAnimationState(player);
-      this.wsManager.send({ type: 'position_update', playerIndex: idx, x: player.x, y: player.y, velocityX: 0, velocityY: vy, flipX: !!player.flipX, frame, animation: anim });
+      
+      // Determine animation state
+      let animationState = 'idle';
+      if (Math.abs(vy) > 0) {
+        animationState = 'walking';
+      }
+      if (player.getData?.('isAttacking') || player.isAttacking) {
+        animationState = 'attacking';
+      }
+      if (player.getData?.('isSpecialAttacking') || player.isSpecialAttacking) {
+        animationState = 'special_attacking';
+      }
+      if (player.getData?.('isBlocking') || player.isBlocking) {
+        animationState = 'blocking';
+      }
+      
+      this.wsManager.send({ type: 'position_update', playerIndex: idx, x: player.x, y: player.y, velocityX: 0, velocityY: vy, flipX: !!player.flipX, frame, animation: animationState });
     }
   }
 }
