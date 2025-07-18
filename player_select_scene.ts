@@ -579,8 +579,8 @@ export default class PlayerSelectScene extends Phaser.Scene {
             console.log('[PlayerSelectScene] Auto-populated missing p1 with default:', this.selected.p1);
           }
           if (!this.selected.p2) {
-            this.selected.p2 = validKeys[1]; // Default to 'davir' for guest
-            console.log('[PlayerSelectScene] Auto-populated missing p2 with default:', this.selected.p2);
+            // Don't auto-populate p2 - guest should make their own selection
+            console.log('[PlayerSelectScene] P2 not selected yet - guest needs to choose character');
           }
           
           console.log('[PlayerSelectScene] Proceeding with auto-populated selections:', this.selected);
@@ -599,9 +599,16 @@ export default class PlayerSelectScene extends Phaser.Scene {
       // Validate that we have valid character keys before proceeding
       const validKeys = ['bento', 'davir', 'jose', 'davis', 'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'];
       const finalP1 = validKeys.includes(p1CharKey) ? p1CharKey : (this.CHARACTER_KEYS[0] || 'bento');
-      const finalP2 = validKeys.includes(p2CharKey) ? p2CharKey : (this.CHARACTER_KEYS[1] || 'davir');
+      const finalP2 = validKeys.includes(p2CharKey) ? p2CharKey : '';
       
       console.log('[PlayerSelectScene] Final selected characters:', { p1: finalP1, p2: finalP2 });
+      
+      // Don't proceed if either player hasn't selected a character
+      if (!finalP1 || !finalP2) {
+        console.log('[PlayerSelectScene] Cannot launch game - missing character selections:', { p1: finalP1, p2: finalP2 });
+        // Optionally show a message to the user
+        return;
+      }
       
       // Update the selected object to ensure it has the correct keys
       this.selected = { p1: finalP1, p2: finalP2 };
