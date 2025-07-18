@@ -589,12 +589,28 @@ export default class PlayerSelectScene extends Phaser.Scene {
       }
       
       // Make sure to use the final selected character keys, handling invalid indices
+      console.log('[PlayerSelectScene] Debug selection process:', {
+        selectedP1Index: this.selectedP1Index,
+        selectedP2Index: this.selectedP2Index,
+        CHARACTER_KEYS_length: this.CHARACTER_KEYS.length,
+        CHARACTER_KEYS: this.CHARACTER_KEYS,
+        selected_p1: this.selected.p1,
+        selected_p2: this.selected.p2
+      });
+      
       const p1CharKey = this.selectedP1Index >= 0 && this.selectedP1Index < this.CHARACTER_KEYS.length 
         ? this.CHARACTER_KEYS[this.selectedP1Index] 
         : this.selected.p1;
       const p2CharKey = this.selectedP2Index >= 0 && this.selectedP2Index < this.CHARACTER_KEYS.length 
         ? this.CHARACTER_KEYS[this.selectedP2Index] 
         : this.selected.p2;
+      
+      console.log('[PlayerSelectScene] Character key resolution:', {
+        p1CharKey,
+        p2CharKey,
+        p1_from_index: this.selectedP1Index >= 0 && this.selectedP1Index < this.CHARACTER_KEYS.length ? this.CHARACTER_KEYS[this.selectedP1Index] : 'fallback',
+        p2_from_index: this.selectedP2Index >= 0 && this.selectedP2Index < this.CHARACTER_KEYS.length ? this.CHARACTER_KEYS[this.selectedP2Index] : 'fallback'
+      });
       
       // Validate that we have valid character keys before proceeding
       const validKeys = ['bento', 'davir', 'jose', 'davis', 'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'];
