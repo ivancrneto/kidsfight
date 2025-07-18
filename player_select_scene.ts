@@ -146,13 +146,13 @@ export default class PlayerSelectScene extends Phaser.Scene {
       this.roomCode = data.roomCode || this.roomCode || null;
       this.isHost = data.isHost || false;
       // Initialize with different default characters for host vs guest to avoid conflicts
-      // Host defaults to bento (index 0), Guest defaults to davir (index 1)
+      // Host defaults to bento (index 0), Guest will select their own character
       if (this.isHost) {
-        this.selected = { p1: keys[0], p2: keys[1] || keys[0] }; // Host: bento for p1, davir for p2
+        this.selected = { p1: keys[0], p2: '' }; // Host: bento for p1, guest will select p2
         this.p1Index = 0; // bento
-        this.p2Index = 1; // davir
+        this.p2Index = -1; // Will be set by guest
         this.selectedP1Index = 0;
-        this.selectedP2Index = 1;
+        this.selectedP2Index = -1; // Will be set by guest
       } else {
         // Guest should wait for host's selections, don't set defaults that will override them
         // Initialize with placeholder values that will be overridden by WebSocket messages
@@ -254,10 +254,9 @@ export default class PlayerSelectScene extends Phaser.Scene {
       setTimeout(() => {
         if (this.wsManager && typeof this.wsManager.send === 'function') {
           if (this.isHost) {
-            // Host sends both player selections to establish initial state
-            console.log('[PlayerSelectScene] Host sending initial character selections:', { 
+            // Host only sends p1 selection to establish initial state, guest will send p2
+            console.log('[PlayerSelectScene] Host sending initial p1 character selection:', { 
               p1: this.selected.p1,
-              p2: this.selected.p2,
               selected: this.selected 
             });
             
@@ -267,18 +266,6 @@ export default class PlayerSelectScene extends Phaser.Scene {
               player: 'p1',
               character: this.selected.p1
             });
-            
-            // Small delay between messages to avoid race conditions
-            setTimeout(() => {
-              if (this.wsManager && typeof this.wsManager.send === 'function') {
-                console.log('[DEBUG] Host sending p2 character:', this.selected.p2);
-                this.wsManager.send({
-                  type: 'player_selected',
-                  player: 'p2',
-                  character: this.selected.p2
-                });
-              }
-            }, 50);
           } else {
             // Guest should not send initial character selection, wait for host's selections first
             // and only send when guest actually makes a selection via setSelectorToCharacter
