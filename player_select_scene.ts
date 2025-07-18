@@ -248,7 +248,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
     // Setup WebSocket handlers for online mode
     if (this.mode === 'online') {
       this.setupWebSocketHandlers();
-      this.setupWebSocketDebug();
+      // Note: setupWebSocketDebug() is now integrated into setupWebSocketHandlers() to avoid callback conflicts
       
       // Send initial character selections when entering the scene (with delay to ensure handlers are set up)
       setTimeout(() => {
@@ -656,6 +656,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private handlePlayerSelected(data: PlayerSelectWebSocketMessage): void {
+    console.log('[PlayerSelectScene] *** HANDLE_PLAYER_SELECTED CALLED ***', data);
     console.log('[PlayerSelectScene] Received player_selected message:', data);
     console.log('[PlayerSelectScene] Current state before handling:', {
       isHost: this.isHost,
@@ -905,13 +906,25 @@ export default class PlayerSelectScene extends Phaser.Scene {
           ? JSON.parse(event.data)
           : event.data;
 
-        console.log('[PlayerSelectScene] Received message:', data);
+        // Combined debug and main logging
+        console.log('[DEBUG][PlayerSelectScene] Incoming WebSocket message:', data);
+        console.log('[PlayerSelectScene] MAIN MESSAGE HANDLER - Received message:', data);
 
-        if (!data || !data.type) return;
+        if (!data || !data.type) {
+          console.log('[PlayerSelectScene] MAIN MESSAGE HANDLER - No data or type, ignoring');
+          return;
+        }
 
+        console.log('[PlayerSelectScene] MAIN MESSAGE HANDLER - Processing message type:', data.type);
+        
+        // Additional debug for game_start messages
+        if (data.type === 'game_start' || data.type === 'gameStart') {
+          console.log('[DEBUG][PlayerSelectScene] Triggering scene.start("KidsFightScene") with:', data);
+        }
         switch (data.type) {
           case 'player_selected':
           case 'playerSelected':
+            console.log('[PlayerSelectScene] MAIN MESSAGE HANDLER - Calling handlePlayerSelected with:', data);
             this.handlePlayerSelected(data);
             break;
           case 'playerReady':
