@@ -1420,6 +1420,7 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Add event handlers for touch input
     leftBtn.on('pointerdown', () => {
+      if (this.gameOver || this.fightEnded) return;
       const playerIdx = this.getPlayerIndex();
       const player = this.players?.[playerIdx];
       console.log('[Touch] Left down, player:', player);
@@ -1462,6 +1463,7 @@ export default class KidsFightScene extends Phaser.Scene {
     });
 
     rightBtn.on('pointerdown', () => {
+      if (this.gameOver || this.fightEnded) return;
       const playerIdx = this.getPlayerIndex();
       const player = this.players?.[playerIdx];
       console.log('[Touch] Right down, player:', player);
