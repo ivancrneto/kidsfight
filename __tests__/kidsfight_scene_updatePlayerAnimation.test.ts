@@ -89,13 +89,39 @@ describe('KidsFightScene updatePlayerAnimation', () => {
   });
 
   describe('movement animation integration', () => {
-    it('should call updateSharedWalkingAnimation when player is moving', () => {
+    it('should call updateWalkingAnimation when local player is moving', () => {
       mockPlayer.body.velocity.x = 100; // Moving
       
       scene.updatePlayerAnimation(0);
       
-      expect(scene.updateSharedWalkingAnimation).toHaveBeenCalledWith(mockPlayer);
+      expect(scene.updateWalkingAnimation).toHaveBeenCalledWith(mockPlayer);
       expect(scene.stopWalkingAnimation).not.toHaveBeenCalled();
+    });
+
+    it('should call updateSharedWalkingAnimation when remote player is moving', () => {
+      // Set up online mode
+      scene.gameMode = 'online';
+      scene.localPlayerIndex = 0; // Local player is 0
+      
+      // Create a remote player (player 1)
+      const remotePlayer = {
+        y: originalY,
+        body: { velocity: { x: 100, y: 0 } },
+        isAttacking: false,
+        isSpecialAttacking: false,
+        isBlocking: false,
+        direction: 'right',
+        setFrame: jest.fn(),
+        getData: jest.fn(() => false),
+        setData: jest.fn(),
+        anims: { stop: jest.fn() }
+      };
+      scene.players = [mockPlayer, remotePlayer];
+      
+      scene.updatePlayerAnimation(1); // Update remote player
+      
+      expect(scene.updateSharedWalkingAnimation).toHaveBeenCalledWith(remotePlayer);
+      expect(scene.updateWalkingAnimation).not.toHaveBeenCalled();
     });
 
     it('should call stopWalkingAnimation when player is not moving', () => {

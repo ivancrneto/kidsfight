@@ -77,10 +77,10 @@ describe('KidsFightScene Walking Animation', () => {
       mockTime = 1150;
       scene.getTime.mockReturnValue(mockTime);
       
-      // Should not change frame
+      // Should call setSafeFrame with the current frame (frame 2, no change)
       scene.updateWalkingAnimation(mockPlayer);
-      expect(scene.setSafeFrame).not.toHaveBeenCalled();
-      expect(mockPlayer.walkAnimData.currentFrame).toBe(2);
+      expect(scene.setSafeFrame).toHaveBeenCalledWith(mockPlayer, 2);
+      expect(mockPlayer.walkAnimData.currentFrame).toBe(2); // Frame shouldn't have changed
     });
 
     it('should handle null player gracefully', () => {
