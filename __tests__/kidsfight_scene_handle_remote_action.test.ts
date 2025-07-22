@@ -15,6 +15,7 @@ describe('KidsFightScene.handleRemoteAction', () => {
       setPosition: jest.fn(),
       body: { reset: jest.fn() },
       setData: jest.fn(),
+      texture: { source: {} }, // Add texture with source for body.reset safety check
       x: 0,
       y: 0,
       health: 100
@@ -26,6 +27,7 @@ describe('KidsFightScene.handleRemoteAction', () => {
       setPosition: jest.fn(),
       body: { reset: jest.fn() },
       setData: jest.fn(),
+      texture: { source: {} }, // Add texture with source for body.reset safety check
       x: 0,
       y: 0,
       health: 100

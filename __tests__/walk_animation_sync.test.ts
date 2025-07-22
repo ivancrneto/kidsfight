@@ -208,7 +208,8 @@ describe('Walk Animation Synchronization', () => {
       expect(mockPlayer1.remoteFrameHold).toEqual({
         frame: 2,
         timestamp: 1000,
-        holdDuration: 300
+        holdDuration: 300,
+        animationState: 'walking'
       });
       
       // Clear the mock calls
@@ -343,7 +344,8 @@ describe('Walk Animation Synchronization', () => {
       expect(mockPlayer1.remoteFrameHold).toEqual({
         frame: 0,
         timestamp: 1000,
-        holdDuration: 300
+        holdDuration: 300,
+        animationState: 'idle'
       });
       
       // Try to update animation during hold

@@ -1779,7 +1779,7 @@ export default class KidsFightScene extends Phaser.Scene {
         setTimeout(() => {
           attacker.setData?.('isAttacking', false);
           attacker.isAttacking = false;
-        }, 300);
+        }, 800); // Increased from 300ms to 800ms for better visibility
       } else {
         attacker.setData?.('isAttacking', false);
         attacker.isAttacking = false;
@@ -1986,9 +1986,13 @@ export default class KidsFightScene extends Phaser.Scene {
         player.setVelocityX?.(action.velocityX ?? 0);
         player.setVelocityY?.(action.velocityY ?? 0);
         player.setFlipX?.(!!action.flipX);
-        // Update physics body position if available
-        if (player.body && typeof player.body.reset === 'function') {
-          player.body.reset(action.x, action.y);
+        // Update physics body position if available - but safely check for texture first
+        if (player.body && typeof player.body.reset === 'function' && player.texture && player.texture.source) {
+          try {
+            player.body.reset(action.x, action.y);
+          } catch (error) {
+            console.warn('[SCENE][DEBUG] Failed to reset body position:', error);
+          }
         }
 
         // Sync physics body velocity for remote player to enable animation cycling
@@ -2076,12 +2080,26 @@ export default class KidsFightScene extends Phaser.Scene {
           // Set frame for all animations (walking, idle, attack, etc.)
           player.setFrame(action.frame);
 
-          // Mark this frame as received from remote and hold it for a bit
+          // Mark this frame as received from remote and hold it for longer for attack/block animations
           const now = this.getTime();
+          let holdDuration = 300; // Default hold duration
+          
+          // Hold attack and block animations longer to make them more visible
+          if (animationState === 'attacking' || animationState === 'special_attacking') {
+            holdDuration = 800; // Hold attack frames for 800ms
+          } else if (animationState === 'blocking') {
+            holdDuration = 500; // Hold block frames for 500ms
+          } else if (animationState === 'walking') {
+            // For walking, we want to hold the frame but not too long to prevent jerky animation
+            holdDuration = 300; // Hold walking frames for 300ms
+          }
+          
+          // Always create or update the remoteFrameHold to ensure frames are properly held
           player.remoteFrameHold = {
             frame: action.frame,
             timestamp: now,
-            holdDuration: 300 // Hold for 300ms to prevent local animation from overriding immediately
+            holdDuration: holdDuration,
+            animationState: animationState // Store the animation state to help with debugging
           };
 
           // Update walkAnimData for walking animations
@@ -2456,6 +2474,162 @@ export default class KidsFightScene extends Phaser.Scene {
     }
     // Send position update in online mode
     if (this.gameMode === 'online' && this.wsManager?.send) {
+      // Determine player index
+      let idx = this.getPlayerIndex ? this.getPlayerIndex() : 0;
+      // If player object has playerIndex, prefer that
+      if (typeof player.playerIndex === 'number') idx = player.playerIndex;
+      const vx = player.body?.velocity?.x ?? 0;
+      const vy = player.body?.velocity?.y ?? 0;
+      // Initialize walkAnimData if it doesn't exist
+      if (!player.walkAnimData) {
+        player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
+      }
+
+      const flipX = !!player.flipX;
+      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
+      // Create a custom cause that includes the animation state
+      const cause = JSON.stringify({ animation: 'walking' });
+      // Send position update with animation state directly in the message
+      this.wsManager.send({
+        type: 'position_update',
+        playerIndex: idx,
+        x: player.x,
+        y: player.y,
+        velocityX: vx,
+        velocityY: vy,
+        flipX,
+        frame: player.walkAnimData.currentFrame,
+        animation: 'walking'  // Send animation state directly
+      });
+    }
+  }
+
+  /**
+   * Update animation & scale for a player. Keeps this implementation minimal yet consistent
+   * with what unit-tests assert (see kidsfight_scene_player_scale.test.ts).
+   */
+  public updatePlayerAnimation(playerIndex: number): void {
+    const player = this.players?.[playerIndex];
+    if (!player) return;
+
+    const BASE_SCALE = 0.4;
+    const origY = player.y;
+    player.setScale?.(BASE_SCALE);
+
+    const isAttack = player.getData?.('isAttacking') || player.isAttacking;
+    const isSpecial = player.getData?.('isSpecialAttacking') || player.isSpecialAttacking;
+    const isBlocking = player.getData?.('isBlocking') || player.isBlocking;
+    const isMoving = player.body?.velocity?.x !== 0;
+    const isRemote = this.gameMode === 'online' && playerIndex !== (this.localPlayerIndex ?? 0);
+
+    // animation priority: attack > special > block
+    if (isAttack) {
+      this.setSafeFrame(player, 4);
+      if (this.time?.delayedCall) {
+        this.time.delayedCall(800, () => {  // Increased from 200ms to 800ms for better visibility
+          this.setSafeFrame(player, 0);
+          player.setData?.('isAttacking', false);
+          player.isAttacking = false;
+          player.anims?.stop?.();
+        });
+      }
+      player.y = origY;
+      return;
+    }
+    if (isSpecial) {
+      this.setSafeFrame(player, 6);
+      player.y = origY;
+      return;
+    }
+    if (isBlocking) {
+      this.setSafeFrame(player, 5);
+      player.y = origY;
+      return;
+    }
+    
+    // game over or fight ended logic
+    if (this.gameOver || this.fightEnded) {
+      if (isMoving) {
+        if (isRemote) {
+          this.updateSharedWalkingAnimation(player);
+        } else {
+          this.updateWalkingAnimation(player);
+        }
+      } else {
+        this.stopWalkingAnimation(player);
+        if (typeof this.winnerIndex === 'number') {
+          const idx = this.players?.indexOf(player);
+          if (idx === this.winnerIndex) {
+            player.setFrame(3);
+          } else {
+            player.setFrame(0);
+          }
+        }
+      }
+      player.y = origY;
+      return;
+    }
+    
+    // movement logic
+    if (isMoving) {
+      if (isRemote) {
+        this.updateSharedWalkingAnimation(player);
+      } else {
+        this.updateWalkingAnimation(player);
+      }
+    } else {
+      this.stopWalkingAnimation(player);
+    }
+    player.y = origY;
+  }
+
+  /**
+   * Update walking animation for a player
+   * Cycles between frames 1 and 2 during movement
+   * Uses per-player walkAnimData implementation for tests
+   */
+  public updateWalkingAnimation(player: any): void {
+    if (!player) return;
+
+    // Stop cycling if game is over or fight ended
+    if (this.gameOver || this.fightEnded) {
+      // Winner: frame 3, Loser: frame 0 (laid down)
+      if (typeof this.winnerIndex === 'number') {
+        const idx = this.players?.indexOf(player);
+        if (idx === this.winnerIndex) {
+          this.setSafeFrame(player, 3);
+        } else {
+          this.setSafeFrame(player, 0);
+        }
+      }
+      return;
+    }
+
+    // Initialize walk animation data if needed
+    if (!player.walkAnimData) {
+      player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
+      // Set initial frame 1 so it gets captured by tests
+      this.setSafeFrame(player, 1);
+    }
+
+    const now = this.getTime();
+
+    // Check if enough time has passed to change frame (per-player timing)
+    if (now - player.walkAnimData.frameTime >= player.walkAnimData.frameDelay) {
+      // Cycle between frames 1 and 2
+      player.walkAnimData.currentFrame = player.walkAnimData.currentFrame === 1 ? 2 : 1;
+      player.walkAnimData.frameTime = now; // Reset frame time to prevent immediate cycling
+    }
+
+    // Set the current frame
+    this.setSafeFrame(player, player.walkAnimData.currentFrame);
+
+    // Send updated walk frame in online mode for local player
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      // Determine player index
+      let idx = this.getPlayerIndex ? this.getPlayerIndex() : 0;
+      // If player object has playerIndex, prefer that
+      if (typeof player.playerIndex === 'number') idx = player.playerIndex;
       const vx = player.body?.velocity?.x ?? 0;
       const vy = player.body?.velocity?.y ?? 0;
       // Initialize walkAnimData if it doesn't exist
@@ -2478,6 +2652,359 @@ export default class KidsFightScene extends Phaser.Scene {
         frame: player.walkAnimData.currentFrame,
         animation: 'walking'  // Send animation state directly
       });
+    }
+  }
+
+  /**
+   * Update walking animation for a player using shared timing
+   * Used by updatePlayerAnimation for synchronized walking between players
+   */
+  public updateSharedWalkingAnimation(player: any): void {
+    if (!player) return;
+
+    const now = this.getTime();
+
+    // Check if there's a remote frame hold that should be respected
+    if (player.remoteFrameHold) {
+      const timeSinceRemote = now - player.remoteFrameHold.timestamp;
+      if (timeSinceRemote < player.remoteFrameHold.holdDuration) {
+        // Still within hold period - keep the remote frame
+        this.setSafeFrame(player, player.remoteFrameHold.frame);
+        return;
+      } else {
+        // Hold period expired - clear the hold
+        player.remoteFrameHold = null;
+        // Continue with normal shared timing logic below
+      }
+    }
+
+    // Initialize shared walk animation data if needed
+    if (!this.sharedWalkAnimData) {
+      this.sharedWalkAnimData = { frameTime: now, currentFrame: 1, frameDelay: 200 };
+      this.setSafeFrame(player, 1);
+      return;
+    }
+
+    // Check if enough time has passed to change frame (shared timing)
+    if (now - this.sharedWalkAnimData.frameTime >= this.sharedWalkAnimData.frameDelay) {
+      // Cycle between frames 1 and 2
+      this.sharedWalkAnimData.currentFrame = this.sharedWalkAnimData.currentFrame === 1 ? 2 : 1;
+      this.sharedWalkAnimData.frameTime = now;
+    }
+
+    // Set the current shared frame
+    this.setSafeFrame(player, this.sharedWalkAnimData.currentFrame);
+
+    // Send updated walk frame in online mode for local player
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      // Determine player index
+      let idx = this.getPlayerIndex ? this.getPlayerIndex() : 0;
+      // If player object has playerIndex, prefer that
+      if (typeof player.playerIndex === 'number') idx = player.playerIndex;
+      const vx = player.body?.velocity?.x ?? 0;
+      const vy = player.body?.velocity?.y ?? 0;
+      // Initialize walkAnimData if it doesn't exist
+      if (!player.walkAnimData) {
+        player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
+      }
+      const flipX = !!player.flipX;
+      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
+      // Send position update with animation state directly in the message
+      this.wsManager.send({
+        type: 'position_update',
+        playerIndex: idx,
+        x: player.x,
+        y: player.y,
+        velocityX: vx,
+        velocityY: vy,
+        flipX,
+        frame: player.walkAnimData.currentFrame,
+        animation: 'walking'  // Send animation state directly
+      });
+    }
+  }
+
+  /**
+   * Stop walking animation and return to idle frame
+   */
+  private stopWalkingAnimation(player: any): void {
+    if (!player) return;
+
+    // Reset to idle frame (frame 0)
+    this.setSafeFrame(player, 0);
+    // Reset walk animation data if exists
+    if (player.walkAnimData) {
+      player.walkAnimData.currentFrame = 1;
+      player.walkAnimData.frameTime = 0;
+    }
+  }
+
+  /**
+   * (Re)creates the 3 special-attack pips for both players.
+   * @param _playerIndex Unused for compatibility
+   * @param recreate Whether to recreate existing pips before recreating
+   */
+  public createSpecialPips(_playerIndex: number = 0, recreate: number = 1): void {
+    if (!this.add || typeof this.add.graphics !== 'function') {
+      this.specialPips1 = [];
+      this.specialPips2 = [];
+      return;
+    }
+    if (recreate) {
+      [this.specialPips1, this.specialPips2].forEach(arr => {
+        if (Array.isArray(arr)) arr.forEach(p => p?.destroy?.());
+      });
+    }
+    this.specialPips1 = [];
+    this.specialPips2 = [];
+    for (let i = 0; i < 3; i++) {
+      const x1 = 140 + i * 36;
+      const x2 = 660 + i * 36;
+      const y = 60;
+      const g1 = this.add.graphics();
+      const pip1 = (g1 && typeof (g1 as any).fillStyle === 'function') ? g1 : this.safeAddGraphics();
+      pip1.fillStyle(0x888888, 0.3);
+      pip1.fillCircle?.(x1, y, 16);
+      pip1.setDepth?.(10);
+      pip1.setScrollFactor?.(0, 0);
+      this.specialPips1.push(pip1);
+      const g2 = this.add.graphics();
+      const pip2 = (g2 && typeof (g2 as any).fillStyle === 'function') ? g2 : this.safeAddGraphics();
+      pip2.fillStyle(0x888888, 0.3);
+      pip2.fillCircle?.(x2, y, 16);
+      pip2.setDepth?.(10);
+      pip2.setScrollFactor?.(0, 0);
+      this.specialPips2.push(pip2);
+    }
+  }
+
+  /** Jump button / ↑ press */
+  public handleJumpDown(): void {
+    if (this.gameOver || this.fightEnded) return;
+    const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
+    if (player && player.body && player.body.touching.down) {
+      player.setVelocityY?.(-330);
+    }
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      this.wsManager.send({ type: 'jump', playerIndex: idx });
+    }
+  }
+
+  /** Normal attack */
+  public handleAttack(): void {
+    if (this.gameOver || this.fightEnded) return;
+    const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
+    this.tryAction?.(idx, 'attack', false);
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      this.wsManager.send({ type: 'attack', playerIndex: idx });
+      
+      // Send position update with attacking animation state
+      if (player) {
+        const vx = player.body?.velocity?.x ?? 0;
+        const vy = player.body?.velocity?.y ?? 0;
+        const flipX = player.flipX;
+        this.wsManager.send({
+          type: 'position_update',
+          playerIndex: idx,
+          x: player.x,
+          y: player.y,
+          velocityX: vx,
+          velocityY: vy,
+          flipX,
+          frame: 4,  // Attack frame
+          animation: 'attacking'
+        });
+      }
+    }
+  }
+
+  /** Block action */
+  public handleBlock(): void {
+    if (this.gameOver || this.fightEnded) return;
+    const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
+    if (player) {
+      player.setData('isBlocking', true);
+      this.playerBlocking[idx] = true;
+    }
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      this.wsManager.send({ type: 'block', playerIndex: idx });
+      
+      // Send position update with blocking animation state
+      if (player) {
+        const vx = player.body?.velocity?.x ?? 0;
+        const vy = player.body?.velocity?.y ?? 0;
+        const flipX = player.flipX;
+        this.wsManager.send({
+          type: 'position_update',
+          playerIndex: idx,
+          x: player.x,
+          y: player.y,
+          velocityX: vx,
+          velocityY: vy,
+          flipX,
+          frame: 5,  // Block frame
+          animation: 'blocking'
+        });
+      }
+    }
+  }
+
+  /** Special attack (costs pips) */
+  public handleSpecial(): void {
+    if (this.gameOver || this.fightEnded) return;
+    const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
+    this.tryAction?.(idx, 'special', true);
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      this.wsManager.send({ type: 'special', playerIndex: idx });
+      
+      // Send position update with special attacking animation state
+      if (player) {
+        const vx = player.body?.velocity?.x ?? 0;
+        const vy = player.body?.velocity?.y ?? 0;
+        const flipX = player.flipX;
+        this.wsManager.send({
+          type: 'position_update',
+          playerIndex: idx,
+          x: player.x,
+          y: player.y,
+          velocityX: vx,
+          velocityY: vy,
+          flipX,
+          frame: 6,  // Special attack frame
+          animation: 'special_attacking'
+        });
+      }
+    }
+  }
+
+  /** Move left press */
+  public handleLeftDown(): void {
+    if (this.touchButtons?.left) this.touchButtons.left.isDown = true;
+    const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
+    player?.setVelocityX?.(-160);
+    player?.setFlipX?.(true);
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      const vx = player.body?.velocity?.x ?? 0;
+      const vy = player.body?.velocity?.y ?? 0;
+      // Initialize walkAnimData if it doesn't exist
+      if (!player.walkAnimData) {
+        player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
+      }
+
+      const flipX = !!player.flipX;
+      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
+      // Send position update with animation state directly in the message
+      this.wsManager.send({
+        type: 'position_update',
+        playerIndex: idx,
+        x: player.x,
+        y: player.y,
+        velocityX: vx,
+        velocityY: vy,
+        flipX,
+        frame: player.walkAnimData.currentFrame,
+        animation: 'walking'  // Send animation state directly
+      });
+    }
+  }
+
+  /** Move right press */
+  public handleRightDown(): void {
+    if (this.touchButtons?.right) this.touchButtons.right.isDown = true;
+    const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
+    player?.setVelocityX?.(160);
+    player?.setFlipX?.(false);
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      const vx = player.body?.velocity?.x ?? 0;
+      const vy = player.body?.velocity?.y ?? 0;
+      // Initialize walkAnimData if it doesn't exist
+      if (!player.walkAnimData) {
+        player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
+      }
+      const flipX = !!player.flipX;
+      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
+      // Send position update with animation state directly in the message
+      this.wsManager.send({
+        type: 'position_update',
+        playerIndex: idx,
+        x: player.x,
+        y: player.y,
+        velocityX: vx,
+        velocityY: vy,
+        flipX,
+        frame: player.walkAnimData.currentFrame,
+        animation: 'walking'  // Send animation state directly
+      });
+    }
+  }
+
+  /** Move left release */
+  public handleLeftUp(): void {
+    if (this.touchButtons?.left) this.touchButtons.left.isDown = false;
+    const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
+    player?.setVelocityX?.(0);
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      const vy = player.body?.velocity?.y ?? 0;
+      // Initialize walkAnimData if it doesn't exist
+      if (!player.walkAnimData) {
+        player.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 200 };
+      } else {
+        // When stopping movement, set to idle frame
+        player.walkAnimData.currentFrame = 0;
+      }
+
+      const flipX = !!player.flipX;
+      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
+      // Send position update with animation state directly in the message
+      this.wsManager.send({
+        type: 'position_update',
+        playerIndex: idx,
+        x: player.x,
+        y: player.y,
+        velocityX: 0,
+        velocityY: vy,
+        flipX,
+        frame: 0,
+        animation: 'idle'  // Send animation state directly
+      });
+    }
+  }
+
+  /** Move right release */
+  public handleRightUp(): void {
+    if (this.touchButtons?.right) this.touchButtons.right.isDown = false;
+    const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
+    player?.setVelocityX?.(0);
+    if (this.gameMode === 'online' && this.wsManager?.send) {
+      const vy = player.body?.velocity?.y ?? 0;
+      // Initialize walkAnimData if it doesn't exist
+      if (!player.walkAnimData) {
+        player.walkAnimData = { frameTime: 0, currentFrame: 0, frameDelay: 200 };
+      }
+
+      const flipX = !!player.flipX;
+      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
+      // Send position update with animation state directly in the message
+      this.wsManager.send({
+        type: 'position_update',
+        playerIndex: idx,
+        x: player.x,
+        y: player.y,
+        velocityX: 0,
+        velocityY: vy,
+        flipX,
+        frame: 0,
+        animation: 'idle'  // Send animation state directly
+      });
+      player.walkAnimData.currentFrame = 0;
     }
   }
 
@@ -2833,7 +3360,7 @@ export default class KidsFightScene extends Phaser.Scene {
     if (isAttack) {
       this.setSafeFrame(player, 4);
       if (this.time?.delayedCall) {
-        this.time.delayedCall(200, () => {
+        this.time.delayedCall(800, () => {  // Increased from 200ms to 800ms for better visibility
           this.setSafeFrame(player, 0);
           player.setData?.('isAttacking', false);
           player.isAttacking = false;
@@ -3090,7 +3617,7 @@ export default class KidsFightScene extends Phaser.Scene {
     if (this.gameOver || this.fightEnded) return;
     const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
-    if (player?.body?.touching?.down) {
+    if (player && player.body && player.body.touching.down) {
       player.setVelocityY?.(-330);
     }
     if (this.gameMode === 'online' && this.wsManager?.send) {
@@ -3102,9 +3629,28 @@ export default class KidsFightScene extends Phaser.Scene {
   public handleAttack(): void {
     if (this.gameOver || this.fightEnded) return;
     const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
     this.tryAction?.(idx, 'attack', false);
     if (this.gameMode === 'online' && this.wsManager?.send) {
       this.wsManager.send({ type: 'attack', playerIndex: idx });
+      
+      // Send position update with attacking animation state
+      if (player) {
+        const vx = player.body?.velocity?.x ?? 0;
+        const vy = player.body?.velocity?.y ?? 0;
+        const flipX = player.flipX;
+        this.wsManager.send({
+          type: 'position_update',
+          playerIndex: idx,
+          x: player.x,
+          y: player.y,
+          velocityX: vx,
+          velocityY: vy,
+          flipX,
+          frame: 4,  // Attack frame
+          animation: 'attacking'
+        });
+      }
     }
   }
 
@@ -3114,11 +3660,29 @@ export default class KidsFightScene extends Phaser.Scene {
     const idx = this.getPlayerIndex();
     const player = this.players?.[idx];
     if (player) {
-      player.setData?.('isBlocking', true);
+      player.setData('isBlocking', true);
       this.playerBlocking[idx] = true;
     }
     if (this.gameMode === 'online' && this.wsManager?.send) {
       this.wsManager.send({ type: 'block', playerIndex: idx });
+      
+      // Send position update with blocking animation state
+      if (player) {
+        const vx = player.body?.velocity?.x ?? 0;
+        const vy = player.body?.velocity?.y ?? 0;
+        const flipX = player.flipX;
+        this.wsManager.send({
+          type: 'position_update',
+          playerIndex: idx,
+          x: player.x,
+          y: player.y,
+          velocityX: vx,
+          velocityY: vy,
+          flipX,
+          frame: 5,  // Block frame
+          animation: 'blocking'
+        });
+      }
     }
   }
 
@@ -3126,9 +3690,28 @@ export default class KidsFightScene extends Phaser.Scene {
   public handleSpecial(): void {
     if (this.gameOver || this.fightEnded) return;
     const idx = this.getPlayerIndex();
+    const player = this.players?.[idx];
     this.tryAction?.(idx, 'special', true);
     if (this.gameMode === 'online' && this.wsManager?.send) {
       this.wsManager.send({ type: 'special', playerIndex: idx });
+      
+      // Send position update with special attacking animation state
+      if (player) {
+        const vx = player.body?.velocity?.x ?? 0;
+        const vy = player.body?.velocity?.y ?? 0;
+        const flipX = player.flipX;
+        this.wsManager.send({
+          type: 'position_update',
+          playerIndex: idx,
+          x: player.x,
+          y: player.y,
+          velocityX: vx,
+          velocityY: vy,
+          flipX,
+          frame: 6,  // Special attack frame
+          animation: 'special_attacking'
+        });
+      }
     }
   }
 

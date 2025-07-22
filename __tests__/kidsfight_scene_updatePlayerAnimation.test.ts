@@ -157,13 +157,18 @@ describe('KidsFightScene updatePlayerAnimation', () => {
   });
 
   describe('attack animation handling', () => {
-    it('should handle regular attack with frame 4 and 200ms timeout', () => {
-      mockPlayer.isAttacking = true;
+    it('should handle regular attack with frame 4 and 800ms timeout', () => {
+      // Setup
+      mockPlayer.getData.mockImplementation((key) => {
+        if (key === 'isAttacking') return true;
+        return false;
+      });
       
+      // Execute
       scene.updatePlayerAnimation(0);
       
       expect(scene.setSafeFrame).toHaveBeenCalledWith(mockPlayer, 4);
-      expect(scene.time.delayedCall).toHaveBeenCalledWith(200, expect.any(Function));
+      expect(scene.time.delayedCall).toHaveBeenCalledWith(800, expect.any(Function));
     });
 
     it('should handle special attack with frame 6', () => {

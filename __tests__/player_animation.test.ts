@@ -133,8 +133,8 @@ describe('Player Animation Tests', () => {
     // Verify initial attack frame is set
     expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(4);
     
-    // Advance timers to trigger the delayed callback (200ms delay)
-    jest.advanceTimersByTime(200);
+    // Advance timers to trigger the delayed callback (800ms delay)
+    jest.advanceTimersByTime(800);
     
     // Verify revert to idle frame
     expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(0);

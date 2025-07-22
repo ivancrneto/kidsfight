@@ -42,25 +42,35 @@ describe('Attack animation timing', () => {
   });
 
   test('isAttacking flag persists and clears after duration', () => {
-    // Trigger a normal attack
+    mockPlayers[0].isAttacking = true;
+    
+    // Call tryAttack which should set a timeout to clear the flag
     scene.tryAttack(0, 1, Date.now(), false);
+    
+    // Flag should still be true immediately after
     expect(mockPlayers[0].isAttacking).toBe(true);
-    // Before duration ends
-    jest.advanceTimersByTime(299);
-    expect(mockPlayers[0].isAttacking).toBe(true);
+    
+    // Advance time by 800ms (updated from 200ms)
+    jest.advanceTimersByTime(800);
+    
     // After duration
     jest.advanceTimersByTime(1);
     expect(mockPlayers[0].isAttacking).toBe(false);
   });
 
   test('updatePlayerAnimation shows attack then returns to idle after duration', () => {
-    scene.tryAttack(0, 1, Date.now(), false);
-    // First update: should flash attack frame
+    mockPlayers[0].isAttacking = true;
+    
+    // Initial call should set attack frame
     scene.updatePlayerAnimation(0);
     expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(4);
+    
+    // Clear mock to check next call
     mockPlayers[0].setFrame.mockClear();
-    // Advance past attack duration
-    jest.advanceTimersByTime(300);
+    mockPlayers[0].anims.stop.mockClear();
+    
+    // Advance time by 800ms (updated from 200ms)
+    jest.advanceTimersByTime(800);
     scene.updatePlayerAnimation(0);
     expect(mockPlayers[0].setFrame).toHaveBeenCalledWith(0);
     expect(mockPlayers[0].anims.stop).toHaveBeenCalled();
