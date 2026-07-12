@@ -427,15 +427,15 @@ export default class PlayerSelectScene extends Phaser.Scene {
       this.updateSelectionIndicators();
       this.updateReadyUI();
     } else {
-      // Online mode: only allow the local player to move their selector
+      // Online mode: only allow the local player to move their selector.
+      // Use the direction-aware newIndex computed above; recomputing it as
+      // (index + 1) made both left and right advance the selector forward.
       if ((player === 1 && this.isHost) || (player === 2 && !this.isHost)) {
         if (player === 1) {
-          newIndex = (this.p1Index + 1) % this.CHARACTER_KEYS.length;
           this.p1Index = newIndex;
           this.selected.p1 = this.characters[newIndex].key;
           this.selectedP1Index = newIndex;
         } else {
-          newIndex = (this.p2Index + 1) % this.CHARACTER_KEYS.length;
           this.p2Index = newIndex;
           this.selected.p2 = this.characters[newIndex].key;
           this.selectedP2Index = newIndex;
