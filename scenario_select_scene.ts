@@ -124,7 +124,10 @@ class ScenarioSelectScene extends Phaser.Scene {
         }, 50);
       } else {
         // Guest only re-sends their own selection (p2) if it's not a default/invalid value
-        if (this.selected.p2 && this.selected.p2 !== 'davir' && this.selected.p2 !== 'player2') {
+        // 'player2' is the placeholder default; skip only that (and empty).
+        // 'davir' is a real, selectable character and must NOT be treated as a
+        // sentinel, or a guest who picks Davi R never syncs their choice.
+        if (this.selected.p2 && this.selected.p2 !== 'player2') {
           console.log('[ScenarioSelectScene] Guest re-sending p2 character selection:', { 
             p2: this.selected.p2 
           });
