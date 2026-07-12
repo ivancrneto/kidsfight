@@ -721,19 +721,17 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private updateReadyUI(): void {
-    if (!this.player1ReadyText || !this.player2ReadyText) return;
-
-    this.player1ReadyText.setText(`P1 ${this.player1Ready ? 'Ready' : 'Not Ready'}`);
-    this.player2ReadyText.setText(`P2 ${this.player2Ready ? 'Ready' : 'Not Ready'}`);
-
-    if (this.readyButton) {
-      const isReady = this.isHost ? this.player1Ready : this.player2Ready;
-      this.readyButton.setText(isReady ? 'Cancelar' : 'COMEÇAR');
-      this.readyButton.setStyle({
-        color: '#fff',
-        backgroundColor: isReady ? '#ff4444' : '#4CAF50'
-      });
+    // The optional per-player "ready" text labels are not always created, so
+    // update them only when present...
+    if (this.player1ReadyText && this.player2ReadyText) {
+      this.player1ReadyText.setText(`P1 ${this.player1Ready ? 'Ready' : 'Not Ready'}`);
+      this.player2ReadyText.setText(`P2 ${this.player2Ready ? 'Ready' : 'Not Ready'}`);
     }
+    // ...but always keep the ready button in sync. Previously this method
+    // early-returned when the (never-created) labels were missing, so the
+    // ready button never updated. Delegate to the canonical helper instead of
+    // duplicating its styling with different colors/casing.
+    this.updateReadyButton();
   }
 
   private createSelectionIndicators(): void {
