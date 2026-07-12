@@ -297,6 +297,13 @@ interface AttackOptions {
 }
 
 // Function to try an attack
+/**
+ * @deprecated Not used by the game. KidsFightScene implements combat in its own
+ * `tryAttack` method (5/10 damage, 0-3 special-pip model). This standalone
+ * helper encodes an obsolete model (10/30 damage, 0-100 special meter) and is
+ * kept only for its existing unit tests. Do not treat it as the live combat
+ * logic, and do not import it into the scene.
+ */
 export function tryAttack({
   scene,
   attackerIdx,
