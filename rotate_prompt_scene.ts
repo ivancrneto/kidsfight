@@ -8,7 +8,7 @@ import KidsFightScene from './kidsfight_scene';
 class RotatePromptScene extends Phaser.Scene {
   private bg!: Phaser.GameObjects.Rectangle;
   private text!: Phaser.GameObjects.Text;
-  private icon!: Phaser.GameObjects.Image;
+  private icon!: Phaser.GameObjects.Text;
   private scenesAdded: boolean;
 
   constructor() {
@@ -30,9 +30,13 @@ class RotatePromptScene extends Phaser.Scene {
       wordWrap: { width: w * 0.8 }
     }).setOrigin(0.5);
     
-    this.icon = this.add.image(w/2, h/2 - 80, 'rotate_icon')
-      .setOrigin(0.5)
-      .setScale(0.5);
+    // Drawn glyph instead of a 'rotate_icon' image that was never preloaded
+    // (there is no such asset), which rendered as a missing-texture box.
+    this.icon = this.add.text(w/2, h/2 - 80, '↻️', {
+      fontSize: `${Math.max(48, Math.round(w * 0.1))}px`,
+      color: '#fff',
+      fontFamily: 'monospace'
+    }).setOrigin(0.5);
   }
 
   resize(): void {
