@@ -588,7 +588,10 @@ export default class KidsFightScene extends Phaser.Scene {
       if (typeof global !== 'undefined') {
         (global as any).mockWsManager = this.wsManager;
       }
-      if (this.wsManager?.connect) this.wsManager.connect(this.roomCode);
+      // Pass the room code as the roomCode argument (2nd param); the manager
+      // resolves the server URL itself. Passing it as the URL made connect()
+      // try to open the room code as a WebSocket endpoint.
+      if (this.wsManager?.connect) this.wsManager.connect(undefined, this.roomCode);
       this.wsManager?.setMessageCallback?.((msg: any) => {
         console.log('[SCENE][DEBUG] Received WebSocket message:', msg);
         // First try to extract action from msg.action, msg.data, or use the message itself

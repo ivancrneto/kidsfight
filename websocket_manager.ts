@@ -98,19 +98,22 @@ class WebSocketManager {
   public async connect(url?: string, roomCode?: string): Promise<WebSocket> {
     console.log('[WSM][DIAG] connect() called', { url, roomCode });
     // Use Render in production, localhost in development
-    let wsUrl = url;
-    if (!wsUrl) {
-      wsUrl = getWebSocketUrl();
+    const wsUrl: string = url || getWebSocketUrl();
+    // Remember the room code if the caller supplied one so it is attached to
+    // outgoing messages (see send()).
+    if (roomCode) {
+      this._roomCode = roomCode;
     }
     if (this._ws) {
       console.warn(`[WSM] WebSocket already connected [${this._debugInstanceId}]`);
       return Promise.resolve(this._ws);
     }
-    
+
     return new Promise((resolve, reject) => {
       try {
         this._isHost = false;
-        this._ws = this._webSocketFactory(url!);
+        // Connect to the resolved URL, not the raw (possibly undefined) argument.
+        this._ws = this._webSocketFactory(wsUrl);
         console.log('[WSM][DIAG] _ws created', { ws: !!this._ws, url: this._ws?.url });
         
         // Set up event handlers
