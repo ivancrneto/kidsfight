@@ -143,7 +143,7 @@ export function updateSceneLayout(scene: any): void {
     console.log('DEBUG:updateSceneLayout: healthBarBg2 or setPosition/setSize missing', scene.healthBarBg2);
   }
   
-  if (scene.healthBar1 && scene.healthBar1.setPosition && scene.healthBar1.setSize) {
+  if (scene.players?.[0] && scene.healthBar1 && scene.healthBar1.setPosition && scene.healthBar1.setSize) {
     console.log('DEBUG:updateSceneLayout: calling healthBar1.setPosition with', p1X - barWidth/2 + (barWidth * (scene.players[0].health || 0))/200, barY);
     scene.healthBar1.setPosition(p1X - barWidth/2 + (barWidth * (scene.players[0].health || 0))/200, barY);
     console.log('DEBUG:updateSceneLayout: calling healthBar1.setSize with', barWidth * (scene.players[0].health || 0)/100, barHeight);
@@ -152,7 +152,7 @@ export function updateSceneLayout(scene: any): void {
     console.log('DEBUG:updateSceneLayout: healthBar1 or setPosition/setSize missing', scene.healthBar1);
   }
   
-  if (scene.healthBar2 && scene.healthBar2.setPosition && scene.healthBar2.setSize) {
+  if (scene.players?.[1] && scene.healthBar2 && scene.healthBar2.setPosition && scene.healthBar2.setSize) {
     console.log('DEBUG:updateSceneLayout: calling healthBar2.setPosition with', p2X - barWidth/2 + (barWidth * (scene.players[1].health || 0))/200, barY);
     scene.healthBar2.setPosition(p2X - barWidth/2 + (barWidth * (scene.players[1].health || 0))/200, barY);
     console.log('DEBUG:updateSceneLayout: calling healthBar2.setSize with', barWidth * (scene.players[1].health || 0)/100, barHeight);
