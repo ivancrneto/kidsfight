@@ -965,7 +965,7 @@ export default class KidsFightScene extends Phaser.Scene {
       'roni': 'Roni',
       'jacqueline': 'Jacqueline',
       'ivan': 'Ivan',
-      'd_isa': 'D\'Isa',
+      'd_isa': 'D. Isa',
       'player1': 'Bento',
       'player2': 'Davi R'
     };
