@@ -1958,9 +1958,10 @@ export default class KidsFightScene extends Phaser.Scene {
           console.log('[SCENE][DEBUG] Attacker exists, texture:', attacker.texture?.key || 'unknown');
         }
 
-        // Call both signatures for test compatibility
+        // Apply the remote attack exactly once. Calling tryAttack more than
+        // once here double-applies damage on the receiving client and desyncs
+        // health between host and guest.
         this.tryAttack(action.playerIndex, defenderIdx, timestamp, false);
-        this.tryAttack(action.playerIndex, attacker, defender, timestamp, false);
         break;
       }
       case 'special': {
@@ -1971,8 +1972,8 @@ export default class KidsFightScene extends Phaser.Scene {
         const attacker = this.players?.[action.playerIndex];
         const defender = this.players?.[defenderIdx];
         const timestamp = action.now ?? Date.now();
+        // Apply the remote special exactly once (see attack case above).
         this.tryAttack(action.playerIndex, defenderIdx, timestamp, true);
-        this.tryAttack(action.playerIndex, attacker, defender, timestamp, true);
         break;
       }
       case 'position_update': {

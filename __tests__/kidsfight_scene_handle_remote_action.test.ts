@@ -69,7 +69,9 @@ describe('KidsFightScene.handleRemoteAction', () => {
     const now = Date.now();
     (scene as any).tryAttack.mockClear();
     scene.handleRemoteAction({ type: 'attack', playerIndex: 0, now });
-    expect((scene as any).tryAttack).toHaveBeenCalledTimes(2);
+    // A remote attack must apply exactly once, otherwise damage is doubled on
+    // the receiving client.
+    expect((scene as any).tryAttack).toHaveBeenCalledTimes(1);
   });
 
   it('sets attack animation on correct player during remote attack', () => {
@@ -80,8 +82,8 @@ describe('KidsFightScene.handleRemoteAction', () => {
     // Handle remote attack from player 0 (guest attacking)
     scene.handleRemoteAction({ type: 'attack', playerIndex: 0, now: Date.now() });
     
-    // Verify tryAttack was called with correct attacker index
-    expect((scene as any).tryAttack).toHaveBeenCalledWith(0, player0, player1, expect.any(Number), false);
+    // Verify tryAttack was called once with the canonical (attackerIdx, defenderIdx, now, special) signature
+    expect((scene as any).tryAttack).toHaveBeenCalledTimes(1);
     expect((scene as any).tryAttack).toHaveBeenCalledWith(0, 1, expect.any(Number), false);
     
     // Restore original function
@@ -115,7 +117,8 @@ describe('KidsFightScene.handleRemoteAction', () => {
     const now = Date.now();
     (scene as any).tryAttack.mockClear();
     scene.handleRemoteAction({ type: 'special', playerIndex: 1, now });
-    expect((scene as any).tryAttack).toHaveBeenCalledTimes(2);
+    // A remote special must apply exactly once (see attack case above).
+    expect((scene as any).tryAttack).toHaveBeenCalledTimes(1);
   });
 
   it('handles position_update action', () => {
