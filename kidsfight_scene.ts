@@ -1931,9 +1931,10 @@ export default class KidsFightScene extends Phaser.Scene {
         break;
       }
       case 'jump': {
-        const isOnlineGame = ((this as any).isOnline ?? false) || this.gameMode === 'online';
-        const jumpVel = isOnlineGame ? -330 : -500;
-        player.setVelocityY?.(jumpVel);
+        // Use the same jump velocity as every other jump path (touch, keyboard,
+        // online). The old local-mode value (-500) made jump height depend on
+        // the code path.
+        player.setVelocityY?.(-330);
         break;
       }
       case 'block': {
