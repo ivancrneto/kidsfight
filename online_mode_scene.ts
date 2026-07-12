@@ -348,18 +348,6 @@ export default class OnlineModeScene extends Phaser.Scene {
         this.wsManager.setRoomCode(data.roomCode);
         this.wsManager.setHost(true);
         this.showRoomCode(data.roomCode);
-      } else if (data.type === 'room_joined') {
-        // Don't reconnect if already connected
-        if (!this.wsManager.isConnected()) {
-          const ws = await this.wsManager.connect(getWebSocketUrl(), data.roomCode);
-          if (!ws) {
-            console.error('Failed to connect to WebSocket server');
-            return;
-          }
-        }
-        this.wsManager.setRoomCode(data.roomCode);
-        this.wsManager.setHost(false);
-        this.startGame({ roomCode: data.roomCode, isHost: false });
       } else if (data.type === 'player_joined') {
         console.log('Player joined, starting game...');
         this.wsManager.setRoomCode(data.roomCode); // Ensure roomCode is set
