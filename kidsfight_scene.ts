@@ -1690,7 +1690,7 @@ export default class KidsFightScene extends Phaser.Scene {
     } else {
       defenderIdxComputed = attackerIdx === 0 ? 1 : 0;
     }
-    let damage = special ? 10 : 5;
+    let damage = special ? this.SPECIAL_DAMAGE : this.ATTACK_DAMAGE;
     const targetBlocking = this.playerBlocking?.[defenderIdxComputed] || defender.getData?.('isBlocking');
     if (targetBlocking) damage = Math.floor(damage / 2);
 
