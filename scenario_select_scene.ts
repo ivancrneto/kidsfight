@@ -357,9 +357,7 @@ class ScenarioSelectScene extends Phaser.Scene {
       };
       this.wsManager.setMessageCallback(this._wsMessageHandler);
     }
-
-    // Responsive layout update on resize
-    this.scale.on('resize', this.updateLayout, this);
+    // (resize handler is registered once earlier in create())
   }
 
   private createNavigationButtons(): void {
@@ -690,7 +688,8 @@ class ScenarioSelectScene extends Phaser.Scene {
 
     // Update positions of UI elements based on new size
     if (this.preview) {
-      this.preview.setPosition(width / 2, height / 2 - 50);
+      // Match the Y used in create() so the preview doesn't jump on resize.
+      this.preview.setPosition(width / 2, height / 2);
       this.rescalePreview();
     }
 
