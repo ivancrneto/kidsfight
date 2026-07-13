@@ -318,6 +318,13 @@ export default class KidsFightScene extends Phaser.Scene {
   private keyShift!: Phaser.Input.Keyboard.Key;
   private keyEnter!: Phaser.Input.Keyboard.Key;
 
+  // Previous-frame key state, used for edge detection so held keys fire an
+  // action once per press instead of every frame.
+  private _prevAttackDown: boolean = false;
+  private _prevSpecialDown: boolean = false;
+  private _prevJumpDown: boolean = false;
+  private _prevBlockDown: boolean = false;
+
   private winnerIndex: number | undefined;
 
   constructor() {
@@ -2399,6 +2406,8 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Process keyboard input
     this.processKeyboardInput();
+    // Process keyboard action keys (attack / special / jump / block)
+    this.handleKeyboardActions();
 
     if (p1.x <= p2.x) {
       // Player 1 on the left facing right, Player 2 on the right facing left
@@ -2508,6 +2517,49 @@ export default class KidsFightScene extends Phaser.Scene {
         animation: 'walking'  // Send animation state directly
       });
     }
+  }
+
+  /**
+   * Poll the keyboard for the action keys (attack / special / jump / block) and
+   * dispatch them to the same handlers the on-screen touch buttons use.
+   * Attack, special and jump are edge-triggered (fire once per key press);
+   * block is a held state (engaged while the key is down, released on key-up).
+   *
+   * Unlike processKeyboardInput this is not gated behind a test guard, so it can
+   * be exercised directly with mocked keys.
+   */
+  public handleKeyboardActions(): void {
+    if (this.gameOver || (this as any)._gameOver || this.fightEnded) return;
+
+    const attackDown = !!(this.attackKey?.isDown || this.keySpace?.isDown);
+    const specialDown = !!this.keyQ?.isDown;
+    const jumpDown = !!(this.cursors?.up?.isDown || this.keyW?.isDown);
+    const blockDown = !!(this.blockKey?.isDown || this.keyShift?.isDown);
+
+    // Edge-triggered actions
+    if (attackDown && !this._prevAttackDown) this.handleAttack();
+    if (specialDown && !this._prevSpecialDown) this.handleSpecial();
+    if (jumpDown && !this._prevJumpDown) this.handleJumpDown();
+
+    // Block is held: engage on press, release on key-up
+    if (blockDown && !this._prevBlockDown) {
+      this.handleBlock();
+    } else if (!blockDown && this._prevBlockDown) {
+      const idx = this.getPlayerIndex();
+      const player = this.players?.[idx];
+      if (player) {
+        player.setData?.('isBlocking', false);
+        this.playerBlocking[idx] = false;
+      }
+      if (this.gameMode === 'online' && this.wsManager?.send) {
+        this.wsManager.send({ type: 'block', playerIndex: idx, active: false });
+      }
+    }
+
+    this._prevAttackDown = attackDown;
+    this._prevSpecialDown = specialDown;
+    this._prevJumpDown = jumpDown;
+    this._prevBlockDown = blockDown;
   }
 
   /**
