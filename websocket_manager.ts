@@ -122,25 +122,7 @@ class WebSocketManager {
           console.log(`[WSM] Connected to server [${this._debugInstanceId}]`);
           this._onConnectionCallback?.(true);
           if (this._onMessageCallback) {
-            this._boundMessageCallback = (e: MessageEvent) => {
-              console.warn(`[WSM] _boundMessageCallback (connect) INVOKED. Current callback ID: ${this._currentCallbackId}`);
-              console.log('[WSM] Raw message event:', e.data);
-              try {
-                // Parse the message data if it's a string
-                let parsedData = e.data;
-                if (typeof e.data === 'string') {
-                  try {
-                    parsedData = JSON.parse(e.data);
-                  } catch (parseError) {
-                    // If it's not JSON, keep it as is
-                    parsedData = e.data;
-                  }
-                }
-                this._onMessageCallback?.({ ...e, data: parsedData });
-              } catch (error) {
-                console.error('[WSM] Error processing message:', error);
-              }
-            };
+            this._boundMessageCallback = this._makeMessageHandler();
             this._ws?.addEventListener('message', this._boundMessageCallback);
             console.log('[WSM] Message event listener registered', { ws: !!this._ws, callback: !!this._boundMessageCallback });
           }
@@ -284,6 +266,34 @@ class WebSocketManager {
     }
   }
 
+  /**
+   * Build the 'message' listener used everywhere we deliver messages to
+   * `_onMessageCallback`. It always JSON-parses a string `data` and delivers a
+   * consistent `{ ...event, data: <parsed> }` shape, regardless of whether the
+   * callback was registered before or after the socket opened. Previously the
+   * pre-open (connect) path parsed while the post-open paths delivered the raw
+   * event, so consumers received a parsed object or a raw JSON string depending
+   * purely on connection timing.
+   */
+  private _makeMessageHandler(): (event: MessageEvent) => void {
+    return (e: MessageEvent) => {
+      try {
+        let parsedData: any = e.data;
+        if (typeof e.data === 'string') {
+          try {
+            parsedData = JSON.parse(e.data);
+          } catch {
+            // Not JSON — keep the raw string.
+            parsedData = e.data;
+          }
+        }
+        this._onMessageCallback?.({ ...e, data: parsedData } as MessageEvent);
+      } catch (error) {
+        console.error('[WSM] Error processing message:', error);
+      }
+    };
+  }
+
   public onMessage(callback: (event: MessageEvent) => void): void {
     this._messageCallbackId++;
     const cbId = this._messageCallbackId;
@@ -299,7 +309,7 @@ class WebSocketManager {
 
     // If WebSocket is already connected, set up the new listener
     if (this.isConnected()) {
-      this._boundMessageCallback = (e: MessageEvent) => this._onMessageCallback?.(e);
+      this._boundMessageCallback = this._makeMessageHandler();
       this._ws!.addEventListener('message', this._boundMessageCallback);
     }
   }
@@ -310,7 +320,7 @@ class WebSocketManager {
       if (this._boundMessageCallback) {
         this._ws.removeEventListener('message', this._boundMessageCallback);
       }
-      this._boundMessageCallback = (e: MessageEvent) => this._onMessageCallback?.(e);
+      this._boundMessageCallback = this._makeMessageHandler();
       this._ws.addEventListener('message', this._boundMessageCallback);
     }
   }

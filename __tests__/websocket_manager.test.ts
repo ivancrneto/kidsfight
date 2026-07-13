@@ -248,10 +248,12 @@ describe('WebSocketManager', () => {
     console.log('Registering messageHandler1', handler1);
     wsManager.setMessageCallback(handler1);
 
-    // Trigger a message event with a JSON string, as a real WebSocket would
+    // Trigger a message event with a JSON string, as a real WebSocket would.
+    // The manager parses string data and delivers a consistent { data: <parsed> }
+    // shape regardless of when the callback was registered.
     (wsManager._ws as any)._trigger('message', { data: JSON.stringify(testData) });
-    // Assert handler1 is called
-    expect(messageHandler1).toHaveBeenCalledWith(JSON.stringify(testData));
+    // Assert handler1 is called with the parsed payload
+    expect(messageHandler1).toHaveBeenCalledWith(testData);
     expect(messageHandler2).not.toHaveBeenCalled();
     messageHandler1.mockClear();
 
@@ -265,7 +267,8 @@ describe('WebSocketManager', () => {
     console.log('Registering messageHandler2');
     const handler2 = (event: any) => {
       console.log('messageHandler2 called');
-      messageHandler2(JSON.parse(event.data));
+      // event.data is already parsed by the manager
+      messageHandler2(event.data);
     };
     wsManager.setMessageCallback(handler2);
 
