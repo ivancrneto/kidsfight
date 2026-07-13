@@ -399,6 +399,35 @@ describe('Player Selection Behaviour', () => {
       expect(scene.selected.p1).toBe('bento');
     });
 
+    it('should honor the direction argument in online mode (move backward)', () => {
+      scene.init({ mode: 'online' });
+      scene.backButton = new MockText();
+      scene.create();
+      scene.CHARACTER_KEYS = [
+        'bento', 'davir', 'jose', 'davis',
+        'carol', 'roni', 'jacqueline', 'ivan', 'd_isa'
+      ];
+      scene.characters = scene.CHARACTER_KEYS.map((key: string, i: number) => ({ key, name: key, x: i, y: 0, scale: 1 }));
+      scene.characterSprites = {};
+      for (const char of scene.characters) {
+        scene.characterSprites[char.key] = new MockSprite(scene, 0, 0, char.key);
+        patchCharacterSpriteOn(scene, char.key);
+      }
+      scene.isHost = true;
+
+      // Moving left from index 1 should land on index 0, not advance to 2.
+      scene.p1Index = 1;
+      scene.selected = { p1: '', p2: '' };
+      scene.handleCharacterSelect(1, -1);
+      expect(scene.p1Index).toBe(0);
+      expect(scene.selected.p1).toBe('bento');
+
+      // Moving left from index 0 should wrap around to the last character.
+      scene.handleCharacterSelect(1, -1);
+      expect(scene.p1Index).toBe(scene.CHARACTER_KEYS.length - 1);
+      expect(scene.selected.p1).toBe('d_isa');
+    });
+
     it('should send player selection to WebSocket in online mode', () => {
       // Create a new scene with proper type assertions and mock WebSocketManager
       const wsScene = new PlayerSelectScene(mockWebSocketManager as unknown as WebSocketManager) as unknown as PlayerSelectSceneWithWS;
