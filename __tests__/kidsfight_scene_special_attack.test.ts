@@ -206,11 +206,28 @@ describe('KidsFightScene - Special Attack', () => {
       
       // Act
       scene['tryAction'](0, 'special', true);
-      
+
       // Assert - Verify damage was applied
       expect(scene.playerHealth[1]).toBe(initialHealth - 10);
       // Verify special pips were consumed
       expect((scene as any).playerSpecial[0]).toBe(0);
+    });
+
+    it('should block a special that is still on cooldown', () => {
+      const mockPlayer1 = { health: 100, setData: jest.fn(), body: { blocked: { down: true } }, setVelocityX: jest.fn(), setVelocityY: jest.fn(), x: 100 };
+      const mockPlayer2 = { health: 100, setData: jest.fn(), body: { blocked: { down: true } }, setVelocityX: jest.fn(), setVelocityY: jest.fn(), x: 150 };
+      scene.players = [mockPlayer1, mockPlayer2];
+      scene.playerHealth = [100, 100];
+      (scene as any).playerSpecial = [3, 0];
+      scene.gameOver = false;
+      // Pretend a special just fired (cooldown active).
+      (scene as any).lastSpecialTime = [Date.now(), 0];
+
+      scene['tryAction'](0, 'special', true);
+
+      // No damage and pips untouched because the cooldown blocked it.
+      expect(scene.playerHealth[1]).toBe(100);
+      expect((scene as any).playerSpecial[0]).toBe(3);
     });
   });
 

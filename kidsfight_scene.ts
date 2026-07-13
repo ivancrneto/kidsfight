@@ -1599,7 +1599,10 @@ export default class KidsFightScene extends Phaser.Scene {
     if (!this.lastConsecutiveResetTime || this.lastConsecutiveResetTime.length < 2) {
       this.lastConsecutiveResetTime = [0, 0];
     }
-    
+    if (!this.lastSpecialTime || this.lastSpecialTime.length < 2) {
+      this.lastSpecialTime = [0, 0];
+    }
+
     const attacker = this.players?.[playerIndex];
     const defenderIdx = playerIndex === 0 ? 1 : 0;
     const defender = this.players?.[defenderIdx];
@@ -1611,6 +1614,8 @@ export default class KidsFightScene extends Phaser.Scene {
     if (isSpecial) {
       const currentPips = this.playerSpecial?.[playerIndex] ?? 0;
       if (currentPips < 3) return; // not enough pips – abort before any state/animation
+      // Enforce the special cooldown so specials can't be spammed back-to-back.
+      if (now - this.lastSpecialTime[playerIndex] < SPECIAL_COOLDOWN) return;
     }
 
     // Only reset consecutive counter if break is at least 1000ms
@@ -1660,9 +1665,11 @@ export default class KidsFightScene extends Phaser.Scene {
       this.lastConsecutiveResetTime[playerIndex] = now;
       console.log(`[CADENCE] Player ${playerIndex} attack allowed: consecutive=${this.consecutiveAttacks[playerIndex]}, delay was=${ATTACK_COOLDOWN}ms`);
     } else {
-      // For specials, just update lastAttackTime (for shared cooldown)
+      // For specials, update lastAttackTime (shared cooldown) and the special
+      // cooldown timestamp.
       this.lastAttackTime[playerIndex] = now;
       this.lastConsecutiveResetTime[playerIndex] = now;
+      this.lastSpecialTime[playerIndex] = now;
     }
   }
 
