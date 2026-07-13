@@ -2638,7 +2638,7 @@ export default class KidsFightScene extends Phaser.Scene {
     const isAttack = player.getData?.('isAttacking') || player.isAttacking;
     const isSpecial = player.getData?.('isSpecialAttacking') || player.isSpecialAttacking;
     const isBlocking = player.getData?.('isBlocking') || player.isBlocking;
-    const isMoving = player.body?.velocity?.x !== 0;
+    const isMoving = (player.body?.velocity?.x ?? 0) !== 0;
     const isRemote = this.gameMode === 'online' && playerIndex !== (this.localPlayerIndex ?? 0);
 
     // animation priority: attack > special > block
@@ -3448,7 +3448,7 @@ export default class KidsFightScene extends Phaser.Scene {
     const isAttack = player.getData?.('isAttacking') || player.isAttacking;
     const isSpecial = player.getData?.('isSpecialAttacking') || player.isSpecialAttacking;
     const isBlocking = player.getData?.('isBlocking') || player.isBlocking;
-    const isMoving = player.body?.velocity?.x !== 0;
+    const isMoving = (player.body?.velocity?.x ?? 0) !== 0;
 
     if (isAttack) return 'attacking';
     if (isSpecial) return 'special_attacking';
