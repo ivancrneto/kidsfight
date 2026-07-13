@@ -57,6 +57,12 @@ class WebSocketManager {
   private _onConnectionCallback: ((isConnected: boolean) => void) | null = null;
   private _boundMessageCallback: ((event: MessageEvent) => void) | null = null;
   private _webSocketFactory: (url: string) => WebSocket;
+  // Auto-reconnect state
+  private _shouldReconnect: boolean = false;
+  private _lastUrl: string | null = null;
+  private _reconnectAttempts: number = 0;
+  private _maxReconnectAttempts: number = 5;
+  private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   private constructor(webSocketFactory?: (url: string) => WebSocket) {
     this._webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
@@ -104,6 +110,13 @@ class WebSocketManager {
     if (roomCode) {
       this._roomCode = roomCode;
     }
+    // Remember the URL and (re)enable auto-reconnect for this connection.
+    this._lastUrl = wsUrl;
+    this._shouldReconnect = true;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     if (this._ws) {
       console.warn(`[WSM] WebSocket already connected [${this._debugInstanceId}]`);
       return Promise.resolve(this._ws);
@@ -120,6 +133,7 @@ class WebSocketManager {
         this._ws.onopen = () => {
           console.log('[WSM][DIAG] _ws.onopen called');
           console.log(`[WSM] Connected to server [${this._debugInstanceId}]`);
+          this._reconnectAttempts = 0; // reset backoff on a successful connection
           this._onConnectionCallback?.(true);
           if (this._onMessageCallback) {
             this._boundMessageCallback = this._makeMessageHandler();
@@ -154,6 +168,10 @@ class WebSocketManager {
             this._onCloseCallback?.(event);
           }
           this._onConnectionCallback?.(false);
+          // Attempt to recover from an unexpected drop (not a manual disconnect).
+          if (this._shouldReconnect && wasConnected) {
+            this._scheduleReconnect();
+          }
         };
 
         this._ws.onerror = (error: Event) => {
@@ -169,7 +187,47 @@ class WebSocketManager {
     });
   }
 
+  /**
+   * Schedule a reconnect attempt using exponential backoff (1s, 2s, 4s, …,
+   * capped at 10s), up to _maxReconnectAttempts. The host flag, room code and
+   * message callback are preserved across the reconnect.
+   */
+  private _scheduleReconnect(): void {
+    if (this._reconnectTimer) return; // already scheduled
+    if (this._reconnectAttempts >= this._maxReconnectAttempts) {
+      console.warn(`[WSM] Giving up reconnect after ${this._reconnectAttempts} attempts [${this._debugInstanceId}]`);
+      return;
+    }
+    const attempt = this._reconnectAttempts + 1;
+    const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 10000);
+    console.log(`[WSM] Scheduling reconnect attempt ${attempt} in ${delay}ms [${this._debugInstanceId}]`);
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      if (!this._shouldReconnect || this._ws) return;
+      this._reconnectAttempts = attempt;
+      const wasHost = this._isHost;
+      const roomCode = this._roomCode;
+      this.connect(this._lastUrl || undefined, roomCode || undefined)
+        .then(() => {
+          // connect() may clear these; restore the pre-drop identity.
+          this._isHost = wasHost;
+          if (roomCode) this._roomCode = roomCode;
+        })
+        .catch(() => {
+          // Connection failed again — queue the next backoff step.
+          if (this._shouldReconnect) this._scheduleReconnect();
+        });
+    }, delay);
+  }
+
   public disconnect(code?: number, reason?: string): void {
+    // A manual disconnect is intentional: stop auto-reconnecting.
+    this._shouldReconnect = false;
+    this._reconnectAttempts = 0;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     if (this._ws) {
       try {
         if (this._boundMessageCallback) {
