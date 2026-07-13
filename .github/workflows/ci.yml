@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: ['main']
+
+jobs:
+  test:
+    name: Type-check & tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # Non-blocking: the codebase currently has pre-existing type errors.
+      # Surfaced here so they can be cleaned up, but not gated on yet.
+      - name: TypeScript type check
+        run: yarn type-check
+        continue-on-error: true
+
+      - name: Run tests
+        run: yarn test
