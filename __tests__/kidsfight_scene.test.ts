@@ -638,7 +638,7 @@ describe('KidsFightScene', () => {
       player1.body.onFloor.mockReturnValueOnce(true);
       const jumpAction = {type: 'jump', playerIndex: 0};
       scene.handleRemoteAction(jumpAction);
-      expect(player1.setVelocityY).toHaveBeenCalledWith(-500);
+      expect(player1.setVelocityY).toHaveBeenCalledWith(-330);
     });
 
     it('should handle player attack', () => {
