@@ -2385,6 +2385,40 @@ export default class KidsFightScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Small burst shown for a regular (non-special) attack. Previously the code
+   * called this.createAttackEffect for normal attacks, but the method never
+   * existed, so regular attacks had no attack visual (only the hit effect).
+   */
+  public createAttackEffect(attacker: any, defender: any): void {
+    try {
+      const isTest = typeof jest !== 'undefined';
+      // Burst near the point of contact, biased toward the defender.
+      const x = (attacker.x + defender.x) / 2;
+      const y = (attacker.y + defender.y) / 2 - 30;
+      const graphicsObj = this.add.graphics();
+      graphicsObj.fillStyle(0xffdd33, 0.7); // Warm yellow
+      graphicsObj.fillCircle(x, y, 22);
+      graphicsObj.fillStyle(0xffffff, 0.35); // Soft glow
+      graphicsObj.fillCircle(x, y, 32);
+      graphicsObj.setDepth(1000);
+      if (!isTest) {
+        console.log('Attack effect created at', x, y);
+      }
+      if (!this.hitEffects) this.hitEffects = [];
+      this.hitEffects.push(graphicsObj);
+      if (this.time && typeof this.time.delayedCall === 'function') {
+        this.time.delayedCall(200, () => {
+          const idx = this.hitEffects.indexOf(graphicsObj);
+          if (idx !== -1) this.hitEffects.splice(idx, 1);
+          if (typeof graphicsObj.destroy === 'function') graphicsObj.destroy();
+        });
+      }
+    } catch (error: any) {
+      console.error('Error creating attack effect:', error);
+    }
+  }
+
   // ------------------------------------------------------------------
   // Game loop
   // ------------------------------------------------------------------
