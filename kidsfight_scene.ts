@@ -1695,15 +1695,29 @@ export default class KidsFightScene extends Phaser.Scene {
     if (targetBlocking) damage = Math.floor(damage / 2);
 
     // --- ENFORCE RANGE CHECKS ---
-    // Only apply damage if attacker and defender are within range
+    // Only apply damage if attacker and defender are within range.
+    // Each additional constraint is guarded on the relevant field being a real
+    // value so headless tests that only set x still behave as before.
     let inRange = false;
     if (attacker && defender && typeof attacker.x === 'number' && typeof defender.x === 'number') {
       const dist = Math.abs(attacker.x - defender.x);
-      if (special) {
-        inRange = dist <= 120;
-      } else {
-        inRange = dist <= 80;
+      let within = dist <= (special ? 120 : 80);
+
+      // Vertical range: don't hit someone on a different platform far above/below.
+      if (within && typeof attacker.y === 'number' && typeof defender.y === 'number') {
+        const vDist = Math.abs(attacker.y - defender.y);
+        within = vDist <= (special ? 120 : 100);
       }
+
+      // Facing: the attacker must be facing the defender (flipX=false faces
+      // right). Skip when they're at the same x or facing is unknown.
+      if (within && typeof attacker.flipX === 'boolean' && dist > 0) {
+        const attackerFacesRight = !attacker.flipX;
+        const defenderIsToTheRight = defender.x > attacker.x;
+        within = attackerFacesRight === defenderIsToTheRight;
+      }
+
+      inRange = within;
     }
     if (!inRange) {
       // Animation flags still set for test compatibility
