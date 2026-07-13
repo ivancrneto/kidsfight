@@ -1727,14 +1727,9 @@ export default class KidsFightScene extends Phaser.Scene {
     this.playerHealth[defenderIdxComputed] = Math.max(0, (this.playerHealth[defenderIdxComputed] || 0) - damage);
     defender.health = this.playerHealth[defenderIdxComputed];
 
-    // Send health update in online mode
-    if (this.gameMode === 'online' && this.wsManager && this.wsManager.sendMessage) {
-      this.wsManager.sendMessage({
-        type: 'health_update',
-        playerIndex: defenderIdxComputed,
-        health: this.playerHealth[defenderIdxComputed]
-      });
-    }
+    // (Health is broadcast below via wsManager.sendHealthUpdate for the local
+    // attacker. A dead block that called the non-existent wsManager.sendMessage
+    // used to sit here — removed.)
 
     // Update health bar visually
     this.updateHealthBar?.(defenderIdxComputed);
