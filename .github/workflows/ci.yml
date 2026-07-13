@@ -8,18 +8,25 @@ on:
 
 jobs:
   test:
-    name: Type-check & tests
+    name: Lint, type-check & tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: '.nvmrc'
           cache: 'yarn'
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+
+      # Non-blocking: oxlint currently reports pre-existing warnings
+      # (mostly unused vars). Surfaced here so they can be cleaned up,
+      # but not gated on yet.
+      - name: Lint (oxlint)
+        run: yarn lint
+        continue-on-error: true
 
       # Non-blocking: the codebase currently has pre-existing type errors.
       # Surfaced here so they can be cleaned up, but not gated on yet.
