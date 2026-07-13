@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import scenario1Img from './scenario1.png';
 import scenario2Img from './scenario2.png';
+import scenario3Img from './scenario3.png';
 import player1RawImg from './sprites-bento3.png';
 import player2RawImg from './sprites-davir3.png';
 import player3RawImg from './sprites-jose3.png';
@@ -612,6 +613,7 @@ export default class KidsFightScene extends Phaser.Scene {
     // Backgrounds
     this.load.image('scenario1', scenario1Img);
     this.load.image('scenario2', scenario2Img);
+    this.load.image('scenario3', scenario3Img);
 
     // Player raw sprites for variable-width spritesheets
     this.load.image('bento_raw', player1RawImg);
