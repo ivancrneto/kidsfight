@@ -296,6 +296,20 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private setupCharacters(): void {
+    // Destroy objects from a previous layout pass so a resize doesn't stack
+    // duplicate circles/sprites/labels (with live pointer handlers) on top of
+    // the old ones.
+    if (this.characters && this.characters.length) {
+      this.characters.forEach(c => {
+        c.bgCircle?.destroy?.();
+        c.nameLabel?.destroy?.();
+      });
+    }
+    if (this.characterSprites) {
+      Object.values(this.characterSprites).forEach(s => (s as any)?.destroy?.());
+      this.characterSprites = {};
+    }
+
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
     // --- Responsive character grid setup (centered grid, smaller height section) ---
@@ -759,6 +773,11 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private createUIButtons(): void {
+    // Destroy the previous buttons so a resize doesn't leave stale, still-
+    // clickable ready/back buttons stacked behind the new ones.
+    this.readyButton?.destroy?.();
+    this.backButton?.destroy?.();
+
     const w = this.cameras.main.width;
     const h = this.cameras.main.height;
 
