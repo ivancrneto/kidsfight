@@ -1116,9 +1116,8 @@ export default class KidsFightScene extends Phaser.Scene {
           player.setOrigin(0.5, 1.0);
           player.setScale(0.4);
           player.setBounce(0.2);
-          if (player.body) {
-            player.body.setGravityY(300);
-          }
+          // Players use the world gravity (500) — no per-body override, which
+          // previously stacked on top of the world value.
           player.setCollideWorldBounds(true);
           if (player.setSize) player.setSize(64, 128, true);
         }
