@@ -479,11 +479,6 @@ class ScenarioSelectScene extends Phaser.Scene {
       }
     );
   
-  // Local mode button handlers
-  if (this.mode === 'local') {
-      this.readyButton.on('pointerdown', () => this.startGame());
-      this.backButton.on('pointerdown', () => this.scene.start('MainMenuScene'));
-    }
   }
 
   private changeScenario(direction: number): void {
