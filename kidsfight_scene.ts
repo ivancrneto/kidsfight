@@ -1032,8 +1032,16 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Determine scenario and player keys from selected data, with fallbacks
     const scenarioKey = (data && data.scenario) ? data.scenario : (this.selectedScenario || 'scenario1');
-    const p1Key = this.selected?.p1 || 'bento';
-    const p2Key = this.selected?.p2 || 'roni';
+    // Normalize legacy placeholder keys to real, loaded sprite keys. 'player1'
+    // and 'player2' are placeholders/aliases (see getCharacterName) with no
+    // sprite of their own, so using them directly rendered a missing texture.
+    const normalizeKey = (k: string | undefined, fallback: string): string => {
+      if (k === 'player1') return 'bento';
+      if (k === 'player2') return 'davir';
+      return k || fallback;
+    };
+    const p1Key = normalizeKey(this.selected?.p1, 'bento');
+    const p2Key = normalizeKey(this.selected?.p2, 'roni');
 
     // Render background
     const bg = this.safeAddImage(400, 240, scenarioKey);
