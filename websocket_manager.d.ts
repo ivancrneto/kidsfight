@@ -16,7 +16,7 @@ declare class WebSocketManager {
     static getInstance(webSocketFactory?: (url: string) => WebSocket): WebSocketManager;
     static resetInstance(): void;
 
-    connect(url?: string): WebSocket | null;
+    connect(url?: string, roomCode?: string): WebSocket | null;
     disconnect(): void;
     isConnected(): boolean;
     send(message: any): boolean;
