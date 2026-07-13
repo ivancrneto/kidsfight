@@ -124,7 +124,9 @@ class WebSocketManager {
 
     return new Promise((resolve, reject) => {
       try {
-        this._isHost = false;
+        // Don't reset the host flag here: connectAsHost() calls setHost(true)
+        // before connect(), so clearing it clobbered the host role on every
+        // fresh connection. setHost() is the sole authority for _isHost.
         // Connect to the resolved URL, not the raw (possibly undefined) argument.
         this._ws = this._webSocketFactory(wsUrl);
         console.log('[WSM][DIAG] _ws created', { ws: !!this._ws, url: this._ws?.url });
