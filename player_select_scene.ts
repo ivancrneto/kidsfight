@@ -9,7 +9,7 @@ import player5RawImg from './sprites-carol3.png';
 import player6RawImg from './sprites-roni3.png';
 import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
-import player9RawImg from './sprites-d_isa.png';
+import player9RawImg from './sprites-d_isa3.png';
 import gameLogoImg from './android-chrome-192x192.png';
 import { WebSocketManager } from './websocket_manager';
 import { DEV } from './globals';
