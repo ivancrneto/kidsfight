@@ -2529,14 +2529,17 @@ export default class KidsFightScene extends Phaser.Scene {
     const leftDown = this.cursors?.left?.isDown || this.touchButtons?.left?.isDown;
     const rightDown = this.cursors?.right?.isDown || this.touchButtons?.right?.isDown;
     let direction = 0;
+    // Note: facing (flipX) is owned by the auto-face logic in update(), which
+    // makes both players face each other every frame. Setting flipX from the
+    // movement direction here would be immediately overwritten locally and
+    // would send a contradictory flip in the online position_update below, so
+    // we intentionally don't touch flipX for movement.
     if (leftDown) {
       player.setVelocityX?.(-160);
-      player.setFlipX?.(true);
       direction = -1;
       this.updateWalkingAnimation(player);
     } else if (rightDown) {
       player.setVelocityX?.(160);
-      player.setFlipX?.(false);
       direction = 1;
       this.updateWalkingAnimation(player);
     } else {
