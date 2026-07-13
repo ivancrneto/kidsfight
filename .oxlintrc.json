@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2021": true,
+    "jest": true
+  },
+  "ignorePatterns": ["dist/", "coverage/", ".parcel-cache/", "server/"]
+}
