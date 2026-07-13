@@ -245,6 +245,8 @@ export default class KidsFightScene extends Phaser.Scene {
   private blockKey: Phaser.Input.Keyboard.Key;
   private gameOver: boolean;
   private fightEnded: boolean;
+  // True while applying a host-sent game_over, to avoid re-broadcasting it.
+  private _applyingRemoteGameOver: boolean = false;
   public gameMode: 'single' | 'local' | 'online' | 'ai';
   public localPlayerIndex: number;
   private playerDirection: string[];
@@ -1955,6 +1957,17 @@ export default class KidsFightScene extends Phaser.Scene {
         });
         return;
       }
+      case 'game_over': {
+        // Host-authoritative match result. Apply it (endGame is idempotent) and
+        // don't re-broadcast.
+        this._applyingRemoteGameOver = true;
+        try {
+          this.endGame(action.winnerIndex ?? -1, action.message ?? '');
+        } finally {
+          this._applyingRemoteGameOver = false;
+        }
+        return;
+      }
     }
     
     // For player-specific actions, check if player exists
@@ -3315,6 +3328,13 @@ export default class KidsFightScene extends Phaser.Scene {
     this.gameOver = true;
     this.fightEnded = true;
     this.winnerIndex = winnerIndex;
+
+    // Host is authoritative for the match result: broadcast it so the guest
+    // ends on the same winner even if its local checkWinner/timer missed it.
+    // The guest applies this via handleRemoteAction and never re-broadcasts.
+    if (this.gameMode === 'online' && this.isHost && this.wsManager?.send && !this._applyingRemoteGameOver) {
+      this.wsManager.send({ type: 'game_over', winnerIndex, message });
+    }
 
     // Stop the timer
     if (this.timerEvent) {
