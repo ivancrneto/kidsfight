@@ -27,7 +27,10 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { y: 200 }, // Lower gravity for much higher jumps
+      // Effective player gravity. Previously this was 200 here plus a per-body
+      // setGravityY(300) on each player (Arcade adds the two), for 500 total.
+      // Consolidated to a single value so jump height has one source of truth.
+      gravity: { y: 500 },
       debug: false
     }
   }
