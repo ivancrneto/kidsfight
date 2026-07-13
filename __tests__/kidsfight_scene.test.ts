@@ -644,13 +644,10 @@ describe('KidsFightScene', () => {
     it('should handle player attack', () => {
       const attackAction = {type: 'attack', playerIndex: 0};
       scene.handleRemoteAction(attackAction);
-      expect(scene.tryAttack).toHaveBeenCalledWith(
-          0,
-          player1,
-          player2,
-          expect.any(Number),
-          false
-      );
+      // A remote attack applies exactly once, via the canonical
+      // (attackerIdx, defenderIdx, now, special) signature.
+      expect(scene.tryAttack).toHaveBeenCalledTimes(1);
+      expect(scene.tryAttack).toHaveBeenCalledWith(0, 1, expect.any(Number), false);
     });
 
     it('should handle player block', () => {
