@@ -1554,6 +1554,10 @@ export default class KidsFightScene extends Phaser.Scene {
         player.setData('isBlocking', true);
         this.playerBlocking[idx] = true;
       }
+      // Tell the opponent we started blocking so their attacks are halved.
+      if (this.gameMode === 'online' && this.wsManager?.send) {
+        this.wsManager.send({ type: 'block', playerIndex: idx, active: true });
+      }
     });
 
     blockBtn.on('pointerup', () => {
@@ -1563,6 +1567,10 @@ export default class KidsFightScene extends Phaser.Scene {
       if (player) {
         player.setData('isBlocking', false);
         this.playerBlocking[idx] = false;
+      }
+      // Tell the opponent we stopped blocking.
+      if (this.gameMode === 'online' && this.wsManager?.send) {
+        this.wsManager.send({ type: 'block', playerIndex: idx, active: false });
       }
     });
 
@@ -1973,8 +1981,10 @@ export default class KidsFightScene extends Phaser.Scene {
         break;
       }
       case 'block': {
-        player.setData?.('isBlocking', action.active);
-        this.playerBlocking[action.playerIndex] = action.active;
+        // Coerce to a boolean: older/other senders may omit `active`.
+        const blocking = !!action.active;
+        player.setData?.('isBlocking', blocking);
+        this.playerBlocking[action.playerIndex] = blocking;
         break;
       }
       case 'attack': {
@@ -2949,8 +2959,8 @@ export default class KidsFightScene extends Phaser.Scene {
       this.playerBlocking[idx] = true;
     }
     if (this.gameMode === 'online' && this.wsManager?.send) {
-      this.wsManager.send({ type: 'block', playerIndex: idx });
-      
+      this.wsManager.send({ type: 'block', playerIndex: idx, active: true });
+
       // Send position update with blocking animation state
       if (player) {
         const vx = player.body?.velocity?.x ?? 0;

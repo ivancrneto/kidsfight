@@ -93,4 +93,19 @@ describe('KidsFightScene mobile touch controls - fight end blocking', () => {
     expect(player.setVelocityY).not.toHaveBeenCalled();
     expect(player.setData).not.toHaveBeenCalledWith('isBlocking', true);
   });
+
+  it('broadcasts block state to the opponent in online mode', () => {
+    scene.fightEnded = false;
+    scene.gameOver = false;
+    (scene as any).gameMode = 'online';
+    const send = jest.fn();
+    (scene as any).wsManager = { send };
+
+    blockBtn.emit('pointerdown');
+    // Must include the `active` flag; the receiver reads action.active.
+    expect(send).toHaveBeenCalledWith({ type: 'block', playerIndex: 0, active: true });
+
+    blockBtn.emit('pointerup');
+    expect(send).toHaveBeenCalledWith({ type: 'block', playerIndex: 0, active: false });
+  });
 });
