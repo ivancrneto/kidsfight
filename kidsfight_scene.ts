@@ -12,7 +12,6 @@ import player7RawImg from './sprites-jacqueline3.png';
 import player8RawImg from './sprites-ivan3.png';
 import player9RawImg from './sprites-d_isa.png';
 import { WebSocketManager } from './websocket_manager'; // This is a singleton instance, not a class
-import { tryAttack } from './gameUtils';
 import { time } from 'console';
 import { SCENARIOS } from './scenario_select_scene';
 const getCharacterName = 'getCharacterName';
