@@ -75,39 +75,35 @@ describe('Touch Controls', () => {
     
     scene.createTouchControls();
     
-    // Calculate expected radius and padding
+    // Circles stay a full radius inside the canvas.
     const radius = Math.floor(Math.min(width, height) * 0.06);
-    const padding = radius * 1.5;
-    
-    // Verify left bottom corner positioning (D-pad)
-    const baseX = padding;
-    const baseY = height - padding;
-    
-    // Check left button position
+    const margin = radius + 8;
+    const baseY = height - margin;
+    const leftX = margin;
+    const rightX = margin + Math.round(radius * 2.6);
+
     expect(scene.add.circle).toHaveBeenCalledWith(
-      baseX - radius, // x position of left button
-      baseY, // y position
+      leftX,
+      baseY,
       expect.any(Number),
       expect.any(Number)
     );
-    
-    // Check right button position
+
     expect(scene.add.circle).toHaveBeenCalledWith(
-      baseX + radius, // x position of right button
-      baseY, // y position
+      rightX,
+      baseY,
       expect.any(Number),
       expect.any(Number)
     );
-    
-    // Verify right bottom corner positioning (action buttons)
-    const baseXR = width - padding;
-    
-    // Check attack button position
+
+    const attackX = width - margin;
     expect(scene.add.circle).toHaveBeenCalledWith(
-      baseXR - radius, // x position of attack button
-      baseY, // y position
+      attackX,
+      baseY,
       expect.any(Number),
       expect.any(Number)
     );
+    expect(leftX - radius).toBeGreaterThanOrEqual(0);
+    expect(attackX + radius).toBeLessThanOrEqual(width);
   });
 });

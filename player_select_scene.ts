@@ -42,8 +42,10 @@ interface GameStartWebSocketMessage extends PlayerSelectWebSocketMessage {
 interface SceneData {
   mode?: 'local' | 'online';
   fromGameMode?: boolean;
+  fromScenario?: boolean;
   roomCode?: string;
   isHost?: boolean;
+  selected?: { p1?: string; p2?: string };
 }
 
 interface CharacterInfo {
@@ -85,6 +87,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
   } | null = null;
   private reconnectButton: Phaser.GameObjects.Text | null = null;
   private isInitialized = false;
+  private _launching = false;
   public startButton!: Phaser.GameObjects.Text;
   public backButton!: Phaser.GameObjects.Text;
   public readyButton!: Phaser.GameObjects.Text;
@@ -179,6 +182,14 @@ export default class PlayerSelectScene extends Phaser.Scene {
       this.p2Index = 1;
       this.selectedP1Index = 0;
       this.selectedP2Index = 1;
+    }
+
+    // Coming back from scenario select must keep the room and the fighters.
+    if (data?.fromScenario && data.selected) {
+      this.selected = {
+        p1: data.selected.p1 || this.selected.p1,
+        p2: data.selected.p2 || this.selected.p2
+      };
     }
   }
 
@@ -380,9 +391,12 @@ export default class PlayerSelectScene extends Phaser.Scene {
           } else {
             if (pointer.leftButtonDown()) this.setSelectorToCharacter(2, i);
           }
+        } else if (pointer.rightButtonDown()) {
+          this.setSelectorToCharacter(2, i);
         } else {
-          if (pointer.leftButtonDown()) this.setSelectorToCharacter(1, i);
-          if (pointer.rightButtonDown()) this.setSelectorToCharacter(2, i);
+          // Default slot is P1. The P1/P2 buttons switch the slot so a touch,
+          // which has no right click, can still choose player 2.
+          this.setSelectorToCharacter(this.localSelectSlot, i);
         }
       });
     this.characterSprites[char.key] = sprite;
@@ -564,6 +578,8 @@ export default class PlayerSelectScene extends Phaser.Scene {
   }
 
   private launchGame(): void {
+    if (this._launching) return;
+    this._launching = true;
     console.log('[PlayerSelectScene] launchGame called, mode:', this.mode, 'isHost:', this.isHost);
 
     let currentPlayer: 1 | 2;
@@ -636,7 +652,7 @@ export default class PlayerSelectScene extends Phaser.Scene {
       // Don't proceed if either player hasn't selected a character
       if (!finalP1 || !finalP2) {
         console.log('[PlayerSelectScene] Cannot launch game - missing character selections:', { p1: finalP1, p2: finalP2 });
-        // Optionally show a message to the user
+        this._launching = false;
         return;
       }
       
@@ -824,7 +840,43 @@ export default class PlayerSelectScene extends Phaser.Scene {
       console.log('[PlayerSelectScene] Ready button clicked');
       this.launchGame();
     });
+    this.backButton.on('pointerdown', () => {
+      this.handleBack();
+    });
+
+    if (this.mode !== 'online') {
+      this.createLocalSlotToggle(w, h);
+    }
   }
+
+  private localSelectSlot: 1 | 2 = 1;
+
+  /** Phones have no right click. These buttons choose which fighter a tap assigns. */
+  private createLocalSlotToggle(w: number, h: number): void {
+    const y = h * 0.78;
+    const make = (label: string, x: number, slot: 1 | 2) => {
+      const raw = this.add?.text?.(x, y, label, {
+        fontSize: '18px',
+        color: '#fff',
+        fontFamily: 'monospace',
+        backgroundColor: this.localSelectSlot === slot ? '#00AA00' : '#4a4a4a',
+        padding: { x: 12, y: 6 }
+      });
+      if (!raw || typeof raw.setOrigin !== 'function') return null;
+      const btn = raw.setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(3);
+      btn.on('pointerdown', () => {
+        this.localSelectSlot = slot;
+        this.createLocalSlotToggle(w, h);
+      });
+      return btn;
+    };
+    this.slotButtons?.forEach(b => b.destroy?.());
+    this.slotButtons = [make('P1', w / 2 - 50, 1), make('P2', w / 2 + 50, 2)].filter(
+      (btn): btn is Phaser.GameObjects.Text => !!btn
+    );
+  }
+
+  private slotButtons: Phaser.GameObjects.Text[] = [];
 
   private updateSelectionIndicators(): void {
     if (!this.characters.length) return;

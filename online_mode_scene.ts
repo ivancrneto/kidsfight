@@ -38,6 +38,7 @@ export default class OnlineModeScene extends Phaser.Scene {
   private wsManager: WebSocketManager;
   private roomCode: string | null = null;
   private errorCanvas!: HTMLCanvasElement;
+  private joinKeyHandler: ((event: KeyboardEvent) => void) | null = null;
 
   constructor() {
     super('OnlineModeScene');
@@ -256,6 +257,7 @@ export default class OnlineModeScene extends Phaser.Scene {
 
     // Responsive layout update on resize
     this.scale.on('resize', this.updateLayout, this);
+    this.events?.on?.('shutdown', this.shutdown, this);
   }
 
   private createGame(): void {
@@ -276,7 +278,8 @@ export default class OnlineModeScene extends Phaser.Scene {
     this.roomCodeInput.style.display = 'block';
     this.roomCodeInput.focus();
 
-    const handleKeyPress = (event: KeyboardEvent) => {
+    this.removeJoinKeyHandler();
+    this.joinKeyHandler = (event: KeyboardEvent) => {
       if (event.key === 'Enter') {
         const code = this.roomCodeInput.value.trim().toUpperCase();
         if (code) {
@@ -287,7 +290,14 @@ export default class OnlineModeScene extends Phaser.Scene {
       }
     };
 
-    this.roomCodeInput.addEventListener('keydown', handleKeyPress);
+    this.roomCodeInput.addEventListener('keydown', this.joinKeyHandler);
+  }
+
+  private removeJoinKeyHandler(): void {
+    if (this.joinKeyHandler && this.roomCodeInput) {
+      this.roomCodeInput.removeEventListener('keydown', this.joinKeyHandler);
+      this.joinKeyHandler = null;
+    }
   }
 
   private joinGame(roomCode: string): void {
@@ -307,6 +317,7 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   private hideJoinPrompt(): void {
+    this.removeJoinKeyHandler();
     this.joinPromptText.setVisible(false);
     this.roomCodeInput.style.display = 'none';
     this.showMainButtons();
@@ -449,7 +460,8 @@ export default class OnlineModeScene extends Phaser.Scene {
       this.scene.start('PlayerSelectScene', {
         mode: 'online',
         roomCode: roomData.roomCode,
-        isHost: roomData.isHost
+        isHost: roomData.isHost,
+        fromGameMode: true
       });
     } catch (error) {
       console.error('Error starting PlayerSelectScene:', error);
@@ -540,6 +552,7 @@ export default class OnlineModeScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    this.removeJoinKeyHandler();
     if (this.roomCodeInput && this.roomCodeInput.parentNode) {
       this.roomCodeInput.parentNode.removeChild(this.roomCodeInput);
     }

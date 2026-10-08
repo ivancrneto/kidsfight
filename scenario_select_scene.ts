@@ -110,18 +110,12 @@ class ScenarioSelectScene extends Phaser.Scene {
           p1: this.selected.p1, 
           p2: this.selected.p2 
         });
+        // Only the host's own fighter. Re-sending p2 overwrote the guest's pick.
         this.wsManager.send({
           type: 'player_selected',
           player: 'p1',
           character: this.selected.p1
         });
-        setTimeout(() => {
-          this.wsManager.send({
-            type: 'player_selected',
-            player: 'p2',
-            character: this.selected.p2
-          });
-        }, 50);
       } else {
         // Guest only re-sends their own selection (p2) if it's not a default/invalid value
         // 'player2' is the placeholder default; skip only that (and empty).
@@ -402,7 +396,15 @@ class ScenarioSelectScene extends Phaser.Scene {
       .setInteractive()
       .setDepth(2)
       .on('pointerdown', () => {
-        this.scene.start('PlayerSelectScene');
+        this.scene.start('PlayerSelectScene', {
+          mode: this.mode,
+          roomCode: this.roomCode,
+          isHost: this.isHost,
+          selected: this.selected,
+          fromGameMode: true,
+          fromScenario: true,
+          wsManager: this.wsManager
+        });
       });
     
     // Ready button (or Start in local mode)
@@ -608,8 +610,11 @@ class ScenarioSelectScene extends Phaser.Scene {
       // Try to use provided keys, else fallback to something valid
       let finalP1 = isValid(p1Char) ? p1Char : (data.p1Char || data.p1 || this.selected?.p1);
       let finalP2 = isValid(p2Char) ? p2Char : (data.p2Char || data.p2 || this.selected?.p2);
-      if (!isValid(finalP1)) finalP1 = validKeys.find(k => this.textures.exists(k)) || 'player1';
-      if (!isValid(finalP2) || finalP2 === finalP1) finalP2 = validKeys.find(k => this.textures.exists(k) && k !== finalP1) || 'player2';
+      if (!isValid(finalP1)) finalP1 = 'bento';
+      // The same fighter on both sides is a legal mirror match. Replacing p2
+      // here turned two Bentos into Bento vs Davi R, because this scene has
+      // not loaded the fighter textures so the old fallback search failed.
+      if (!isValid(finalP2)) finalP2 = 'davir';
       console.debug('[ScenarioSelectScene][_transitionToGame] Transitioning to KidsFightScene with:', { ...data, p1: finalP1, p2: finalP2 });
       this.scene.start('KidsFightScene', {
         ...data,

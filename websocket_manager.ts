@@ -63,6 +63,9 @@ class WebSocketManager {
   private _reconnectAttempts: number = 0;
   private _maxReconnectAttempts: number = 5;
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  // readyState is already CLOSED when onclose runs, so isConnected() cannot
+  // tell a live session from a socket that never opened.
+  private _opened: boolean = false;
 
   private constructor(webSocketFactory?: (url: string) => WebSocket) {
     this._webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
@@ -135,6 +138,7 @@ class WebSocketManager {
         this._ws.onopen = () => {
           console.log('[WSM][DIAG] _ws.onopen called');
           console.log(`[WSM] Connected to server [${this._debugInstanceId}]`);
+          this._opened = true;
           this._reconnectAttempts = 0; // reset backoff on a successful connection
           this._onConnectionCallback?.(true);
           if (this._onMessageCallback) {
@@ -162,8 +166,11 @@ class WebSocketManager {
             this._ws?.removeEventListener('message', this._boundMessageCallback);
             this._boundMessageCallback = null;
           }
-          // Only null out after cleanup to ensure isConnected() works during cleanup
-          const wasConnected = this.isConnected();
+          // Only null out after cleanup to ensure isConnected() works during cleanup.
+          // Use the open flag: onclose fires with readyState CLOSED, so
+          // isConnected() is always false here in a real browser.
+          const wasConnected = this._opened;
+          this._opened = false;
           this._ws = null;
           // Only trigger close callback if we were actually connected
           if (wasConnected) {
@@ -213,7 +220,10 @@ class WebSocketManager {
         .then(() => {
           // connect() may clear these; restore the pre-drop identity.
           this._isHost = wasHost;
-          if (roomCode) this._roomCode = roomCode;
+          if (roomCode) {
+            this._roomCode = roomCode;
+            this.send({ type: 'rejoin_room', roomCode, isHost: wasHost });
+          }
         })
         .catch(() => {
           // Connection failed again — queue the next backoff step.

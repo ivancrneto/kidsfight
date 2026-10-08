@@ -50,8 +50,12 @@ class RotatePromptScene extends Phaser.Scene {
   }
 
   update(): void {
-    // Check for landscape orientation
-    if (this.scale.width > this.scale.height || this.scale.orientation === Phaser.Scale.LANDSCAPE) {
+    // The game canvas is fixed at 800x600, so scale size is always landscape.
+    // Use the browser window, which is what a phone actually rotates.
+    const winW = typeof window !== 'undefined' ? window.innerWidth : this.scale.width;
+    const winH = typeof window !== 'undefined' ? window.innerHeight : this.scale.height;
+    const landscape = winW > winH;
+    if (landscape) {
       // Only execute this once per orientation change
       if (!this.scenesAdded) {
         console.log('[RotatePromptScene] 🛑 Detected landscape orientation - transitioning to main menu');

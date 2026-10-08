@@ -250,7 +250,12 @@ export default class KidsFightScene extends Phaser.Scene {
   public gameMode: 'single' | 'local' | 'online' | 'ai';
   public localPlayerIndex: number;
   private playerDirection: string[];
-  private touchButtons?: { left?: Phaser.GameObjects.Circle; right?: Phaser.GameObjects.Circle; up?: Phaser.GameObjects.Circle };
+  private touchButtons?: {
+    left?: any; right?: any; up?: any;
+    attack?: any; special?: any; block?: any;
+    p2left?: any; p2right?: any; p2up?: any;
+    p2attack?: any; p2block?: any; p2special?: any;
+  };
   private playerHealth: number[];
   private healthBar1!: Phaser.GameObjects.Graphics;
   private healthBar2!: Phaser.GameObjects.Graphics;
@@ -316,13 +321,21 @@ export default class KidsFightScene extends Phaser.Scene {
   private cursors2!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyShift!: Phaser.Input.Keyboard.Key;
   private keyEnter!: Phaser.Input.Keyboard.Key;
+  private keyE!: Phaser.Input.Keyboard.Key;
 
   // Previous-frame key state, used for edge detection so held keys fire an
-  // action once per press instead of every frame.
+  // action once per press instead of every frame. The *2 flags belong to the
+  // second local fighter in a couch match.
   private _prevAttackDown: boolean = false;
   private _prevSpecialDown: boolean = false;
   private _prevJumpDown: boolean = false;
   private _prevBlockDown: boolean = false;
+  private _prevAttackDown2: boolean = false;
+  private _prevSpecialDown2: boolean = false;
+  private _prevJumpDown2: boolean = false;
+  private _prevBlockDown2: boolean = false;
+  private _rematchRestarting: boolean = false;
+  private _disconnectNotice?: Phaser.GameObjects.Text;
 
   private winnerIndex: number | undefined;
 
@@ -948,6 +961,8 @@ export default class KidsFightScene extends Phaser.Scene {
     this.replayPopupShown = false;
     this.replayPopupElements = [];
     this.rematchButton = undefined;
+    this._rematchRestarting = false;
+    this._disconnectNotice = undefined;
     
     // Clear any existing hit effects
     if (this.hitEffects) {
@@ -983,6 +998,8 @@ export default class KidsFightScene extends Phaser.Scene {
 
     // Extract base texture name without any suffixes
     if (!textureKey) return null;
+    // Look up the full key first. Splitting on '_' turns "d_isa" into "d".
+    if (characterMap[textureKey]) return characterMap[textureKey];
     const baseName = textureKey.split('_')[0];
     return characterMap[baseName] || null;
   }
@@ -1111,6 +1128,8 @@ export default class KidsFightScene extends Phaser.Scene {
       const p2 = this.physics.add.sprite(player2X, 310, p2Key, 0);
 
       this.players = [p1, p2];
+      p1.playerIndex = 0;
+      p2.playerIndex = 1;
 
       // Set up physics and initial states for both players
       this.players.forEach((player: any) => {
@@ -1166,6 +1185,7 @@ export default class KidsFightScene extends Phaser.Scene {
       this.keyQ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
       this.keyShift = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
       this.keyEnter = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+      this.keyE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     }
 
     // Create health bars UI
@@ -1320,6 +1340,16 @@ export default class KidsFightScene extends Phaser.Scene {
     return this.gameMode === 'online' ? this.localPlayerIndex : 0;
   }
 
+  /** Two humans on one device. Online keeps a single local fighter. */
+  private isCouchMatch(): boolean {
+    return this.gameMode === 'local' || this.gameMode === 'single';
+  }
+
+  /** Online guest displays the host's result and does not declare its own. */
+  private isOnlineGuest(): boolean {
+    return this.gameMode === 'online' && !this.isHost;
+  }
+
   private createPlatforms(): void {
     if (!this.add) return;
 
@@ -1395,15 +1425,18 @@ export default class KidsFightScene extends Phaser.Scene {
     const width = this.sys.game.canvas.width || 800;
     const height = this.sys.game.canvas.height || 480;
     const radius = Math.floor(Math.min(width, height) * 0.06); // responsive sizing
-    const padding = radius * 1.5;
+    // Keep every circle fully inside the canvas. The old padding put the
+    // left and block buttons half off the screen.
+    const margin = radius + 8;
+    const baseY = height - margin;
+    const leftX = margin;
+    const rightX = margin + Math.round(radius * 2.6);
+    const jumpX = Math.round((leftX + rightX) / 2);
+    const jumpY = baseY - Math.round(radius * 2.2);
 
-    // Left bottom corner (D-pad)
-    const baseX = padding;
-    const baseY = height - padding;
-
-    const leftBtn = this.add.circle(baseX - radius, baseY, radius, 0x4444ff);
-    const rightBtn = this.add.circle(baseX + radius, baseY, radius, 0x4444ff);
-    const jumpBtn = this.add.circle(baseX, baseY - radius * 2, radius, 0x44ff44);
+    const leftBtn = this.add.circle(leftX, baseY, radius, 0x4444ff);
+    const rightBtn = this.add.circle(rightX, baseY, radius, 0x4444ff);
+    const jumpBtn = this.add.circle(jumpX, jumpY, radius, 0x44ff44);
 
     this.add.text(leftBtn.x - radius / 4, leftBtn.y - radius / 2, '◀', {
       fontSize: `${radius}px`,
@@ -1412,11 +1445,13 @@ export default class KidsFightScene extends Phaser.Scene {
     this.add.text(rightBtn.x, rightBtn.y - radius / 2, '▶', {fontSize: `${radius}px`, color: '#ffffff'}).setOrigin(0.5);
     this.add.text(jumpBtn.x, jumpBtn.y - radius / 2, '⭡', {fontSize: `${radius}px`, color: '#ffffff'}).setOrigin(0.5);
 
-    // Right bottom corner (arc of action buttons with better spacing)
-    const baseXR = width - padding;
-    const attackBtn = this.add.circle(baseXR - radius, baseY, radius, 0xff4444).setDepth(1000);
-    const blockBtn = this.add.circle(baseXR + radius, baseY - radius * 2, radius, 0xffff44).setDepth(1000); 
-    const specialBtn = this.add.circle(baseXR - radius, baseY - radius * 3.5, radius, 0xff44ff).setDepth(1000); 
+    // Right bottom corner. Block sits above attack, inside the screen.
+    const attackX = width - margin;
+    const blockY = baseY - Math.round(radius * 2.4);
+    const specialX = attackX - Math.round(radius * 2.4);
+    const attackBtn = this.add.circle(attackX, baseY, radius, 0xff4444).setDepth(1000);
+    const blockBtn = this.add.circle(attackX, blockY, radius, 0xffff44).setDepth(1000);
+    const specialBtn = this.add.circle(specialX, blockY, radius, 0xff44ff).setDepth(1000); 
 
     this.add.text(attackBtn.x, attackBtn.y - radius / 2, 'A', {
       fontSize: `${radius}px`,
@@ -1460,7 +1495,7 @@ export default class KidsFightScene extends Phaser.Scene {
       }
     });
 
-    leftBtn.on('pointerout', () => {
+    leftBtn.on('pointerupoutside', () => {
       const playerIdx = this.getPlayerIndex();
       const player = this.players?.[playerIdx];
       console.log('[Touch] Left out, player:', player);
@@ -1503,7 +1538,7 @@ export default class KidsFightScene extends Phaser.Scene {
       }
     });
 
-    rightBtn.on('pointerout', () => {
+    rightBtn.on('pointerupoutside', () => {
       const playerIdx = this.getPlayerIndex();
       const player = this.players?.[playerIdx];
       console.log('[Touch] Right out, player:', player);
@@ -1524,12 +1559,7 @@ export default class KidsFightScene extends Phaser.Scene {
     });
 
     jumpBtn.on('pointerdown', () => {
-      if (this.gameOver || this.fightEnded) return;
-      const idx = this.getPlayerIndex();
-      const player = this.players?.[idx];
-      if (player && player.body && player.body.touching.down) {
-        player.setVelocityY(-330);
-      }
+      this.handleJumpDown(this.isCouchMatch() ? 0 : this.getPlayerIndex());
     });
 
     attackBtn.on('pointerdown', () => {
@@ -1559,19 +1589,13 @@ export default class KidsFightScene extends Phaser.Scene {
       }
     });
 
-    blockBtn.on('pointerup', () => {
-      const idx = this.getPlayerIndex();
-      const player = this.players?.[idx];
-      console.log('[Touch] Block up, player:', player);
-      if (player) {
-        player.setData('isBlocking', false);
-        this.playerBlocking[idx] = false;
-      }
-      // Tell the opponent we stopped blocking.
-      if (this.gameMode === 'online' && this.wsManager?.send) {
-        this.wsManager.send({ type: 'block', playerIndex: idx, active: false });
-      }
-    });
+    const releaseTouchBlock = () => {
+      this.releaseBlock(this.isCouchMatch() ? 0 : this.getPlayerIndex());
+    };
+    blockBtn.on('pointerup', releaseTouchBlock);
+    blockBtn.on('pointerupoutside', releaseTouchBlock);
+    blockBtn.on('pointercancel', releaseTouchBlock);
+    blockBtn.on('pointerout', releaseTouchBlock);
 
     // Store references for touch handling
     this.touchButtons = {
@@ -1582,14 +1606,64 @@ export default class KidsFightScene extends Phaser.Scene {
       special: specialBtn,
       block: blockBtn
     } as any;
+
+    // Second fighter on a couch match. Online keeps a single local cluster.
+    // Buttons are appended so the original six stay first for layout tests.
+    if (this.isCouchMatch()) {
+      const topY = margin;
+      const p2left = this.add.circle(leftX, topY, radius, 0x4444ff);
+      const p2right = this.add.circle(rightX, topY, radius, 0x4444ff);
+      const p2jump = this.add.circle(jumpX, topY + Math.round(radius * 2.2), radius, 0x44ff44);
+      const p2attack = this.add.circle(attackX, topY, radius, 0xff4444).setDepth(1000);
+      const p2block = this.add.circle(attackX, topY + Math.round(radius * 2.4), radius, 0xffff44).setDepth(1000);
+      const p2special = this.add.circle(specialX, topY + Math.round(radius * 2.4), radius, 0xff44ff).setDepth(1000);
+      [p2left, p2right, p2jump, p2attack, p2block, p2special].forEach(b => b.setInteractive());
+      const p2 = 1;
+      p2left.on('pointerdown', () => {
+        if (this.gameOver || this.fightEnded) return;
+        this.touchButtons.p2left.isDown = true;
+        this.players?.[p2]?.setVelocityX?.(-160);
+      });
+      const stopP2Left = () => {
+        this.touchButtons.p2left.isDown = false;
+        if (!this.touchButtons.p2right?.isDown) this.players?.[p2]?.setVelocityX?.(0);
+      };
+      p2left.on('pointerup', stopP2Left);
+      p2left.on('pointerupoutside', stopP2Left);
+      p2left.on('pointercancel', stopP2Left);
+      p2right.on('pointerdown', () => {
+        if (this.gameOver || this.fightEnded) return;
+        this.touchButtons.p2right.isDown = true;
+        this.players?.[p2]?.setVelocityX?.(160);
+      });
+      const stopP2Right = () => {
+        this.touchButtons.p2right.isDown = false;
+        if (!this.touchButtons.p2left?.isDown) this.players?.[p2]?.setVelocityX?.(0);
+      };
+      p2right.on('pointerup', stopP2Right);
+      p2right.on('pointerupoutside', stopP2Right);
+      p2right.on('pointercancel', stopP2Right);
+      p2jump.on('pointerdown', () => this.handleJumpDown(p2));
+      p2attack.on('pointerdown', () => this.tryAction(p2, 'attack', false));
+      p2special.on('pointerdown', () => this.tryAction(p2, 'special', true));
+      p2block.on('pointerdown', () => this.handleBlock(p2));
+      const releaseP2Block = () => this.releaseBlock(p2);
+      p2block.on('pointerup', releaseP2Block);
+      p2block.on('pointerupoutside', releaseP2Block);
+      p2block.on('pointercancel', releaseP2Block);
+      p2block.on('pointerout', releaseP2Block);
+      Object.assign(this.touchButtons, {
+        p2left, p2right, p2up: p2jump, p2attack, p2block, p2special
+      });
+    }
   }
 
 
   /**
    * Try to perform an action (attack or special)
    */
-  public tryAction(playerIndex: number, actionType: 'attack' | 'special', isSpecial: boolean): void {
-    if (this.gameOver || (this as any)._gameOver) return;
+  public tryAction(playerIndex: number, actionType: 'attack' | 'special', isSpecial: boolean): boolean {
+    if (this.gameOver || (this as any)._gameOver) return false;
     // Ensure essential arrays exist
     if (!this.playerHealth || this.playerHealth.length < 2) {
       this.playerHealth = [100, 100];
@@ -1613,16 +1687,16 @@ export default class KidsFightScene extends Phaser.Scene {
     const attacker = this.players?.[playerIndex];
     const defenderIdx = playerIndex === 0 ? 1 : 0;
     const defender = this.players?.[defenderIdx];
-    if (!attacker || !defender) return; // players not ready
+    if (!attacker || !defender) return false; // players not ready
 
     const now = Date.now();
 
     // Special action requires at least 3 pips (check first and return if not enough)
     if (isSpecial) {
       const currentPips = this.playerSpecial?.[playerIndex] ?? 0;
-      if (currentPips < 3) return; // not enough pips – abort before any state/animation
+      if (currentPips < 3) return false; // not enough pips – abort before any state/animation
       // Enforce the special cooldown so specials can't be spammed back-to-back.
-      if (now - this.lastSpecialTime[playerIndex] < SPECIAL_COOLDOWN) return;
+      if (now - this.lastSpecialTime[playerIndex] < SPECIAL_COOLDOWN) return false;
     }
 
     // Only reset consecutive counter if break is at least 1000ms
@@ -1637,7 +1711,7 @@ export default class KidsFightScene extends Phaser.Scene {
     if (!isSpecial) {
       if (this.consecutiveAttacks[playerIndex] >= MAX_CONSECUTIVE_ATTACKS) {
         console.log(`[CADENCE] Player ${playerIndex} blocked: max consecutive attacks (${MAX_CONSECUTIVE_ATTACKS}) reached`);
-        return;
+        return false;
       }
     }
 
@@ -1651,18 +1725,22 @@ export default class KidsFightScene extends Phaser.Scene {
       if (timeSinceLastAttack < requiredDelay) {
         const remainingTime = requiredDelay - timeSinceLastAttack;
         console.log(`[CADENCE] Player ${playerIndex} blocked: ${remainingTime}ms remaining (${this.consecutiveAttacks[playerIndex]} consecutive attacks)`);
-        return;
+        return false;
       }
     }
 
     // Always perform the attack locally (guarantees effect is shown for host and guest)
     this.tryAttack(playerIndex, defenderIdx, now, isSpecial);
-    // In online mode, send the action to the remote player
+    // One message carries the animation and the defender's health after this
+    // swing. The receiver assigns that health instead of calling tryAttack,
+    // so a hit is not subtracted again on top of health_update.
     if (this.gameMode === 'online' && this.wsManager?.send) {
       this.wsManager.send({
         type: isSpecial ? 'special' : 'attack',
         playerIndex,
-        now
+        now,
+        defenderHealth: this.playerHealth[defenderIdx],
+        specialPips: this.playerSpecial[playerIndex]
       });
     }
     // Counter and cooldown logic remains unchanged below
@@ -1678,6 +1756,7 @@ export default class KidsFightScene extends Phaser.Scene {
       this.lastConsecutiveResetTime[playerIndex] = now;
       this.lastSpecialTime[playerIndex] = now;
     }
+    return true;
   }
 
   /**
@@ -1753,9 +1832,18 @@ export default class KidsFightScene extends Phaser.Scene {
       inRange = within;
     }
     if (!inRange) {
-      // Animation flags still set for test compatibility
+      // Animation flags still set for test compatibility, then cleared so a
+      // whiffed special does not freeze the fighter on frame 6.
       attacker.setData?.(special ? 'isSpecialAttacking' : 'isAttacking', true);
       attacker.isAttacking = true;
+      if (special) attacker.isSpecialAttacking = true;
+      const clearMiss = () => {
+        attacker.setData?.('isAttacking', false);
+        attacker.setData?.('isSpecialAttacking', false);
+        attacker.isAttacking = false;
+        attacker.isSpecialAttacking = false;
+      };
+      if (typeof setTimeout === 'function') setTimeout(clearMiss, 800);
       return;
     }
 
@@ -1893,15 +1981,8 @@ export default class KidsFightScene extends Phaser.Scene {
     if (action.type === 'replay_response') {
       console.log('[SCENE][DEBUG] Received replay_response:', action);
       if (action.accepted) {
-        // Hide any popup and restart the scene
-        this.hideReplayPopup();
-        this.scene.restart({
-          gameMode: this.gameMode,
-          isHost: this.isHost,
-          roomCode: this.roomCode,
-          selectedScenario: this.selectedScenario,
-          selected: this.selected
-        });
+        // The server also sends game_restart. Restart once.
+        this.restartForRematch();
       } else {
         // Declined - reset rematch button state for the requesting player
         this.hideReplayPopup();
@@ -1921,11 +2002,17 @@ export default class KidsFightScene extends Phaser.Scene {
     }
     
     console.log('[SCENE][DEBUG] Processing action type:', action.type);
-    
-    if (this.gameOver) {
-      console.log('[SCENE][DEBUG] Game over, ignoring action');
+
+    const earlyType = action.type || action.action;
+    if (earlyType === 'player_disconnected') {
+      this.showDisconnectNotice();
       return;
     }
+    if (earlyType === 'player_rejoined') {
+      this.hideDisconnectNotice();
+      return;
+    }
+
     const isTestEnv = typeof jest !== 'undefined' || process.env.NODE_ENV === 'test';
     // In tests we allow handleRemoteAction in any mode for coverage expectations.
     const online = (this.isOnline ?? (this.gameMode === 'online')) || isTestEnv;
@@ -1947,14 +2034,7 @@ export default class KidsFightScene extends Phaser.Scene {
       }
       case 'game_restart': {
         console.log('[SCENE][DEBUG] Received game_restart, restarting scene');
-        this.hideReplayPopup();
-        this.scene.restart({
-          gameMode: this.gameMode,
-          isHost: this.isHost,
-          roomCode: this.roomCode,
-          selectedScenario: this.selectedScenario,
-          selected: this.selected
-        });
+        this.restartForRematch();
         return;
       }
       case 'game_over': {
@@ -1969,7 +2049,12 @@ export default class KidsFightScene extends Phaser.Scene {
         return;
       }
     }
-    
+
+    if (this.gameOver) {
+      console.log('[SCENE][DEBUG] Game over, ignoring action');
+      return;
+    }
+
     // For player-specific actions, check if player exists
     const player = this.players?.[action.playerIndex];
     if (!player) return;
@@ -1984,9 +2069,8 @@ export default class KidsFightScene extends Phaser.Scene {
         break;
       }
       case 'jump': {
-        // Use the same jump velocity as every other jump path (touch, keyboard,
-        // online). The old local-mode value (-500) made jump height depend on
-        // the code path.
+        // The sender only transmits a jump that left the ground. Apply it here
+        // even if this client still thinks the fighter is airborne.
         player.setVelocityY?.(-330);
         break;
       }
@@ -1997,7 +2081,9 @@ export default class KidsFightScene extends Phaser.Scene {
         this.playerBlocking[action.playerIndex] = blocking;
         break;
       }
-      case 'attack': {
+      case 'attack':
+      case 'special': {
+        const isSpecialAction = (action.type || action.action) === 'special';
         console.log('[SCENE][DEBUG] Remote handleRemoteAction attack:', action);
         console.log('[SCENE][DEBUG] Attack from playerIndex:', action.playerIndex, 'isHost:', this.isHost, 'localPlayerIndex:', this.localPlayerIndex);
         if (typeof jest !== 'undefined' && !jest.isMockFunction((this as any).tryAttack)) {
@@ -2005,34 +2091,38 @@ export default class KidsFightScene extends Phaser.Scene {
         }
         const defenderIdx = action.playerIndex === 0 ? 1 : 0;
         const attacker = this.players?.[action.playerIndex];
-        const defender = this.players?.[defenderIdx];
         const timestamp = action.now ?? Date.now();
 
-        // Ensure we're applying animation to the correct player
-        console.log('[SCENE][DEBUG] Applying attack animation to player at index:', action.playerIndex);
-        if (attacker) {
-          console.log('[SCENE][DEBUG] Attacker exists, texture:', attacker.texture?.key || 'unknown');
+        if (typeof action.defenderHealth === 'number') {
+          // Authoritative result from the fighter who threw the attack.
+          this.playerHealth[defenderIdx] = Math.max(0, action.defenderHealth);
+          const defender = this.players?.[defenderIdx];
+          if (defender) defender.health = this.playerHealth[defenderIdx];
+          this.updateHealthBar?.(defenderIdx);
+          if (typeof action.specialPips === 'number') {
+            if (!this.playerSpecial) this.playerSpecial = [0, 0];
+            this.playerSpecial[action.playerIndex] = action.specialPips;
+            this.updateSpecialPips?.();
+          }
+          if (attacker) {
+            attacker.setData?.('isAttacking', true);
+            attacker.isAttacking = true;
+            if (isSpecialAction) {
+              attacker.setData?.('isSpecialAttacking', true);
+              attacker.isSpecialAttacking = true;
+            }
+          }
+        } else {
+          // Legacy messages and unit tests: apply the swing once.
+          this.tryAttack(action.playerIndex, defenderIdx, timestamp, isSpecialAction);
         }
-
-        // Apply the remote attack exactly once. Calling tryAttack more than
-        // once here double-applies damage on the receiving client and desyncs
-        // health between host and guest.
-        this.tryAttack(action.playerIndex, defenderIdx, timestamp, false);
-        break;
-      }
-      case 'special': {
-        if (typeof jest !== 'undefined' && !jest.isMockFunction((this as any).tryAttack)) {
-          jest.spyOn(this as any, 'tryAttack');
-        }
-        const defenderIdx = action.playerIndex === 0 ? 1 : 0;
-        const attacker = this.players?.[action.playerIndex];
-        const defender = this.players?.[defenderIdx];
-        const timestamp = action.now ?? Date.now();
-        // Apply the remote special exactly once (see attack case above).
-        this.tryAttack(action.playerIndex, defenderIdx, timestamp, true);
         break;
       }
       case 'position_update': {
+        // Never let a peer (or our own echoed packet) move the local fighter.
+        if (this.gameMode === 'online' && typeof this.localPlayerIndex === 'number' && action.playerIndex === this.localPlayerIndex) {
+          break;
+        }
         console.log('[SCENE][DEBUG] Received position_update', action);
         if (typeof player.setPosition === 'function') {
           player.setPosition(action.x, action.y);
@@ -2243,15 +2333,8 @@ export default class KidsFightScene extends Phaser.Scene {
           selected: this.selected
         });
         if (success) {
-          this.hideReplayPopup();
-          // Restart the scene with the current configuration
-          this.scene.restart({
-            gameMode: this.gameMode,
-            isHost: this.isHost,
-            roomCode: this.roomCode,
-            selectedScenario: this.selectedScenario,
-            selected: this.selected
-          });
+          // game_restart (and a duplicate replay_response) share one restart.
+          this.restartForRematch();
         } else {
           console.error('[KidsFightScene] Failed to send rematch response');
         }
@@ -2523,6 +2606,15 @@ export default class KidsFightScene extends Phaser.Scene {
       }
     }
 
+    // Pose packets other than walking. Walking is sent from the walk cycle
+    // so a moving remote sprite is not republished as the local fighter.
+    if (this.gameMode === 'online' && typeof this.localPlayerIndex === 'number') {
+      const local = this.players?.[this.localPlayerIndex];
+      if (local && this.currentPose(local, this.localPlayerIndex).animation !== 'walking') {
+        this.broadcastPosition(this.localPlayerIndex);
+      }
+    }
+
     // Now that movement/frame logic done, evaluate win conditions (after external stubs may be in place)
     if (!this.gameOver && typeof this.checkWinner === 'function') {
       this.checkWinner();
@@ -2540,64 +2632,67 @@ export default class KidsFightScene extends Phaser.Scene {
     // Skip if game is over or fight ended
     if (this.gameOver || (this as any)._gameOver || this.fightEnded) return;
 
-    // Get local player index using consistent method
+    // Facing (flipX) is owned by the auto-face logic in update().
+    if (this.isCouchMatch()) {
+      this.applyHorizontalMove(0, !!(this.cursors?.left?.isDown || this.touchButtons?.left?.isDown), !!(this.cursors?.right?.isDown || this.touchButtons?.right?.isDown));
+      this.applyHorizontalMove(1, !!(this.keyA?.isDown || this.touchButtons?.p2left?.isDown), !!(this.keyD?.isDown || this.touchButtons?.p2right?.isDown));
+      return;
+    }
+
     const idx = this.getPlayerIndex();
+    const leftDown = !!(this.cursors?.left?.isDown || this.touchButtons?.left?.isDown || this.keyA?.isDown);
+    const rightDown = !!(this.cursors?.right?.isDown || this.touchButtons?.right?.isDown || this.keyD?.isDown);
+    this.applyHorizontalMove(idx, leftDown, rightDown);
+  }
+
+  private applyHorizontalMove(idx: number, leftDown: boolean, rightDown: boolean): void {
     const player = this.players?.[idx];
     if (!player) return;
-
-    // Handle both keyboard and touch button input for movement
-    const leftDown = this.cursors?.left?.isDown || this.touchButtons?.left?.isDown;
-    const rightDown = this.cursors?.right?.isDown || this.touchButtons?.right?.isDown;
-    let direction = 0;
-    // Note: facing (flipX) is owned by the auto-face logic in update(), which
-    // makes both players face each other every frame. Setting flipX from the
-    // movement direction here would be immediately overwritten locally and
-    // would send a contradictory flip in the online position_update below, so
-    // we intentionally don't touch flipX for movement.
     if (leftDown) {
       player.setVelocityX?.(-160);
-      direction = -1;
       this.updateWalkingAnimation(player);
     } else if (rightDown) {
       player.setVelocityX?.(160);
-      direction = 1;
       this.updateWalkingAnimation(player);
     } else {
       player.setVelocityX?.(0);
-      direction = 0;
-      // Stop walking animation and return to idle frame
       this.stopWalkingAnimation(player);
     }
-    // Send position update in online mode
-    if (this.gameMode === 'online' && this.wsManager?.send) {
-      // Determine player index
-      let idx = this.getPlayerIndex ? this.getPlayerIndex() : 0;
-      // If player object has playerIndex, prefer that
-      if (typeof player.playerIndex === 'number') idx = player.playerIndex;
-      const vx = player.body?.velocity?.x ?? 0;
-      const vy = player.body?.velocity?.y ?? 0;
-      // Initialize walkAnimData if it doesn't exist
-      if (!player.walkAnimData) {
-        player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
-      }
+  }
 
-      const flipX = !!player.flipX;
-      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
-      // Create a custom cause that includes the animation state
-      const cause = JSON.stringify({ animation: 'walking' });
-      // Send position update with animation state directly in the message
-      this.wsManager.send({
-        type: 'position_update',
-        playerIndex: idx,
-        x: player.x,
-        y: player.y,
-        velocityX: vx,
-        velocityY: vy,
-        flipX,
-        frame: player.walkAnimData.currentFrame,
-        animation: 'walking'  // Send animation state directly
-      });
+  private currentPose(player: any, idx: number): { animation: string; frame: number } {
+    if (player?.getData?.('isSpecialAttacking') || player?.isSpecialAttacking) {
+      return { animation: 'special_attacking', frame: 6 };
     }
+    if (player?.getData?.('isAttacking') || player?.isAttacking) {
+      return { animation: 'attacking', frame: 4 };
+    }
+    if (player?.getData?.('isBlocking') || this.playerBlocking?.[idx]) {
+      return { animation: 'blocking', frame: 5 };
+    }
+    const vx = player?.body?.velocity?.x ?? 0;
+    if (vx !== 0) {
+      return { animation: 'walking', frame: player.walkAnimData?.currentFrame ?? 1 };
+    }
+    return { animation: 'idle', frame: 0 };
+  }
+
+  private broadcastPosition(idx: number): void {
+    if (this.gameMode !== 'online' || idx !== this.localPlayerIndex || !this.wsManager?.send) return;
+    const player = this.players?.[idx];
+    if (!player || typeof player.x !== 'number') return;
+    const pose = this.currentPose(player, idx);
+    this.wsManager.send({
+      type: 'position_update',
+      playerIndex: idx,
+      x: player.x,
+      y: player.y,
+      velocityX: player.body?.velocity?.x ?? 0,
+      velocityY: player.body?.velocity?.y ?? 0,
+      flipX: !!player.flipX,
+      frame: pose.frame,
+      animation: pose.animation
+    });
   }
 
   /**
@@ -2612,35 +2707,52 @@ export default class KidsFightScene extends Phaser.Scene {
   public handleKeyboardActions(): void {
     if (this.gameOver || (this as any)._gameOver || this.fightEnded) return;
 
-    const attackDown = !!(this.attackKey?.isDown || this.keySpace?.isDown);
-    const specialDown = !!this.keyQ?.isDown;
-    const jumpDown = !!(this.cursors?.up?.isDown || this.keyW?.isDown);
-    const blockDown = !!(this.blockKey?.isDown || this.keyShift?.isDown);
-
-    // Edge-triggered actions
-    if (attackDown && !this._prevAttackDown) this.handleAttack();
-    if (specialDown && !this._prevSpecialDown) this.handleSpecial();
-    if (jumpDown && !this._prevJumpDown) this.handleJumpDown();
-
-    // Block is held: engage on press, release on key-up
-    if (blockDown && !this._prevBlockDown) {
-      this.handleBlock();
-    } else if (!blockDown && this._prevBlockDown) {
-      const idx = this.getPlayerIndex();
-      const player = this.players?.[idx];
-      if (player) {
-        player.setData?.('isBlocking', false);
-        this.playerBlocking[idx] = false;
-      }
-      if (this.gameMode === 'online' && this.wsManager?.send) {
-        this.wsManager.send({ type: 'block', playerIndex: idx, active: false });
-      }
+    if (this.isCouchMatch()) {
+      this.pollFighterKeys(0,
+        !!(this.attackKey?.isDown || this.keySpace?.isDown),
+        !!this.keyQ?.isDown,
+        !!this.cursors?.up?.isDown,
+        !!(this.blockKey?.isDown || this.keyShift?.isDown));
+      this.pollFighterKeys(1,
+        !!this.keyS?.isDown,
+        !!this.keyE?.isDown,
+        !!this.keyW?.isDown,
+        !!this.keyEnter?.isDown);
+      return;
     }
 
-    this._prevAttackDown = attackDown;
-    this._prevSpecialDown = specialDown;
-    this._prevJumpDown = jumpDown;
-    this._prevBlockDown = blockDown;
+    const idx = this.getPlayerIndex();
+    this.pollFighterKeys(idx,
+      !!(this.attackKey?.isDown || this.keySpace?.isDown),
+      !!this.keyQ?.isDown,
+      !!(this.cursors?.up?.isDown || this.keyW?.isDown),
+      !!(this.blockKey?.isDown || this.keyShift?.isDown));
+  }
+
+  private pollFighterKeys(idx: number, attackDown: boolean, specialDown: boolean, jumpDown: boolean, blockDown: boolean): void {
+    const second = this.isCouchMatch() && idx === 1;
+    const prevAttack = second ? this._prevAttackDown2 : this._prevAttackDown;
+    const prevSpecial = second ? this._prevSpecialDown2 : this._prevSpecialDown;
+    const prevJump = second ? this._prevJumpDown2 : this._prevJumpDown;
+    const prevBlock = second ? this._prevBlockDown2 : this._prevBlockDown;
+
+    if (attackDown && !prevAttack) this.handleAttack(idx);
+    if (specialDown && !prevSpecial) this.handleSpecial(idx);
+    if (jumpDown && !prevJump) this.handleJumpDown(idx);
+    if (blockDown && !prevBlock) this.handleBlock(idx);
+    else if (!blockDown && prevBlock) this.releaseBlock(idx);
+
+    if (second) {
+      this._prevAttackDown2 = attackDown;
+      this._prevSpecialDown2 = specialDown;
+      this._prevJumpDown2 = jumpDown;
+      this._prevBlockDown2 = blockDown;
+    } else {
+      this._prevAttackDown = attackDown;
+      this._prevSpecialDown = specialDown;
+      this._prevJumpDown = jumpDown;
+      this._prevBlockDown = blockDown;
+    }
   }
 
   /**
@@ -2664,8 +2776,13 @@ export default class KidsFightScene extends Phaser.Scene {
     // animation priority: attack > special > block
     if (isAttack) {
       this.setSafeFrame(player, 4);
-      if (this.time?.delayedCall) {
-        this.time.delayedCall(800, () => {  // Increased from 200ms to 800ms for better visibility
+      // One timer per swing. Scheduling a new one every frame cleared the
+      // next attack early and piled up callbacks.
+      if (!(player as any)._attackClearPending && this.time?.delayedCall) {
+        (player as any)._attackClearPending = true;
+        this.time.delayedCall(800, () => {
+          (player as any)._attackClearPending = false;
+          if (player.getData?.('isSpecialAttacking') || player.isSpecialAttacking) return;
           this.setSafeFrame(player, 0);
           player.setData?.('isAttacking', false);
           player.isAttacking = false;
@@ -2677,6 +2794,18 @@ export default class KidsFightScene extends Phaser.Scene {
     }
     if (isSpecial) {
       this.setSafeFrame(player, 6);
+      if (!(player as any)._specialClearPending) {
+        (player as any)._specialClearPending = true;
+        const clearSpecial = () => {
+          (player as any)._specialClearPending = false;
+          player.setData?.('isSpecialAttacking', false);
+          player.setData?.('isAttacking', false);
+          player.isSpecialAttacking = false;
+          player.isAttacking = false;
+        };
+        if (this.time?.delayedCall) this.time.delayedCall(800, clearSpecial);
+        else if (typeof setTimeout === 'function') setTimeout(clearSpecial, 800);
+      }
       player.y = origY;
       return;
     }
@@ -2760,36 +2889,23 @@ export default class KidsFightScene extends Phaser.Scene {
       player.walkAnimData.frameTime = now; // Reset frame time to prevent immediate cycling
     }
 
-    // Set the current frame
     this.setSafeFrame(player, player.walkAnimData.currentFrame);
 
-    // Send updated walk frame in online mode for local player
-    if (this.gameMode === 'online' && this.wsManager?.send) {
-      // Determine player index
-      let idx = this.getPlayerIndex ? this.getPlayerIndex() : 0;
-      // If player object has playerIndex, prefer that
-      if (typeof player.playerIndex === 'number') idx = player.playerIndex;
-      const vx = player.body?.velocity?.x ?? 0;
-      const vy = player.body?.velocity?.y ?? 0;
-      // Initialize walkAnimData if it doesn't exist
-      if (!player.walkAnimData) {
-        player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
-      }
-      const flipX = !!player.flipX;
-      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
-      // Create a custom cause that includes the animation state
-      const cause = JSON.stringify({ animation: 'walking' });
-      // Send position update with animation state directly in the message
+    // Only the sprite this client controls may publish its walk frame.
+    const idx = typeof player.playerIndex === 'number'
+      ? player.playerIndex
+      : (this.players?.indexOf(player) ?? -1);
+    if (this.gameMode === 'online' && this.ownsFighter(idx) && idx >= 0 && this.wsManager?.send) {
       this.wsManager.send({
         type: 'position_update',
         playerIndex: idx,
         x: player.x,
         y: player.y,
-        velocityX: vx,
-        velocityY: vy,
-        flipX,
+        velocityX: player.body?.velocity?.x ?? 0,
+        velocityY: player.body?.velocity?.y ?? 0,
+        flipX: !!player.flipX,
         frame: player.walkAnimData.currentFrame,
-        animation: 'walking'  // Send animation state directly
+        animation: 'walking'
       });
     }
   }
@@ -2831,36 +2947,9 @@ export default class KidsFightScene extends Phaser.Scene {
       this.sharedWalkAnimData.frameTime = now;
     }
 
-    // Set the current shared frame
+    // Set the current shared frame. Do not transmit this sprite: shared
+    // walking runs for the remote fighter, and sending it used the local index.
     this.setSafeFrame(player, this.sharedWalkAnimData.currentFrame);
-
-    // Send updated walk frame in online mode for local player
-    if (this.gameMode === 'online' && this.wsManager?.send) {
-      // Determine player index
-      let idx = this.getPlayerIndex ? this.getPlayerIndex() : 0;
-      // If player object has playerIndex, prefer that
-      if (typeof player.playerIndex === 'number') idx = player.playerIndex;
-      const vx = player.body?.velocity?.x ?? 0;
-      const vy = player.body?.velocity?.y ?? 0;
-      // Initialize walkAnimData if it doesn't exist
-      if (!player.walkAnimData) {
-        player.walkAnimData = { frameTime: 0, currentFrame: 1, frameDelay: 200 };
-      }
-      const flipX = !!player.flipX;
-      console.log(`[WALK SYNC] Sending frame update: player=${idx}, frame=${player.walkAnimData.currentFrame}`);
-      // Send position update with animation state directly in the message
-      this.wsManager.send({
-        type: 'position_update',
-        playerIndex: idx,
-        x: player.x,
-        y: player.y,
-        velocityX: vx,
-        velocityY: vy,
-        flipX,
-        frame: player.walkAnimData.currentFrame,
-        animation: 'walking'  // Send animation state directly
-      });
-    }
   }
 
   /**
@@ -2917,107 +3006,64 @@ export default class KidsFightScene extends Phaser.Scene {
     }
   }
 
-  /** Jump button / ↑ press */
-  public handleJumpDown(): void {
+  /** Jump button / ↑ press. Sends the jump only when the fighter actually leaves the ground. */
+  public handleJumpDown(playerIndex?: number): void {
     if (this.gameOver || this.fightEnded) return;
-    const idx = this.getPlayerIndex();
+    const idx = playerIndex ?? this.getPlayerIndex();
     const player = this.players?.[idx];
-    if (player && player.body && player.body.touching.down) {
+    const grounded = !!(player && player.body && player.body.touching?.down);
+    if (grounded) {
       player.setVelocityY?.(-330);
     }
-    if (this.gameMode === 'online' && this.wsManager?.send) {
+    if (grounded && this.ownsFighter(idx) && this.gameMode === 'online' && this.wsManager?.send) {
       this.wsManager.send({ type: 'jump', playerIndex: idx });
     }
   }
 
-  /** Normal attack */
-  public handleAttack(): void {
+  /** Normal attack. tryAction is the only sender of the attack message. */
+  public handleAttack(playerIndex?: number): void {
     if (this.gameOver || this.fightEnded) return;
-    const idx = this.getPlayerIndex();
-    const player = this.players?.[idx];
+    const idx = playerIndex ?? this.getPlayerIndex();
     this.tryAction?.(idx, 'attack', false);
-    if (this.gameMode === 'online' && this.wsManager?.send) {
-      this.wsManager.send({ type: 'attack', playerIndex: idx });
-      
-      // Send position update with attacking animation state
-      if (player) {
-        const vx = player.body?.velocity?.x ?? 0;
-        const vy = player.body?.velocity?.y ?? 0;
-        const flipX = player.flipX;
-        this.wsManager.send({
-          type: 'position_update',
-          playerIndex: idx,
-          x: player.x,
-          y: player.y,
-          velocityX: vx,
-          velocityY: vy,
-          flipX,
-          frame: 4,  // Attack frame
-          animation: 'attacking'
-        });
-      }
-    }
   }
 
   /** Block action */
-  public handleBlock(): void {
+  public handleBlock(playerIndex?: number): void {
     if (this.gameOver || this.fightEnded) return;
-    const idx = this.getPlayerIndex();
+    const idx = playerIndex ?? this.getPlayerIndex();
     const player = this.players?.[idx];
     if (player) {
       player.setData('isBlocking', true);
       this.playerBlocking[idx] = true;
     }
-    if (this.gameMode === 'online' && this.wsManager?.send) {
+    if (this.ownsFighter(idx) && this.gameMode === 'online' && this.wsManager?.send) {
       this.wsManager.send({ type: 'block', playerIndex: idx, active: true });
-
-      // Send position update with blocking animation state
-      if (player) {
-        const vx = player.body?.velocity?.x ?? 0;
-        const vy = player.body?.velocity?.y ?? 0;
-        const flipX = player.flipX;
-        this.wsManager.send({
-          type: 'position_update',
-          playerIndex: idx,
-          x: player.x,
-          y: player.y,
-          velocityX: vx,
-          velocityY: vy,
-          flipX,
-          frame: 5,  // Block frame
-          animation: 'blocking'
-        });
-      }
     }
   }
 
-  /** Special attack (costs pips) */
-  public handleSpecial(): void {
-    if (this.gameOver || this.fightEnded) return;
-    const idx = this.getPlayerIndex();
+  /** True when this client is allowed to speak for that fighter. */
+  private ownsFighter(idx: number): boolean {
+    if (this.gameMode !== 'online') return true;
+    if (typeof this.localPlayerIndex !== 'number') return true;
+    return idx === this.localPlayerIndex;
+  }
+
+  private releaseBlock(idx: number): void {
     const player = this.players?.[idx];
-    this.tryAction?.(idx, 'special', true);
-    if (this.gameMode === 'online' && this.wsManager?.send) {
-      this.wsManager.send({ type: 'special', playerIndex: idx });
-      
-      // Send position update with special attacking animation state
-      if (player) {
-        const vx = player.body?.velocity?.x ?? 0;
-        const vy = player.body?.velocity?.y ?? 0;
-        const flipX = player.flipX;
-        this.wsManager.send({
-          type: 'position_update',
-          playerIndex: idx,
-          x: player.x,
-          y: player.y,
-          velocityX: vx,
-          velocityY: vy,
-          flipX,
-          frame: 6,  // Special attack frame
-          animation: 'special_attacking'
-        });
-      }
+    if (player) {
+      player.setData?.('isBlocking', false);
+      this.playerBlocking[idx] = false;
     }
+    if (this.ownsFighter(idx) && this.gameMode === 'online' && this.wsManager?.send) {
+      this.wsManager.send({ type: 'block', playerIndex: idx, active: false });
+    }
+  }
+
+  /** Special attack (costs pips). tryAction is the only sender of the special message. */
+  public handleSpecial(playerIndex?: number): void {
+    if (this.gameOver || this.fightEnded) return;
+    const idx = playerIndex ?? this.getPlayerIndex();
+    this.tryAction?.(idx, 'special', true);
   }
 
   /** Move left press */
@@ -3323,8 +3369,40 @@ export default class KidsFightScene extends Phaser.Scene {
   /**
    * Handle game over visuals and state. Restored with working rematch (Jogar novamente) logic.
    */
+  private restartForRematch(): void {
+    if (this._rematchRestarting) return;
+    this._rematchRestarting = true;
+    this.hideReplayPopup();
+    this.scene?.restart?.({
+      gameMode: this.gameMode,
+      isHost: this.isHost,
+      roomCode: this.roomCode,
+      selectedScenario: this.selectedScenario,
+      selected: this.selected
+    });
+  }
+
+  private showDisconnectNotice(): void {
+    if (this._disconnectNotice || !this.add?.text || !this.cameras?.main) return;
+    this._disconnectNotice = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      'Oponente desconectou',
+      { fontSize: '28px', color: '#ffffff', backgroundColor: '#000000' }
+    ).setOrigin(0.5).setDepth(6000);
+  }
+
+  private hideDisconnectNotice(): void {
+    this._disconnectNotice?.destroy?.();
+    this._disconnectNotice = undefined;
+  }
+
   public endGame(winnerIndex: number, message: string): void {
     if (this.gameOver || (this as any)._gameOver) return;
+    // The host decides the winner. A guest that ends from its own health or
+    // timer ignores the host's later game_over, because handleRemoteAction
+    // drops messages once gameOver is set.
+    if (this.isOnlineGuest() && !this._applyingRemoteGameOver) return;
     this.gameOver = true;
     this.fightEnded = true;
     this.winnerIndex = winnerIndex;

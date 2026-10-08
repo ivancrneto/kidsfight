@@ -110,19 +110,22 @@ class GameModeScene extends Phaser.Scene {
 
     // Button click handlers
     this.localButton.on('pointerdown', () => {
-      this.scene.start('PlayerSelectScene', { mode: 'local' });
+      this.scene.start('PlayerSelectScene', { mode: 'local', fromGameMode: true });
     });
 
     this.onlineButton.on('pointerdown', () => {
       this.scene.start('OnlineModeScene');
     });
 
-    this.backButton.on('pointerdown', () => {
-      this.scene.start('TitleScene');
-    });
+    // This menu is the root. There is no TitleScene to return to.
+    this.backButton.setVisible(false);
+    this.backButton.disableInteractive();
 
     // Responsive layout update on resize
     this.scale.on('resize', this.updateLayout, this);
+    this.events.on('shutdown', () => {
+      this.scale.off('resize', this.updateLayout, this);
+    });
   }
 
   private updateLayout(gameSize: Phaser.Structs.Size): void {

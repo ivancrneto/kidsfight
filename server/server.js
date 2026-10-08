@@ -25,6 +25,21 @@ function shouldStartGame(room) {
   );
 }
 
+function generateRoomCode() {
+  if (process.env.NODE_ENV === 'development' && !gameRooms.has('111111')) {
+    return '111111';
+  }
+  for (let i = 0; i < 20; i++) {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    if (!gameRooms.has(code)) return code;
+  }
+  return Date.now().toString().slice(-6);
+}
+
+function socketOpen(sock) {
+  return sock && sock.readyState === WebSocket.OPEN;
+}
+
 function startGame(room, roomCode) {
   if (room.host) {
     room.host.send(JSON.stringify({
@@ -62,14 +77,8 @@ server.on('connection', (ws) => {
 
       switch (data.type) {
         case 'create_room':
-          // Generate a unique room code
-          if (process.env.NODE_ENV === 'development') {
-            // Use fixed code only in development for easier testing
-            roomCode = '111111';
-          } else {
-            // Generate a random 6-digit code as string for production and typical development
-            roomCode = Math.floor(100000 + Math.random() * 900000).toString();
-          }
+          // Never replace a room that still has a connected player.
+          roomCode = generateRoomCode();
 
           // Create new room with default characters
           gameRooms.set(roomCode, {
@@ -93,7 +102,7 @@ server.on('connection', (ws) => {
             return;
           }
           
-          if (room.client) {
+          if (socketOpen(room.client)) {
             ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
             return;
           }
@@ -104,10 +113,12 @@ server.on('connection', (ws) => {
           isHost = false;
 
           // Notify both players
-          room.host.send(JSON.stringify({ 
-            type: 'player_joined',
-            roomCode: roomCode
-          }));
+          if (socketOpen(room.host)) {
+            room.host.send(JSON.stringify({
+              type: 'player_joined',
+              roomCode: roomCode
+            }));
+          }
           
           ws.send(JSON.stringify({ 
             type: 'game_joined',
@@ -119,10 +130,49 @@ server.on('connection', (ws) => {
           console.log(`Player joined room: ${roomCode}`);
           break;
 
+        case 'rejoin_room': {
+          const rejoin = gameRooms.get(data.roomCode);
+          if (!rejoin) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Room not found' }));
+            return;
+          }
+          const wantHost = !!data.isHost;
+          if (wantHost) {
+            if (socketOpen(rejoin.host) && rejoin.host !== ws) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+              return;
+            }
+            rejoin.host = ws;
+            isHost = true;
+          } else {
+            if (socketOpen(rejoin.client) && rejoin.client !== ws) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+              return;
+            }
+            rejoin.client = ws;
+            isHost = false;
+          }
+          roomCode = data.roomCode;
+          ws.send(JSON.stringify({
+            type: 'room_rejoined',
+            roomCode,
+            isHost,
+            playerIndex: isHost ? 0 : 1
+          }));
+          const other = isHost ? rejoin.client : rejoin.host;
+          if (socketOpen(other)) {
+            other.send(JSON.stringify({ type: 'player_rejoined', roomCode }));
+          }
+          break;
+        }
+
         case 'player_selected':
         case 'playerSelected': {
           const selRoom = gameRooms.get(roomCode);
           if (!selRoom) return;
+          // Host owns p1, guest owns p2. Either side used to overwrite the other.
+          if (isHost && data.player !== 'p1') return;
+          if (!isHost && data.player !== 'p2') return;
           // Update character selection in gameState
           if (data.player === 'p1' || data.player === 'p2') {
             selRoom.gameState[data.player] = selRoom.gameState[data.player] || {};
@@ -177,6 +227,7 @@ server.on('connection', (ws) => {
           break;
         }
         case 'scenario_selected':
+          if (!isHost) return;
           const scRoom = gameRooms.get(roomCode);
           if (!scRoom) return;
           // Store scenario in game state
@@ -332,11 +383,22 @@ server.on('connection', (ws) => {
 
           // List of system message types to NOT relay
           const systemTypes = [
-            'create_room', 'join_room', 'player_joined', 'game_joined',
+            'create_room', 'join_room', 'rejoin_room', 'player_joined', 'game_joined',
             'player_selected', 'playerSelected', 'player_ready', 'scenario_selected',
-            'game_start', 'game_action'
+            'game_start', 'game_action', 'room_rejoined'
           ];
           if (!systemTypes.includes(data.type)) {
+            const senderIndex = isHost ? 0 : 1;
+            const opponentIndex = isHost ? 1 : 0;
+            // The host is the only one who may end the match.
+            if (data.type === 'game_over' && !isHost) return;
+            // Movement and attacks always belong to the socket that sent them.
+            if (['attack', 'special', 'block', 'jump', 'move', 'position_update'].includes(data.type)) {
+              data.playerIndex = senderIndex;
+            }
+            // Health reports describe the opponent, not the sender's own bar.
+            if (data.type === 'health_update' && data.playerIndex !== opponentIndex) return;
+
             const relayTarget = isHost ? relayRoom.client : relayRoom.host;
             if (relayTarget) {
               relayTarget.send(JSON.stringify(data));
@@ -353,22 +415,22 @@ server.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('Client disconnected');
-    
-    // Clean up the room if either player disconnects
-    if (roomCode) {
-      const room = gameRooms.get(roomCode);
-      if (room) {
-        // Notify the other player
-        const otherPlayer = isHost ? room.client : room.host;
-        if (otherPlayer) {
-          otherPlayer.send(JSON.stringify({ 
-            type: 'player_disconnected'
-          }));
-        }
-        
-        // Remove the room
-        gameRooms.delete(roomCode);
-      }
+
+    if (!roomCode) return;
+    const room = gameRooms.get(roomCode);
+    if (!room) return;
+
+    // Drop only this socket so the other player can wait for a rejoin.
+    if (isHost && room.host === ws) room.host = null;
+    if (!isHost && room.client === ws) room.client = null;
+
+    const otherPlayer = isHost ? room.client : room.host;
+    if (socketOpen(otherPlayer)) {
+      otherPlayer.send(JSON.stringify({ type: 'player_disconnected' }));
+    }
+
+    if (!socketOpen(room.host) && !socketOpen(room.client)) {
+      gameRooms.delete(roomCode);
     }
   });
 });

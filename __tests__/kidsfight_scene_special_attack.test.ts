@@ -159,10 +159,10 @@ describe('KidsFightScene - Special Attack', () => {
       scene['handleSpecial']();
 
       // Assert
-      expect(mockWsManager.send).toHaveBeenCalledWith({
+      expect(mockWsManager.send).toHaveBeenCalledWith(expect.objectContaining({
         type: 'special',
         playerIndex: 0
-      });
+      }));
     });
   });
 
