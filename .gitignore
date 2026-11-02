@@ -15,3 +15,4 @@ temp_main_fix.js
 test-results.json
 .parcel-cache/
 coverage/
+AGENTS.local.md
